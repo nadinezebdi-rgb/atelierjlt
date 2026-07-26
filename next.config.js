@@ -1,5 +1,11 @@
 const nextConfig = {
   output: 'standalone',
+  // Include product images in the standalone build (they live outside /public because
+  // Next standalone does NOT copy /public and Emergent's deploy pipeline follows that).
+  // Also expose /public/products so both `/api/img/*` and `/products/*` work.
+  outputFileTracingIncludes: {
+    '/**': ['./lib/product-images/**/*', './public/products/**/*'],
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

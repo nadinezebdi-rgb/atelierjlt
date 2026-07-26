@@ -6,7 +6,7 @@ import { IMAGES } from '@/lib/data/products'
 
 const photos = [
   '/api/img/deco-02',
-  '/api/img/pull-02',
+  '/api/img/lifestyle-plaid',
   '/api/img/bougie-03',
   '/api/img/plaid-01',
   '/api/img/bijou-02',

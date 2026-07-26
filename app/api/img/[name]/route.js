@@ -1,26 +1,52 @@
-import { IMAGE_B64, IMAGE_MIME } from '@/lib/data/image-blobs'
+import fs from 'node:fs'
+import path from 'node:path'
 
-export async function GET(request, { params }) {
-  const p = await params
-  const raw = decodeURIComponent(p.name || '')
-  // Accept both "bijou-01" and "bijou-01.jpeg"
+// Images are stored in /app/lib/product-images/ (mirrored from /public/products) and
+// explicitly included in the Next standalone build via outputFileTracingIncludes.
+// This is a lightweight disk-based serving route (no huge JS blob in memory).
+
+const IMG_DIR = path.join(process.cwd(), 'lib', 'product-images')
+const FALLBACK_DIR = path.join(process.cwd(), 'public', 'products')
+
+const EXTENSIONS = ['jpeg', 'jpg', 'webp', 'png']
+
+function mimeFor(ext) {
+  const e = ext.toLowerCase()
+  if (e === 'jpg' || e === 'jpeg') return 'image/jpeg'
+  if (e === 'webp') return 'image/webp'
+  if (e === 'png') return 'image/png'
+  return 'application/octet-stream'
+}
+
+function resolveImage(nameArg) {
+  const raw = decodeURIComponent(nameArg || '')
+  // strip extension if present
   const key = raw.replace(/\.(jpe?g|webp|png)$/i, '')
-
-  const b64 = IMAGE_B64[key]
-  const mime = IMAGE_MIME[key]
-
-  if (!b64) {
-    return new Response('Not found', { status: 404 })
+  for (const dir of [IMG_DIR, FALLBACK_DIR]) {
+    for (const ext of EXTENSIONS) {
+      const p = path.join(dir, `${key}.${ext}`)
+      if (fs.existsSync(p)) return { path: p, ext }
+    }
   }
+  return null
+}
 
-  const buffer = Buffer.from(b64, 'base64')
-
-  return new Response(buffer, {
-    status: 200,
-    headers: {
-      'Content-Type': mime || 'application/octet-stream',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'Content-Length': String(buffer.length),
-    },
-  })
+export async function GET(_request, { params }) {
+  const p = await params
+  const found = resolveImage(p.name)
+  if (!found) return new Response('Not found', { status: 404 })
+  try {
+    const buffer = fs.readFileSync(found.path)
+    return new Response(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': mimeFor(found.ext),
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Length': String(buffer.length),
+      },
+    })
+  } catch (err) {
+    console.error('img read error', err)
+    return new Response('Server error', { status: 500 })
+  }
 }
