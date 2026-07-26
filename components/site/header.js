@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu, Search, Heart, User, ShoppingBag, X } from 'lucide-react'
 import { useCart } from './cart-provider'
+import { useAuth } from './auth-provider'
 import { cn } from '@/lib/utils'
 
 const nav = [
@@ -24,6 +25,7 @@ export default function Header({ transparent = false }) {
   const [scrolled, setScrolled] = useState(false)
   const [mobile, setMobile] = useState(false)
   const { count, setOpen } = useCart()
+  const { user } = useAuth()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -86,8 +88,9 @@ export default function Header({ transparent = false }) {
             <Link href="/wishlist" className="hidden md:block hover:opacity-60 transition" aria-label="Favoris">
               <Heart className="h-[18px] w-[18px]" strokeWidth={1.5} />
             </Link>
-            <Link href="/compte" className="hidden md:block hover:opacity-60 transition" aria-label="Mon compte">
+            <Link href="/compte" className="hidden md:flex items-center gap-1.5 hover:opacity-60 transition" aria-label="Mon compte">
               <User className="h-[18px] w-[18px]" strokeWidth={1.5} />
+              {user && <span className="text-[11px] uppercase tracking-[0.22em] max-w-[100px] truncate">{(user.name || user.email.split('@')[0])}</span>}
             </Link>
             <button
               onClick={() => setOpen(true)}
