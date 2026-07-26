@@ -7,6 +7,7 @@ import WhyGinette from '@/components/home/why-ginette'
 import BestSellers from '@/components/home/best-sellers'
 import Atelier from '@/components/home/atelier'
 import Lifestyle from '@/components/home/lifestyle'
+import ChezGinette from '@/components/home/chez-ginette'
 import CollectionsShowcase from '@/components/home/collections-showcase'
 import InstagramGrid from '@/components/home/instagram-grid'
 import Newsletter from '@/components/home/newsletter'
@@ -22,6 +23,7 @@ function App() {
         <BestSellers />
         <Atelier />
         <Lifestyle />
+        <ChezGinette />
         <CollectionsShowcase />
         <InstagramGrid />
         <Newsletter />
