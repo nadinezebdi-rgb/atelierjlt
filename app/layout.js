@@ -17,13 +17,53 @@ const inter = Inter({
 })
 
 export const metadata = {
-  title: 'GINETTE Créations — Maison française de décoration artisanale',
+  metadataBase: new URL('https://atelierginette.fr'),
+  title: {
+    default: 'GINETTE Créations — Maison française de décoration artisanale',
+    template: '%s · GINETTE Créations',
+  },
   description:
-    'Les objets qui donnent une âme à votre intérieur. Chaque création Ginette est imaginée, fabriquée et assemblée à la main en France.',
+    "Les objets qui donnent une âme à votre intérieur. Chaque création Ginette est imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+  applicationName: 'Atelier Ginette',
+  keywords: [
+    'décoration artisanale française',
+    'crochet fait main',
+    'sac crochet',
+    'plaid chunky',
+    'bougies parfumées cristaux',
+    'bijoux artisanaux',
+    'atelier ginette',
+  ],
+  authors: [{ name: 'Atelier Ginette', url: 'https://atelierginette.fr' }],
+  alternates: {
+    canonical: 'https://atelierginette.fr',
+    languages: {
+      'fr-FR': 'https://atelierginette.fr',
+    },
+  },
   openGraph: {
     title: 'GINETTE Créations',
     description: 'Maison française de décoration artisanale.',
+    url: 'https://atelierginette.fr',
+    siteName: 'Atelier Ginette',
+    locale: 'fr_FR',
     type: 'website',
+    images: [
+      {
+        url: '/api/img/lifestyle-plaid',
+        width: 1024,
+        height: 1024,
+        alt: 'Une scène chez Ginette — plaid crochet et coussins',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GINETTE Créations',
+    description: 'Maison française de décoration artisanale.',
+  },
+  icons: {
+    icon: '/favicon.ico',
   },
 }
 

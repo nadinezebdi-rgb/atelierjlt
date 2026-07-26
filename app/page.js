@@ -12,9 +12,38 @@ import CollectionsShowcase from '@/components/home/collections-showcase'
 import InstagramGrid from '@/components/home/instagram-grid'
 import Newsletter from '@/components/home/newsletter'
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Atelier Ginette',
+  alternateName: 'GINETTE Créations',
+  url: 'https://atelierginette.fr',
+  logo: 'https://atelierginette.fr/api/img/logo',
+  description: 'Maison française de décoration artisanale. Sacs crochet, plaids, bougies, bijoux, coussins faits main.',
+  sameAs: [
+    'https://www.instagram.com/ginette.creations/',
+    'https://www.facebook.com/ginette.creations/',
+  ],
+  address: {
+    '@type': 'PostalAddress',
+    addressCountry: 'FR',
+    addressRegion: 'Drôme',
+  },
+  contactPoint: {
+    '@type': 'ContactPoint',
+    contactType: 'customer service',
+    email: 'bonjour@atelierginette.fr',
+    availableLanguage: ['French'],
+  },
+}
+
 function App() {
   return (
     <div className="min-h-screen bg-ivory">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header transparent />
       <main>
         <Hero />

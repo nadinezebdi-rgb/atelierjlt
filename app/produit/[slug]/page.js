@@ -42,6 +42,28 @@ export default function ProductPage() {
   const p = data.product
   const related = data.related || []
 
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: p.name,
+    description: p.story,
+    image: p.images.map((img) => (img.startsWith('http') ? img : `https://atelierginette.fr${img}`)),
+    sku: p.id,
+    brand: { '@type': 'Brand', name: 'GINETTE Créations' },
+    category: p.category,
+    material: p.material,
+    color: p.color,
+    offers: {
+      '@type': 'Offer',
+      url: `https://atelierginette.fr/produit/${p.slug}`,
+      priceCurrency: 'EUR',
+      price: p.price,
+      availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition',
+      seller: { '@type': 'Organization', name: 'Atelier Ginette' },
+    },
+  }
+
   const handleAdd = async () => {
     await add(p.slug, qty)
     toast.success(`${p.name} ajouté au panier`)
@@ -49,6 +71,10 @@ export default function ProductPage() {
 
   return (
     <div className="min-h-screen bg-ivory">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <Header />
       <main className="pt-6">
         {/* Breadcrumb */}
