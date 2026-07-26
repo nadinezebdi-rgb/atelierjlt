@@ -56,7 +56,7 @@ export default function ContactPage() {
           </form>
 
           <div className="space-y-8 md:pl-10 md:border-l border-linen">
-            <InfoRow icon={Mail} title="Bonjour" value="bonjour@atelierginette.fr" />
+            <InfoRow icon={Mail} title="Bonjour" value="contact@atelierginette.fr" />
             <InfoRow icon={MapPin} title="Atelier" value="Vieux mas, La Roche-sur-Grâne — Drôme" />
             <div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-ink/50 mb-3">Suivez-nous</div>

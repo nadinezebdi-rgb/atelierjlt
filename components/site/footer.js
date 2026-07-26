@@ -13,8 +13,8 @@ export default function Footer() {
               Maison française de décoration artisanale.
               Imaginé, fabriqué et assemblé à la main dans notre atelier de la Drôme.
             </p>
-            <a href="mailto:bonjour@atelierginette.fr" className="inline-block mt-4 text-sm text-ivory/80 hover:text-terracotta transition-colors">
-              bonjour@atelierginette.fr
+            <a href="mailto:contact@atelierginette.fr" className="inline-block mt-4 text-sm text-ivory/80 hover:text-terracotta transition-colors">
+              contact@atelierginette.fr
             </a>
             <div className="flex gap-4 mt-6">
               <a href="https://www.instagram.com/ginette.creations/" target="_blank" rel="noopener" aria-label="Instagram" className="hover:opacity-70 transition"><Instagram className="h-4 w-4" strokeWidth={1.5} /></a>

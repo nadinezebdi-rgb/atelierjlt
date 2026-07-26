@@ -32,7 +32,7 @@ const jsonLd = {
   contactPoint: {
     '@type': 'ContactPoint',
     contactType: 'customer service',
-    email: 'bonjour@atelierginette.fr',
+    email: 'contact@atelierginette.fr',
     availableLanguage: ['French'],
   },
 }
