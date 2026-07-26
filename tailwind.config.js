@@ -8,6 +8,14 @@ module.exports = {
     './src/**/*.{js,jsx}',
   ],
   prefix: '',
+  safelist: [
+    // Dynamic accent colors used per-category
+    'bg-brique', 'bg-terracotta', 'bg-sable', 'bg-wood', 'bg-plantes', 'bg-sage',
+    'text-brique', 'text-terracotta', 'text-sable', 'text-wood', 'text-plantes', 'text-sage', 'text-ivory',
+    'border-brique', 'border-terracotta', 'border-sable', 'border-wood', 'border-plantes', 'border-sage',
+    'ring-brique', 'ring-plantes',
+    'hover:bg-brique', 'hover:bg-plantes', 'hover:bg-sable',
+  ],
   theme: {
     container: {
       center: true,

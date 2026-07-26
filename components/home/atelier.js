@@ -42,7 +42,7 @@ export default function Atelier() {
           </div>
           <Link
             href="/atelier"
-            className="group inline-flex items-center gap-3 mt-10 border border-ink text-ink px-8 py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-ink hover:text-ivory transition-colors duration-500"
+            className="group inline-flex items-center gap-3 mt-10 border border-sable text-ink px-8 py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-sable hover:text-ink transition-colors duration-500"
           >
             Entrer dans l'atelier
             <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" strokeWidth={1.5} />

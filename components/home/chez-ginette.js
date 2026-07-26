@@ -39,7 +39,7 @@ export default function ChezGinette() {
   const s = scenes[i]
 
   return (
-    <section className="py-20 md:py-28 bg-ink text-ivory">
+    <section className="py-20 md:py-28 bg-plantes text-ivory">
       <div className="container">
         <div className="flex items-end justify-between mb-10 md:mb-14 gap-4">
           <div>
@@ -62,7 +62,7 @@ export default function ChezGinette() {
             initial={{ opacity: 0, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-            className="md:col-span-8 relative aspect-square md:aspect-[4/3] overflow-hidden bg-ink/40"
+            className="md:col-span-8 relative aspect-square md:aspect-[4/3] overflow-hidden bg-plantes/40"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={s.src} alt={s.label} className="w-full h-full object-cover" />
@@ -92,7 +92,7 @@ export default function ChezGinette() {
                 <button
                   key={sc.src}
                   onClick={() => setI(idx)}
-                  className={`relative flex-1 aspect-square overflow-hidden transition-opacity ${idx === i ? 'ring-2 ring-terracotta ring-offset-4 ring-offset-ink' : 'opacity-60 hover:opacity-100'}`}
+                  className={`relative flex-1 aspect-square overflow-hidden transition-opacity ${idx === i ? 'ring-2 ring-terracotta ring-offset-4 ring-offset-plantes' : 'opacity-60 hover:opacity-100'}`}
                   aria-label={`Voir ${sc.label}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}

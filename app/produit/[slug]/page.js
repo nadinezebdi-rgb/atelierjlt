@@ -100,7 +100,7 @@ export default function ProductPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.images[active]} alt={p.name} className="w-full h-full object-cover" />
               {p.isLimited && (
-                <span className="absolute top-6 left-6 bg-terracotta text-ivory text-[10px] uppercase tracking-[0.22em] px-3 py-1.5">Édition limitée</span>
+                <span className="absolute top-6 left-6 bg-brique text-ivory text-[10px] uppercase tracking-[0.22em] px-3 py-1.5">Édition limitée</span>
               )}
             </motion.div>
             <div className="grid grid-cols-3 gap-3">

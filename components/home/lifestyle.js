@@ -38,7 +38,7 @@ export default function Lifestyle() {
             </Link>
             <Link
               href="/collections?cat=decoration"
-              className="inline-flex items-center gap-3 border border-ink/30 text-ink px-7 py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-ink hover:text-ivory transition-colors duration-500"
+              className="inline-flex items-center gap-3 border border-sable text-ink px-7 py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-sable hover:text-ink transition-colors duration-500"
             >
               Voir les coussins
             </Link>

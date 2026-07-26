@@ -51,7 +51,7 @@ export default function Newsletter() {
           />
           <button
             disabled={loading}
-            className="bg-ink text-ivory px-8 py-3 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition-colors disabled:opacity-70"
+            className="bg-ink text-ivory px-8 py-3 text-[11px] uppercase tracking-[0.28em] hover:bg-plantes transition-colors disabled:opacity-70"
           >
             {loading ? '…' : "S'inscrire"}
           </button>

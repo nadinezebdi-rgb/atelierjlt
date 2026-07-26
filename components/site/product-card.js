@@ -40,7 +40,7 @@ export default function ProductCard({ product, index = 0 }) {
               <span className="bg-ivory/95 text-ink text-[10px] uppercase tracking-[0.22em] px-2.5 py-1">Nouveau</span>
             )}
             {product.isLimited && (
-              <span className="bg-terracotta text-ivory text-[10px] uppercase tracking-[0.22em] px-2.5 py-1">Édition limitée</span>
+              <span className="bg-brique text-ivory text-[10px] uppercase tracking-[0.22em] px-2.5 py-1">Édition limitée</span>
             )}
           </div>
           {/* Wishlist */}
