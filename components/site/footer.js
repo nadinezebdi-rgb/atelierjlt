@@ -7,8 +7,10 @@ export default function Footer() {
       <div className="container">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-8">
           <div className="col-span-2 md:col-span-2 pr-6">
-            <div className="font-display text-3xl font-black leading-none">Ginette</div>
-            <div className="text-[10px] tracking-[0.4em] uppercase mt-2 opacity-70">Créations</div>
+            <div className="mb-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/api/img/logo-small" alt="Atelier Ginette" className="h-14 md:h-16 w-auto object-contain invert brightness-0 [filter:invert(1)]" style={{ filter: 'invert(1)' }} />
+            </div>
             <p className="mt-6 text-sm leading-relaxed text-ivory/70 max-w-sm">
               Maison française de décoration artisanale.
               Imaginé, fabriqué et assemblé à la main dans notre atelier de la Drôme.
@@ -41,7 +43,7 @@ export default function Footer() {
           ]} />
         </div>
         <div className="mt-16 pt-6 border-t border-ivory/10 flex flex-col md:flex-row items-center justify-between gap-3 text-[10px] uppercase tracking-[0.3em] text-ivory/50">
-          <span>© {new Date().getFullYear()} Ginette Créations — Made in France</span>
+          <span>© {new Date().getFullYear()} Atelier Ginette — Made in France</span>
           <span>Paiement sécurisé · Stripe · Apple Pay · PayPal</span>
         </div>
       </div>

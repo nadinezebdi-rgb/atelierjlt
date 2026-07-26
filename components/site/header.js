@@ -74,13 +74,13 @@ export default function Header({ transparent = false }) {
           </div>
 
           {/* Center: logo */}
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center">
-            <span className="font-display text-2xl md:text-[28px] font-black tracking-tight text-ink leading-none">
-              Ginette
-            </span>
-            <span className="text-[9px] md:text-[10px] tracking-[0.4em] uppercase text-ink/70 mt-1">
-              Créations
-            </span>
+          <Link href="/" className="absolute left-1/2 -translate-x-1/2 flex items-center" aria-label="Atelier Ginette — accueil">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/api/img/logo-small"
+              alt="Atelier Ginette"
+              className="h-10 md:h-14 w-auto object-contain"
+            />
           </Link>
 
           {/* Right: icons */}

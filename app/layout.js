@@ -19,8 +19,8 @@ const inter = Inter({
 export const metadata = {
   metadataBase: new URL('https://atelierginette.fr'),
   title: {
-    default: 'GINETTE Créations — Maison française de décoration artisanale',
-    template: '%s · GINETTE Créations',
+    default: 'Atelier Ginette — Maison française de décoration artisanale',
+    template: '%s · Atelier Ginette',
   },
   description:
     "Les objets qui donnent une âme à votre intérieur. Chaque création Ginette est imaginée, fabriquée et assemblée à la main dans notre atelier français.",
@@ -42,7 +42,7 @@ export const metadata = {
     },
   },
   openGraph: {
-    title: 'GINETTE Créations',
+    title: 'Atelier Ginette',
     description: 'Maison française de décoration artisanale.',
     url: 'https://atelierginette.fr',
     siteName: 'Atelier Ginette',
@@ -59,7 +59,7 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GINETTE Créations',
+    title: 'Atelier Ginette',
     description: 'Maison française de décoration artisanale.',
   },
   icons: {

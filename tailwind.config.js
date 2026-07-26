@@ -58,10 +58,13 @@ module.exports = {
         cream: '#F1EBE0',
         linen: '#E7DFCF',
         sand: '#D8CDB7',
+        sable: '#C8B48E',       /* Sable naturel — plus chaud que le sand */
         wood: '#B99A73',
         ink: '#141210',
         terracotta: '#B65F3F',
+        brique: '#8E3F2C',      /* Brique ancienne — rouge profond terre cuite */
         sage: '#8E9C82',
+        plantes: '#5B7A4A',     /* Vert des plantes — feuillage foncé */
       },
       borderRadius: {
         lg: 'var(--radius)',

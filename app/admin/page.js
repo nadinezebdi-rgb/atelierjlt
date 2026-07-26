@@ -64,7 +64,7 @@ export default function AdminPage() {
       <header className="border-b border-linen sticky top-0 bg-ivory/95 backdrop-blur z-30">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-6">
-            <div className="font-display text-xl font-black">Ginette — Admin</div>
+            <div className="font-display text-xl font-black">Atelier Ginette — Admin</div>
             <div className="hidden md:flex items-center gap-1">
               {tabs.map((t) => (
                 <button key={t.key} onClick={() => setTab(t.key)} className={`text-[11px] uppercase tracking-[0.22em] px-3 py-1.5 transition ${tab === t.key ? 'bg-ink text-ivory' : 'hover:bg-linen/50'}`}>

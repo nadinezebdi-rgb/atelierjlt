@@ -49,7 +49,7 @@ export default function ProductPage() {
     description: p.story,
     image: p.images.map((img) => (img.startsWith('http') ? img : `https://atelierginette.fr${img}`)),
     sku: p.id,
-    brand: { '@type': 'Brand', name: 'GINETTE Créations' },
+    brand: { '@type': 'Brand', name: 'Atelier Ginette' },
     category: p.category,
     material: p.material,
     color: p.color,

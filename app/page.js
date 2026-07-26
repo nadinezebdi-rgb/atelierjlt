@@ -16,7 +16,7 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'Atelier Ginette',
-  alternateName: 'GINETTE Créations',
+  alternateName: 'Atelier Ginette',
   url: 'https://atelierginette.fr',
   logo: 'https://atelierginette.fr/api/img/logo',
   description: 'Maison française de décoration artisanale. Sacs crochet, plaids, bougies, bijoux, coussins faits main.',

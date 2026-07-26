@@ -77,7 +77,7 @@ async function handler(request, { params }) {
   const url = new URL(request.url)
 
   try {
-    if (!root) return NextResponse.json({ message: 'Ginette Créations API', ok: true })
+    if (!root) return NextResponse.json({ message: 'Atelier Ginette API', ok: true })
 
     // ============ PRODUCTS ============
     if (root === 'products') {
