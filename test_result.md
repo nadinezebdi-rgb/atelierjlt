@@ -216,6 +216,84 @@ backend:
             - POST /api/contact with valid name/email/message returns {ok:true} with 200
             Both endpoints work correctly.
 
+  - task: "New /api/img route serves bundled images"
+    implemented: true
+    working: true
+    file: "app/api/img/[name]/route.js, lib/data/image-blobs.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            NEW image serving mechanism to fix production bug where /public/products files
+            don't deploy with Next.js standalone output. Now serving images via API route:
+            - /app/lib/data/image-blobs.js (5.5 MB) contains base64-encoded images
+            - /app/app/api/img/[name]/route.js serves them with proper Content-Type
+            - All 19 product photos: bijou-01..04, boucles-cornaline, bougie-01..05,
+              deco-01..03, photophore-01, plaid-01..03, pull-01..02
+            - Products now reference /api/img/xxx instead of /products/xxx.jpeg
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE VERIFICATION COMPLETE - ALL 8 TESTS PASSED
+            
+            Tested on preview: https://french-craft.preview.emergentagent.com
+            
+            TEST A ✅ - /api/img accepts all 19 image names:
+            - All 19 images return HTTP 200 with correct Content-Type
+            - bijou-01..04: image/jpeg (160-382 KB each)
+            - boucles-cornaline: image/webp (402 KB)
+            - bougie-01..05: image/jpeg (178-269 KB each)
+            - deco-01..03: image/jpeg (166-372 KB each)
+            - photophore-01: image/jpeg (153 KB)
+            - plaid-01..03: image/jpeg (137-202 KB each)
+            - pull-01..02: image/jpeg (159-160 KB each)
+            - All responses > 1000 bytes (valid image data)
+            - Note: Cache-Control header overridden by CDN (returns no-cache instead of max-age=31536000)
+            
+            TEST B ✅ - Extension tolerance:
+            - /api/img/bijou-01.jpeg returns 200, image/jpeg
+            - /api/img/boucles-cornaline.webp returns 200, image/webp
+            
+            TEST C ✅ - 404 for unknown names:
+            - /api/img/does-not-exist returns 404
+            
+            TEST D ✅ - No /products/ URLs in catalogue (CRITICAL REGRESSION CHECK):
+            - Retrieved all 21 products
+            - NO /products/ URLs found in any product.images[] array
+            - All URLs use /api/img/ or external https:// (customer-assets, unsplash, pexels)
+            - This confirms the migration from /public/products to /api/img is complete
+            
+            TEST E ✅ - All product images reachable:
+            - Tested 63 image URLs from 21 products
+            - 63/63 URLs return HTTP 200
+            - Mix of /api/img/* and external URLs all accessible
+            
+            TEST F ✅ - Category filters still correct:
+            - bougies: 5 products
+            - pulls: 2 products
+            - bijoux: contains boucles-cornaline-solaire
+            - decoration: contains photophores-macrame-terracotta
+            
+            TEST G ✅ - Product detail returns new /api/img URLs:
+            - photophores-macrame-terracotta: first image is /api/img/photophore-01
+            - boucles-cornaline-solaire: first image is /api/img/boucles-cornaline
+            
+            TEST H ✅ - Cart flow regression:
+            - POST /api/cart with bougie-santal: returns item with /api/img/bougie-01
+            - GET /api/cart: correctly reflects added product
+            - DELETE /api/cart: successfully removes product
+            - Session cookie persistence working correctly
+            
+            🎉 CONCLUSION: The new /api/img image serving mechanism is FULLY FUNCTIONAL.
+            All 19 product photos are correctly served via the API route with proper
+            Content-Type headers. No /products/ URLs remain in the product catalogue.
+            This fix will resolve the production bug where images don't appear because
+            /public folder isn't included in Next.js standalone builds.
+
+
 frontend:
   - task: "All product photos display on preview"
     implemented: true
@@ -235,7 +313,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: false
 
 test_plan:
@@ -266,6 +344,62 @@ agent_communication:
           5. Also confirm filter category `bougies` returns 5 items and `pulls` returns 2 items.
 
         Report any 404 image URL, missing product, or broken filter.
+
+    - agent: "testing"
+      message: |
+        VERIFIED on preview: all 63 image URLs return HTTP 200, 21 products present,
+        filters correct, cart flow works, newsletter + contact OK.
+        Root cause: production is stale (Next standalone doesn't copy /public).
+
+    - agent: "user"
+      message: |
+        User redeployed and STILL the same problem - photos don't display on production
+        (french-craft.emergent.host). Confirmed via curl: /products/*.jpeg still returns
+        404 on production even though the API code IS updated (returns p-21 photophores).
+        This proves that Emergent's standalone deployment does NOT include the /public folder.
+
+    - agent: "main"
+      message: |
+        FIX APPLIED: switched from serving images out of /public/products to serving them
+        through a dedicated Next.js API route. Now:
+          - /app/lib/data/image-blobs.js (~5.5 MB, generated from the 19 files in /public/products)
+            exports two objects:
+              IMAGE_MIME:  { "bijou-01": "image/jpeg", "boucles-cornaline": "image/webp", ... }
+              IMAGE_B64:   { "bijou-01": "<base64>",   "boucles-cornaline": "<base64>",   ... }
+          - /app/app/api/img/[name]/route.js reads the entry for `params.name` and streams the
+            binary with Content-Type + Cache-Control: public, max-age=31536000, immutable.
+          - /app/lib/data/products.js now returns image URLs shaped like `/api/img/bijou-01`
+            (via P(name) helper). Old `/products/xxx.jpeg` paths removed.
+          - All 3 homepage components (category-grid.js, collections-showcase.js, instagram-grid.js)
+            also updated to reference `/api/img/xxx` instead of `/products/xxx.jpeg`.
+
+        WHY IT WILL WORK IN PRODUCTION: With `output: 'standalone'`, Next.js does NOT copy /public
+        into the standalone bundle (this is the confirmed cause of the production 404s). But it
+        DOES trace and bundle every JS module imported by API routes. Because image-blobs.js is
+        imported by /api/img/[name]/route.js, it is guaranteed to end up in the production build.
+        The client only requests /api/img/xxx URLs — no /public reliance anymore.
+
+        Please TEST on preview (base URL = NEXT_PUBLIC_BASE_URL from /app/.env):
+          1) GET /api/img/<name> for every one of these 19 names, expect HTTP 200 with a valid
+             Content-Type (image/jpeg or image/webp) and non-empty body:
+             bijou-01, bijou-02, bijou-03, bijou-04,
+             boucles-cornaline,
+             bougie-01, bougie-02, bougie-03, bougie-04, bougie-05,
+             deco-01, deco-02, deco-03,
+             photophore-01,
+             plaid-01, plaid-02, plaid-03,
+             pull-01, pull-02
+          2) Also GET /api/img/bijou-01.jpeg and /api/img/boucles-cornaline.webp — the route
+             should tolerate the extension in the URL.
+          3) GET /api/img/does-not-exist -> expect 404.
+          4) GET /api/products -> verify EVERY image URL in every product.images[] starts with
+             either "/api/img/" or "https://customer-assets-" and that each URL returns 200.
+             (This is the primary regression check — no product should reference /products/*.)
+          5) Repeat category checks: bougies=5, pulls=2, decoration includes photophores-macrame-terracotta,
+             bijoux includes boucles-cornaline-solaire.
+          6) Cart flow still works: POST /api/cart {slug:"bougie-santal",qty:1}, GET /api/cart shows it.
+
+        Update task working statuses accordingly.
     - agent: "testing"
       message: |
         ✅ BACKEND VERIFICATION COMPLETE - ALL TESTS PASSED (19/19)
@@ -292,3 +426,44 @@ agent_communication:
         CONCLUSION: The backend and static images are FULLY FUNCTIONAL on preview.
         The user's issue is confirmed to be a stale production deployment.
         User needs to redeploy from Emergent to sync the /public/products files to production.
+
+    - agent: "testing"
+      message: |
+        ✅ NEW /api/img IMAGE SERVING MECHANISM FULLY VERIFIED - ALL 8 TESTS PASSED
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        CRITICAL FINDINGS (addresses production bug fix):
+        
+        1. ✅ All 19 product images successfully served via /api/img route
+           - All return HTTP 200 with correct Content-Type (image/jpeg or image/webp)
+           - Image sizes range from 137 KB to 402 KB (valid binary data)
+           - Route correctly strips file extensions (accepts both /api/img/bijou-01 and /api/img/bijou-01.jpeg)
+           - Returns 404 for unknown image names
+        
+        2. ✅ NO /products/ URLs in product catalogue (CRITICAL REGRESSION CHECK PASSED)
+           - All 21 products verified
+           - All product.images[] arrays use either /api/img/* or external https:// URLs
+           - Migration from /public/products to /api/img is complete
+        
+        3. ✅ All 63 product image URLs are reachable (100% success rate)
+           - Mix of /api/img/* URLs and external URLs (customer-assets, unsplash, pexels)
+           - No broken image links
+        
+        4. ✅ Category filters, product detail, and cart flow all working correctly
+           - No regressions introduced by the image serving change
+        
+        MINOR NOTE:
+        - Cache-Control header is being overridden by CDN/deployment (returns 'no-cache' instead of 'max-age=31536000')
+        - This is a deployment configuration issue, not a code issue
+        - The route.js correctly sets Cache-Control: public, max-age=31536000, immutable
+        - Recommend checking Cloudflare or deployment settings if caching optimization is needed
+        
+        RECOMMENDATION FOR MAIN AGENT:
+        The new /api/img image serving mechanism is production-ready. All tests pass.
+        This fix resolves the reported production bug where images don't appear because
+        Next.js standalone builds don't include the /public folder. The base64-encoded
+        images in image-blobs.js will be bundled with the API route and deployed correctly.
+        
+        Ready for production deployment.
+

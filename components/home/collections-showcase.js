@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { COLLECTIONS, IMAGES } from '@/lib/data/products'
 
-const covers = ['/products/plaid-03.jpeg', '/products/bougie-03.jpeg', '/products/deco-02.jpeg', '/products/pull-01.jpeg', '/products/bijou-02.jpeg', '/products/deco-01.jpeg']
+const covers = ['/api/img/plaid-03', '/api/img/bougie-03', '/api/img/deco-02', '/api/img/pull-01', '/api/img/bijou-02', '/api/img/deco-01']
 
 export default function CollectionsShowcase() {
   return (

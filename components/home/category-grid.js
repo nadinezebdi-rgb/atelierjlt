@@ -5,11 +5,11 @@ import { motion } from 'framer-motion'
 
 const cats = [
   { name: 'Sacs Crochet',       href: '/collections?cat=sacs',              image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg', span: 'lg:row-span-2 lg:col-span-2', h: 'h-[520px] lg:h-full' },
-  { name: 'Pulls Crochet',      href: '/collections?cat=pulls',             image: '/products/pull-02.jpeg', h: 'h-[300px]' },
-  { name: 'Bougies',            href: '/collections?cat=bougies',           image: '/products/bougie-03.jpeg', h: 'h-[300px]' },
-  { name: 'Bijoux',             href: '/collections?cat=bijoux',            image: '/products/bijou-01.jpeg', h: 'h-[300px]' },
-  { name: 'Décoration',         href: '/collections?cat=decoration',        image: '/products/deco-02.jpeg', h: 'h-[300px]' },
-  { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees', image: '/products/plaid-03.jpeg', h: 'h-[300px]', span: 'lg:col-span-2' },
+  { name: 'Pulls Crochet',      href: '/collections?cat=pulls',             image: '/api/img/pull-02', h: 'h-[300px]' },
+  { name: 'Bougies',            href: '/collections?cat=bougies',           image: '/api/img/bougie-03', h: 'h-[300px]' },
+  { name: 'Bijoux',             href: '/collections?cat=bijoux',            image: '/api/img/bijou-01', h: 'h-[300px]' },
+  { name: 'Décoration',         href: '/collections?cat=decoration',        image: '/api/img/deco-02', h: 'h-[300px]' },
+  { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees', image: '/api/img/plaid-03', h: 'h-[300px]', span: 'lg:col-span-2' },
 ]
 
 export default function CategoryGrid() {

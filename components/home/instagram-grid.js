@@ -5,12 +5,12 @@ import { Instagram } from 'lucide-react'
 import { IMAGES } from '@/lib/data/products'
 
 const photos = [
-  '/products/deco-02.jpeg',
-  '/products/pull-02.jpeg',
-  '/products/bougie-03.jpeg',
-  '/products/plaid-01.jpeg',
-  '/products/bijou-02.jpeg',
-  '/products/deco-01.jpeg',
+  '/api/img/deco-02',
+  '/api/img/pull-02',
+  '/api/img/bougie-03',
+  '/api/img/plaid-01',
+  '/api/img/bijou-02',
+  '/api/img/deco-01',
 ]
 
 export default function InstagramGrid() {
