@@ -58,8 +58,7 @@ export default function Header({ transparent = false }) {
           solid ? 'bg-ivory/95 backdrop-blur-md border-b border-linen/60' : 'bg-transparent'
         )}
       >
-        <div className="container flex items-center justify-between h-20 md:h-24">
-          {/* Left: menu + search */}
+        <div className="container flex items-center justify-between h-24 md:h-32">          {/* Left: menu + search */}
           <div className="flex items-center gap-5">
             <button
               aria-label="Menu"
@@ -79,7 +78,7 @@ export default function Header({ transparent = false }) {
             <img
               src="/api/img/logo-small"
               alt="Atelier Ginette"
-              className="h-10 md:h-14 w-auto object-contain"
+              className="h-16 md:h-24 w-auto object-contain"
             />
           </Link>
 
