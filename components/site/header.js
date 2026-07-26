@@ -9,10 +9,11 @@ import { cn } from '@/lib/utils'
 
 const nav = [
   { name: 'Collections', href: '/collections' },
-  { name: 'Décoration', href: '/collections?cat=decoration' },
   { name: 'Sacs', href: '/collections?cat=sacs' },
-  { name: 'Céramique', href: '/collections?cat=ceramique' },
+  { name: 'Pulls', href: '/collections?cat=pulls' },
+  { name: 'Bougies', href: '/collections?cat=bougies' },
   { name: 'Bijoux', href: '/collections?cat=bijoux' },
+  { name: 'Décoration', href: '/collections?cat=decoration' },
   { name: 'Nouveautés', href: '/collections?cat=nouveautes' },
   { name: 'Notre Atelier', href: '/atelier' },
   { name: 'Journal', href: '/journal' },

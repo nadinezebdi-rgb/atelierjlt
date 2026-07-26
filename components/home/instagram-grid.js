@@ -5,12 +5,12 @@ import { Instagram } from 'lucide-react'
 import { IMAGES } from '@/lib/data/products'
 
 const photos = [
-  IMAGES.interior1,
-  'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg',
-  IMAGES.ceramic1,
-  'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/ryt6y008_WhatsApp%20Image%202026-02-19%20at%2012.58.17.webp',
-  IMAGES.ceramic2,
-  'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/kmstmnfe_couverture.webp',
+  '/products/deco-02.jpeg',
+  '/products/pull-02.jpeg',
+  '/products/bougie-03.jpeg',
+  '/products/plaid-01.jpeg',
+  '/products/bijou-02.jpeg',
+  '/products/deco-01.jpeg',
 ]
 
 export default function InstagramGrid() {

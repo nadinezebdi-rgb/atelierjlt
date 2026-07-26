@@ -2,15 +2,14 @@
 
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { IMAGES } from '@/lib/data/products'
 
 const cats = [
-  { name: 'Sacs Crochet', href: '/collections?cat=sacs', image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg', span: 'lg:row-span-2 lg:col-span-2', h: 'h-[520px] lg:h-full' },
-  { name: 'Décoration', href: '/collections?cat=decoration', image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/ryt6y008_WhatsApp%20Image%202026-02-19%20at%2012.58.17.webp', h: 'h-[300px]' },
-  { name: 'Céramique', href: '/collections?cat=ceramique', image: IMAGES.ceramic1, h: 'h-[300px]' },
-  { name: 'Bijoux', href: '/collections?cat=bijoux', image: IMAGES.ceramic2, h: 'h-[300px]' },
-  { name: 'Nouveautés', href: '/collections?cat=nouveautes', image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/yhbe53yp_COUVERTURE%20ET%20CHAUSSONS.webp', h: 'h-[300px]' },
-  { name: 'Éditions limitées', href: '/collections?cat=editions-limitees', image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/kmstmnfe_couverture.webp', h: 'h-[300px]', span: 'lg:col-span-2' },
+  { name: 'Sacs Crochet',       href: '/collections?cat=sacs',              image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg', span: 'lg:row-span-2 lg:col-span-2', h: 'h-[520px] lg:h-full' },
+  { name: 'Pulls Crochet',      href: '/collections?cat=pulls',             image: '/products/pull-02.jpeg', h: 'h-[300px]' },
+  { name: 'Bougies',            href: '/collections?cat=bougies',           image: '/products/bougie-03.jpeg', h: 'h-[300px]' },
+  { name: 'Bijoux',             href: '/collections?cat=bijoux',            image: '/products/bijou-01.jpeg', h: 'h-[300px]' },
+  { name: 'Décoration',         href: '/collections?cat=decoration',        image: '/products/deco-02.jpeg', h: 'h-[300px]' },
+  { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees', image: '/products/plaid-03.jpeg', h: 'h-[300px]', span: 'lg:col-span-2' },
 ]
 
 export default function CategoryGrid() {
@@ -23,8 +22,7 @@ export default function CategoryGrid() {
             <h2 className="font-display font-bold text-4xl md:text-5xl leading-[1.05] mt-4 text-balance">Une maison, plusieurs matières.</h2>
           </div>
           <p className="text-ink/60 md:max-w-sm leading-relaxed">
-            Sacs crochetés main, céramiques tournées, bijoux discrets, objets rares.
-            Chaque catégorie est pensée comme une pièce de la maison.
+            Sacs crochetés main, pulls tricotés, bougies aux cristaux, bijoux discrets. Chaque catégorie est pensée comme une pièce de la maison.
           </p>
         </div>
 
@@ -41,7 +39,7 @@ export default function CategoryGrid() {
               <Link href={c.href} className={`group relative block overflow-hidden bg-cream ${c.h}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={c.image} alt={c.name} className="w-full h-full object-cover img-zoom" />
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
                   <div className="text-[10px] uppercase tracking-[0.28em] text-ivory/85">Découvrir</div>
                   <div className="font-display text-2xl md:text-3xl text-ivory mt-1 leading-tight">{c.name}</div>
