@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 40 33% 96%;
+  --foreground: 20 14% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14% 8%;
+  --primary: 20 14% 8%;
+  --primary-foreground: 40 33% 96%;
+  --secondary: 35 22% 88%;
+  --secondary-foreground: 20 14% 8%;
+  --muted: 35 22% 92%;
+  --muted-foreground: 25 10% 40%;
+  --accent: 18 40% 62%;
+  --accent-foreground: 40 33% 96%;
+  --destructive: 0 60% 50%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 30 15% 85%;
+  --input: 30 15% 85%;
+  --ring: 20 14% 8%;
+  --radius: 0.25rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'ss01', 'ss02';
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display), Georgia, serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+  }
+  .font-sans {
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(30 15% 78%); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(30 15% 60%); }
+
+/* Marquee */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 45s linear infinite;
+}
+
+/* Elegant fade */
+@keyframes softFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.soft-fade { animation: softFadeUp 0.9s ease-out both; }
+
+/* Image zoom hover */
+.img-zoom { transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+.img-zoom:hover { transform: scale(1.05); }
