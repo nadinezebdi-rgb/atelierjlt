@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils'
 const nav = [
   { name: 'Collections', href: '/collections' },
   { name: 'Sacs', href: '/collections?cat=sacs' },
-  { name: 'Pulls', href: '/collections?cat=pulls' },
   { name: 'Bougies', href: '/collections?cat=bougies' },
   { name: 'Bijoux', href: '/collections?cat=bijoux' },
   { name: 'Décoration', href: '/collections?cat=decoration' },

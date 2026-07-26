@@ -218,7 +218,7 @@ function ProductEditor({ product, onSave }) {
         <Field label="Stock"><input type="number" value={p.stock || 0} onChange={(e) => upd('stock', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
         <Field label="Catégorie">
           <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink">
-            {['sacs', 'pulls', 'bougies', 'bijoux', 'decoration'].map((c) => <option key={c} value={c}>{c}</option>)}
+            {['sacs', 'bougies', 'bijoux', 'decoration'].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
         <Field label="Matière"><input value={p.material || ''} onChange={(e) => upd('material', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>

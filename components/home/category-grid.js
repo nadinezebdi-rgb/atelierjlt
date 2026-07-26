@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 
 const cats = [
   { name: 'Sacs Crochet',       href: '/collections?cat=sacs',              image: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg', accent: 'brique',    span: 'lg:row-span-2 lg:col-span-2', h: 'h-[520px] lg:h-full' },
-  { name: 'Pulls Crochet',      href: '/collections?cat=pulls',             image: '/api/img/pull-02',   accent: 'sable',      h: 'h-[300px]' },
   { name: 'Bougies',            href: '/collections?cat=bougies',           image: '/api/img/bougie-03', accent: 'terracotta', h: 'h-[300px]' },
   { name: 'Bijoux',             href: '/collections?cat=bijoux',            image: '/api/img/bijou-01',  accent: 'wood',       h: 'h-[300px]' },
   { name: 'Décoration',         href: '/collections?cat=decoration',        image: '/api/img/deco-02',   accent: 'plantes',    h: 'h-[300px]' },
