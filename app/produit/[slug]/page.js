@@ -20,13 +20,39 @@ export default function ProductPage() {
   const [qty, setQty] = useState(1)
   const [openInfo, setOpenInfo] = useState('desc')
   const [zoom, setZoom] = useState(null)
+  const [variantIdx, setVariantIdx] = useState(0)
+  const [sizeIdx, setSizeIdx] = useState(0)
   const { add } = useCart()
 
   useEffect(() => {
     if (!slug) return
     fetch(`/api/products/${slug}`)
       .then((r) => r.json())
-      .then(setData)
+      .then((d) => {
+        setData(d)
+        // Sélectionne le variant par défaut, en préférant une couleur en stock
+        if (d?.product?.variants?.length) {
+          const vs = d.product.variants
+          const defaultIdx = vs.findIndex((v) => v.isDefault)
+          const defaultOk = defaultIdx >= 0 && (vs[defaultIdx].stock || 0) > 0
+          if (defaultOk) setVariantIdx(defaultIdx)
+          else {
+            const firstInStock = vs.findIndex((v) => (v.stock || 0) > 0)
+            setVariantIdx(firstInStock >= 0 ? firstInStock : (defaultIdx >= 0 ? defaultIdx : 0))
+          }
+        }
+        // Sélectionne la taille par défaut, en préférant une taille en stock
+        if (d?.product?.sizes?.length) {
+          const ss = d.product.sizes
+          const defaultIdx = ss.findIndex((s) => s.isDefault)
+          const defaultOk = defaultIdx >= 0 && (ss[defaultIdx].stock || 0) > 0
+          if (defaultOk) setSizeIdx(defaultIdx)
+          else {
+            const firstInStock = ss.findIndex((s) => (s.stock || 0) > 0)
+            setSizeIdx(firstInStock >= 0 ? firstInStock : (defaultIdx >= 0 ? defaultIdx : 0))
+          }
+        }
+      })
       .catch(() => {})
   }, [slug])
 
@@ -41,32 +67,61 @@ export default function ProductPage() {
 
   const p = data.product
   const related = data.related || []
+  const variants = p.variants || []
+  const sizes = p.sizes || []
+  const selectedVariant = variants.length ? variants[variantIdx] : null
+  const selectedSize = sizes.length ? sizes[sizeIdx] : null
+  // Utilise l'image du variant en priorité sinon la galerie normale
+  const galleryImages = selectedVariant?.image
+    ? [selectedVariant.image, ...(p.images || []).filter((i) => i !== selectedVariant.image)]
+    : p.images
+  // Stock effectif : min entre variant et taille, ou fallback stock produit
+  const effectiveStock = Math.min(
+    selectedVariant ? (selectedVariant.stock ?? Infinity) : Infinity,
+    selectedSize ? (selectedSize.stock ?? Infinity) : Infinity,
+    p.stock ?? Infinity
+  )
+  // Prix : la taille prime sur le variant qui prime sur le prix produit
+  const effectivePrice = selectedSize?.price ?? selectedVariant?.price ?? p.price
+  const effectiveColor = selectedVariant?.name || p.color
+  const effectiveDimensions = selectedSize?.dimensions || p.dimensions
+  const effectiveMakingTime = selectedSize?.makingTime || p.makingTime
 
   const productJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: p.name,
     description: p.story,
-    image: p.images.map((img) => (img.startsWith('http') ? img : `https://atelierginette.fr${img}`)),
+    image: p.images.map((img) => (img.startsWith('http') ? img : `https://atelierjlt.fr${img}`)),
     sku: p.id,
-    brand: { '@type': 'Brand', name: 'Atelier Ginette' },
+    brand: { '@type': 'Brand', name: 'Atelier JLT' },
     category: p.category,
     material: p.material,
     color: p.color,
     offers: {
       '@type': 'Offer',
-      url: `https://atelierginette.fr/produit/${p.slug}`,
+      url: `https://atelierjlt.fr/produit/${p.slug}`,
       priceCurrency: 'EUR',
       price: p.price,
       availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       itemCondition: 'https://schema.org/NewCondition',
-      seller: { '@type': 'Organization', name: 'Atelier Ginette' },
+      seller: { '@type': 'Organization', name: 'Atelier JLT' },
     },
   }
 
   const handleAdd = async () => {
-    await add(p.slug, qty)
-    toast.success(`${p.name} ajouté au panier`)
+    const extra = {}
+    if (selectedVariant) extra.variant = selectedVariant.name
+    if (selectedSize) extra.size = selectedSize.label
+    await add(p.slug, qty, extra)
+    const parts = []
+    if (selectedVariant) parts.push(selectedVariant.name)
+    if (selectedSize) parts.push(selectedSize.label)
+    toast.success(
+      parts.length
+        ? `${p.name} — ${parts.join(' · ')} ajouté au panier`
+        : `${p.name} ajouté au panier`
+    )
   }
 
   return (
@@ -90,25 +145,25 @@ export default function ProductPage() {
           {/* Gallery */}
           <div className="space-y-3">
             <motion.div
-              key={active}
+              key={selectedVariant?.name + '-' + active}
               initial={{ opacity: 0.5 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
               className="relative aspect-[4/5] bg-cream overflow-hidden cursor-zoom-in"
-              onClick={() => setZoom(p.images[active])}
+              onClick={() => setZoom(galleryImages[active])}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.images[active]} alt={p.name} className="w-full h-full object-cover" />
+              <img src={galleryImages[active]} alt={p.name} className="w-full h-full object-cover" />
               {p.isLimited && (
                 <span className="absolute top-6 left-6 bg-brique text-ivory text-[10px] uppercase tracking-[0.22em] px-3 py-1.5">Édition limitée</span>
               )}
             </motion.div>
             <div className="grid grid-cols-3 gap-3">
-              {p.images.map((img, i) => (
+              {galleryImages.map((img, i) => (
                 <button
-                  key={i}
+                  key={img + i}
                   onClick={() => setActive(i)}
-                  className={`aspect-square overflow-hidden bg-cream border ${active === i ? 'border-ink' : 'border-transparent'}`}
+                  className={`aspect-square overflow-hidden bg-cream border ${active === i ? 'border-emerald' : 'border-transparent'}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img} alt="" className="w-full h-full object-cover" />
@@ -119,25 +174,107 @@ export default function ProductPage() {
 
           {/* Details */}
           <div className="md:pt-6 lg:pl-6">
-            <div className="text-[10px] uppercase tracking-[0.36em] text-terracotta">{p.category}</div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl leading-[1.05] mt-3 text-balance">{p.name}</h1>
+            <div className="text-[10px] uppercase tracking-[0.36em] text-emerald">Collection {p.category}</div>
+            <h1 className="font-display font-normal text-4xl md:text-5xl leading-[1.05] mt-3 text-balance"
+                style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>{p.name}</h1>
             <div className="flex items-center gap-4 mt-4">
-              <span className="font-display text-2xl tabular-nums">{formatPrice(p.price)}</span>
+              <span className="font-display text-2xl tabular-nums">{formatPrice(effectivePrice)}</span>
               <span className="text-[11px] uppercase tracking-[0.22em] text-ink/50">TVA incluse</span>
             </div>
 
             {/* Story */}
-            <div className="mt-8 text-ink/75 leading-relaxed text-[15px] font-display italic border-l-2 border-terracotta pl-5">
+            <div className="mt-8 text-ink/75 leading-relaxed text-[15px] font-display italic border-l-2 border-emerald pl-5">
               “{p.story}”
             </div>
+
+            {/* Sizes — sélecteur de taille */}
+            {sizes.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-baseline justify-between mb-4">
+                  <span className="text-[11px] uppercase tracking-[0.28em] text-ink/60">
+                    Taille : <span className="text-ink font-medium">{selectedSize?.label}</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-[0.22em] text-ink/40">
+                    {selectedSize?.dimensions}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sizes.map((s, i) => {
+                    const isSelected = i === sizeIdx
+                    const isOut = (s.stock || 0) === 0
+                    return (
+                      <button
+                        key={s.label}
+                        onClick={() => { setSizeIdx(i); setQty(1) }}
+                        disabled={isOut}
+                        title={s.dimensions + (isOut ? ' — épuisé' : '')}
+                        className={`px-4 py-2.5 text-[11px] uppercase tracking-[0.22em] border transition ${
+                          isSelected
+                            ? 'bg-emerald text-ivory border-emerald'
+                            : 'bg-transparent border-ink/25 text-ink hover:border-emerald hover:text-emerald'
+                        } ${isOut ? 'opacity-40 cursor-not-allowed line-through' : ''}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>{s.label}</span>
+                          <span className={`tabular-nums ${isSelected ? 'text-ivory/80' : 'text-ink/50'}`}>
+                            · {formatPrice(s.price)}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Variants — sélecteur de couleur */}
+            {variants.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-baseline justify-between mb-4">
+                  <span className="text-[11px] uppercase tracking-[0.28em] text-ink/60">
+                    Couleur : <span className="text-ink font-medium">{effectiveColor}</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-[0.22em] text-ink/40">
+                    {variants.length} {variants.length > 1 ? 'nuances' : 'nuance'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {variants.map((v, i) => {
+                    const isSelected = i === variantIdx
+                    const isOut = (v.stock || 0) === 0
+                    return (
+                      <button
+                        key={v.name}
+                        onClick={() => { setVariantIdx(i); setActive(0); setQty(1) }}
+                        disabled={isOut}
+                        title={v.name + (isOut ? ' — épuisé' : '')}
+                        className={`group relative h-10 w-10 rounded-full flex items-center justify-center transition ${
+                          isSelected ? 'ring-2 ring-offset-2 ring-emerald ring-offset-ivory' : 'ring-1 ring-ink/15 hover:ring-emerald'
+                        } ${isOut ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <span
+                          className="h-8 w-8 rounded-full block border border-ink/10"
+                          style={{ backgroundColor: v.hex }}
+                        />
+                        {isOut && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="block h-[1px] w-8 bg-ink/80 rotate-45" />
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Meta chips */}
             <div className="grid grid-cols-2 gap-3 mt-8 text-[13px]">
               <MetaRow k="Matière" v={p.material} />
-              <MetaRow k="Dimensions" v={p.dimensions} />
+              <MetaRow k="Dimensions" v={effectiveDimensions} />
               <MetaRow k="Poids" v={p.weight} />
-              <MetaRow k="Fabrication" v={p.makingTime} />
-              <MetaRow k="Couleur" v={p.color} />
+              <MetaRow k="Fabrication" v={effectiveMakingTime} />
+              <MetaRow k="Couleur" v={effectiveColor} />
               <MetaRow k="Origine" v="Fabrication française" />
             </div>
 
@@ -146,13 +283,14 @@ export default function ProductPage() {
               <div className="flex items-center border border-ink/30">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-3 h-full hover:bg-linen/40" aria-label="Diminuer"><Minus className="h-3.5 w-3.5" strokeWidth={1.5} /></button>
                 <span className="w-10 text-center text-sm tabular-nums">{qty}</span>
-                <button onClick={() => setQty((q) => Math.min(p.stock, q + 1))} className="px-3 h-full hover:bg-linen/40" aria-label="Augmenter"><Plus className="h-3.5 w-3.5" strokeWidth={1.5} /></button>
+                <button onClick={() => setQty((q) => Math.min(effectiveStock, q + 1))} className="px-3 h-full hover:bg-linen/40" aria-label="Augmenter"><Plus className="h-3.5 w-3.5" strokeWidth={1.5} /></button>
               </div>
               <button
                 onClick={handleAdd}
-                className="flex-1 bg-ink text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition-colors"
+                disabled={effectiveStock === 0}
+                className="flex-1 bg-emerald text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-emeraldDark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Ajouter au panier — {formatPrice(p.price * qty)}
+                {effectiveStock === 0 ? 'Rupture de stock' : `Ajouter au panier — ${formatPrice(effectivePrice * qty)}`}
               </button>
               <button
                 onClick={() => toast('Ajouté aux favoris')}
@@ -163,7 +301,7 @@ export default function ProductPage() {
               </button>
             </div>
             <div className="mt-3 text-[11px] uppercase tracking-[0.22em] text-ink/50">
-              {p.stock > 5 ? 'En stock' : `Plus que ${p.stock} exemplaires`}
+              {effectiveStock === 0 ? 'Épuisé — reviendra bientôt' : effectiveStock > 5 ? 'En stock' : `Plus que ${effectiveStock} exemplaires`}
             </div>
 
             {/* Trust */}

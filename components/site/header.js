@@ -6,18 +6,16 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Menu, Search, Heart, User, ShoppingBag, X } from 'lucide-react'
 import { useCart } from './cart-provider'
 import { useAuth } from './auth-provider'
+import Logo from './logo'
 import { cn } from '@/lib/utils'
 
 const nav = [
-  { name: 'Collections', href: '/collections' },
-  { name: 'Sacs', href: '/collections?cat=sacs' },
-  { name: 'Bougies', href: '/collections?cat=bougies' },
-  { name: 'Bijoux', href: '/collections?cat=bijoux' },
-  { name: 'Décoration', href: '/collections?cat=decoration' },
-  { name: 'Nouveautés', href: '/collections?cat=nouveautes' },
-  { name: 'Notre Atelier', href: '/atelier' },
-  { name: 'Journal', href: '/journal' },
-  { name: 'Contact', href: '/contact' },
+  { name: 'Collections',        href: '/collections' },
+  { name: 'Nouveautés',         href: '/collections?cat=nouveautes' },
+  { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees' },
+  { name: 'Notre Atelier',      href: '/atelier' },
+  { name: 'Journal',            href: '/journal' },
+  { name: 'Contact',            href: '/contact' },
 ]
 
 export default function Header({ transparent = false }) {
@@ -33,32 +31,24 @@ export default function Header({ transparent = false }) {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Sur les pages transparentes (accueil), la barre flotte au-dessus du hero
+  // sans laisser de bande blanche. Le hero étant maintenant crème (clair),
+  // le logo et les icônes restent en teinte foncée pour la lisibilité.
+  const overlayHero = transparent && !scrolled
   const solid = scrolled || !transparent
 
   return (
     <>
-      {/* Top marquee */}
-      <div className="bg-ink text-ivory text-[11px] tracking-[0.28em] uppercase py-2.5 overflow-hidden">
-        <div className="container flex items-center justify-center gap-6">
-          <span>Livraison offerte dès 150 €</span>
-          <span className="opacity-40">·</span>
-          <span className="hidden md:inline">Fabrication française</span>
-          <span className="opacity-40 hidden md:inline">·</span>
-          <span className="hidden md:inline">Emballage soigné</span>
-        </div>
-      </div>
-
-      <motion.header
-        initial={{ y: -12, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      <header
         className={cn(
-          'sticky top-0 z-40 transition-colors duration-500',
-          solid ? 'bg-ivory/95 backdrop-blur-md border-b border-linen/60' : 'bg-transparent'
+          'left-0 right-0 z-40 transition-colors duration-500',
+          'sticky top-0 bg-ivory/95 backdrop-blur-md border-b border-linen/60',
+          scrolled ? 'shadow-[0_1px_0_rgba(0,0,0,0.02)]' : ''
         )}
       >
-        <div className="container flex items-center justify-between h-28 md:h-40">          {/* Left: menu + search */}
-          <div className="flex items-center gap-5">
+        <div className="container flex items-center justify-between h-28 md:h-36 pt-3 md:pt-4">
+          {/* Left: menu + search */}
+          <div className={cn('flex items-center gap-5', 'text-ink')}>
             <button
               aria-label="Menu"
               onClick={() => setMobile(true)}
@@ -71,18 +61,17 @@ export default function Header({ transparent = false }) {
             </button>
           </div>
 
-          {/* Center: logo */}
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2 flex items-center" aria-label="Atelier Ginette — accueil">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/api/img/logo-small"
-              alt="Atelier Ginette"
-              className="h-24 md:h-40 w-auto object-contain"
-            />
+          {/* Center: logo Atelier JLT */}
+          <Link
+            href="/"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center"
+            aria-label="Atelier JLT — accueil"
+          >
+            <Logo variant="dark" size="lg" />
           </Link>
 
           {/* Right: icons */}
-          <div className="flex items-center gap-4 md:gap-5">
+          <div className={cn('flex items-center gap-4 md:gap-5', 'text-ink')}>
             <Link href="/wishlist" className="hidden md:block hover:opacity-60 transition" aria-label="Favoris">
               <Heart className="h-[18px] w-[18px]" strokeWidth={1.5} />
             </Link>
@@ -109,20 +98,27 @@ export default function Header({ transparent = false }) {
         </div>
 
         {/* Desktop nav */}
-        <nav className="hidden lg:block border-t border-linen/60">
+        <nav
+          className={cn(
+            'hidden lg:block border-t border-linen/60'
+          )}
+        >
           <div className="container flex items-center justify-center gap-8 xl:gap-12 h-12">
             {nav.map((n) => (
               <Link
                 key={n.name}
                 href={n.href}
-                className="text-[11px] uppercase tracking-[0.22em] text-ink/80 hover:text-terracotta transition-colors"
+                className={cn(
+                  'text-[11px] uppercase tracking-[0.22em] transition-colors',
+                  'text-ink/75 hover:text-emerald'
+                )}
               >
                 {n.name}
               </Link>
             ))}
           </div>
         </nav>
-      </motion.header>
+      </header>
 
       {/* Mobile drawer */}
       <AnimatePresence>
@@ -143,7 +139,7 @@ export default function Header({ transparent = false }) {
               className="fixed inset-y-0 left-0 w-[85%] max-w-sm bg-ivory z-50 lg:hidden flex flex-col"
             >
               <div className="flex items-center justify-between p-6 border-b border-linen/60">
-                <span className="font-display text-xl font-black">Ginette</span>
+                <Logo variant="dark" size="sm" />
                 <button onClick={() => setMobile(false)} aria-label="Fermer">
                   <X className="h-5 w-5" strokeWidth={1.5} />
                 </button>

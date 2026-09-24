@@ -46,7 +46,7 @@ function AuthCard({ mode, setMode, onLogin, onRegister }) {
     setBusy(true)
     const r = mode === 'login' ? await onLogin(email, password) : await onRegister(email, password, name)
     if (!r.ok) toast.error(r.error || 'Erreur')
-    else toast.success('Bienvenue chez Ginette')
+    else toast.success('Bienvenue chez Atelier JLT')
     setBusy(false)
   }
 
@@ -78,7 +78,7 @@ function AuthCard({ mode, setMode, onLogin, onRegister }) {
         </button>
       </form>
       <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="mt-6 text-[11px] uppercase tracking-[0.24em] text-ink/60 hover:text-terracotta transition w-full text-center">
-        {mode === 'login' ? 'Nouvelle chez Ginette — créer un compte' : "Déjà un compte — me connecter"}
+        {mode === 'login' ? 'Nouveau chez Atelier JLT — créer un compte' : "Déjà un compte — me connecter"}
       </button>
     </motion.div>
   )
@@ -100,7 +100,7 @@ function Dashboard({ user, tab, setTab, onLogout }) {
           <h1 className="font-display font-bold text-4xl md:text-6xl mt-3 leading-tight">Bonjour {user.name || user.email.split('@')[0]}.</h1>
           <p className="text-ink/60 mt-3">
             <Sparkles className="h-4 w-4 inline mr-1 text-terracotta" strokeWidth={1.5} />
-            {user.loyaltyPoints || 0} points Ginette · <span className="italic">100 points = -10€ sur votre prochaine commande</span>
+            {user.loyaltyPoints || 0} points JLT · <span className="italic">100 points = -10€ sur votre prochaine commande</span>
           </p>
         </div>
         <button onClick={onLogout} className="self-start flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-ink/60 hover:text-terracotta transition">
@@ -149,7 +149,7 @@ function TabProfile({ user }) {
         <MetaBox label="Prénom" value={user.name || '—'} />
         <MetaBox label="Email" value={user.email} />
         <MetaBox label="Compte créé le" value={new Date(user.createdAt).toLocaleDateString('fr-FR')} />
-        <MetaBox label="Points Ginette" value={`${user.loyaltyPoints || 0} pts`} />
+        <MetaBox label="Points JLT" value={`${user.loyaltyPoints || 0} pts`} />
       </div>
     </div>
   )

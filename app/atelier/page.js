@@ -22,7 +22,7 @@ export default function AtelierPage() {
         <section className="relative h-[70vh] min-h-[500px] overflow-hidden bg-ink">
           <motion.div initial={{ scale: 1.1 }} animate={{ scale: 1 }} transition={{ duration: 2.5, ease: [0.22, 1, 0.36, 1] }} className="absolute inset-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={IMAGES.atelier} alt="L'atelier Ginette" className="w-full h-full object-cover" />
+            <img src={IMAGES.atelier} alt="L'atelier JLT" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-ink/40" />
           </motion.div>
           <div className="relative h-full container flex items-end pb-16">
@@ -36,7 +36,7 @@ export default function AtelierPage() {
         {/* Story */}
         <section className="container py-20 md:py-28 max-w-3xl">
           <div className="space-y-6 text-lg leading-relaxed text-ink/80">
-            <p>Un ancien mas drômois, quelques pièces baignées de lumière. C’est ici que naît Ginette. Un lieu vivant, où le silence du crochet croise le bruit du tour, où les matières sèchent posées sur des planches.</p>
+            <p>Un ancien mas drômois, quelques pièces baignées de lumière. C’est ici que naît l’Atelier JLT. Un lieu vivant, où le silence du crochet croise le bruit du tour, où les matières sèchent posées sur des planches.</p>
             <p>Nous sommes une petite équipe, cinq mains, une exigence commune : ne rien produire que nous ne voudrions pas garder chez nous.</p>
           </div>
         </section>

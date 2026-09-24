@@ -10,11 +10,12 @@ module.exports = {
   prefix: '',
   safelist: [
     // Dynamic accent colors used per-category
-    'bg-brique', 'bg-terracotta', 'bg-sable', 'bg-wood', 'bg-plantes', 'bg-sage',
-    'text-brique', 'text-terracotta', 'text-sable', 'text-wood', 'text-plantes', 'text-sage', 'text-ivory',
-    'border-brique', 'border-terracotta', 'border-sable', 'border-wood', 'border-plantes', 'border-sage',
-    'ring-brique', 'ring-plantes',
-    'hover:bg-brique', 'hover:bg-plantes', 'hover:bg-sable',
+    'bg-brique', 'bg-terracotta', 'bg-sable', 'bg-wood', 'bg-plantes', 'bg-sage', 'bg-emerald', 'bg-emeraldDark',
+    'text-brique', 'text-terracotta', 'text-sable', 'text-wood', 'text-plantes', 'text-sage', 'text-ivory', 'text-emerald', 'text-emeraldDark',
+    'border-brique', 'border-terracotta', 'border-sable', 'border-wood', 'border-plantes', 'border-sage', 'border-emerald',
+    'ring-brique', 'ring-plantes', 'ring-emerald',
+    'hover:bg-brique', 'hover:bg-plantes', 'hover:bg-sable', 'hover:bg-emerald', 'hover:bg-emeraldDark',
+    'hover:text-emerald', 'hover:border-emerald',
   ],
   theme: {
     container: {
@@ -73,6 +74,8 @@ module.exports = {
         brique: '#8E3F2C',      /* Brique ancienne — rouge profond terre cuite */
         sage: '#8E9C82',
         plantes: '#5B7A4A',     /* Vert des plantes — feuillage foncé */
+        emerald: '#0F5C3F',     /* Vert émeraude profond — couleur exacte du logo Atelier JLT */
+        emeraldDark: '#0A4530', /* Version foncée pour hover / accents */
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -20,6 +20,9 @@ export default function CartDrawer() {
   const [addr, setAddr] = useState({ name: user?.name || '', email: user?.email || '', address: '', city: '', zip: '', country: 'France', phone: '' })
   const [placed, setPlaced] = useState(null)
 
+  // Clé unique pour distinguer les lignes du panier (slug + variant + size)
+  const lineKey = (it) => `${it.slug}::${it.variant || ''}::${it.size || ''}`
+
   const applyCoupon = async () => {
     const r = await fetch('/api/coupons/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: couponCode }) })
     const d = await r.json()
@@ -79,7 +82,7 @@ export default function CartDrawer() {
                   ) : (
                     <ul className="divide-y divide-linen/60">
                       {items.map((it) => (
-                        <li key={it.slug} className="flex gap-4 p-6">
+                        <li key={lineKey(it)} className="flex gap-4 p-6">
                           <div className="h-24 w-20 flex-shrink-0 bg-cream overflow-hidden">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={it.image} alt={it.name} className="w-full h-full object-cover" />
@@ -88,15 +91,32 @@ export default function CartDrawer() {
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <div className="font-display text-base leading-tight">{it.name}</div>
-                                <div className="text-[11px] uppercase tracking-[0.18em] text-ink/50 mt-1">{it.category}</div>
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-ink/50 mt-1 flex items-center gap-2 flex-wrap">
+                                  {it.variant && it.variantHex && (
+                                    <span
+                                      className="block h-3 w-3 rounded-full border border-ink/15"
+                                      style={{ backgroundColor: it.variantHex }}
+                                    />
+                                  )}
+                                  <span>{it.variant || it.category}</span>
+                                  {it.size && (
+                                    <>
+                                      <span className="text-ink/25">·</span>
+                                      <span className="text-ink/70">{it.size}</span>
+                                    </>
+                                  )}
+                                </div>
+                                {it.sizeDimensions && (
+                                  <div className="text-[10px] text-ink/40 mt-0.5 normal-case tracking-normal">{it.sizeDimensions}</div>
+                                )}
                               </div>
-                              <button onClick={() => remove(it.slug)} className="text-[11px] uppercase tracking-[0.18em] text-ink/50 hover:text-terracotta">Retirer</button>
+                              <button onClick={() => remove(it.slug, { variant: it.variant, size: it.size })} className="text-[11px] uppercase tracking-[0.18em] text-ink/50 hover:text-terracotta">Retirer</button>
                             </div>
                             <div className="flex items-center justify-between mt-4">
                               <div className="flex items-center border border-linen">
-                                <button onClick={() => update(it.slug, Math.max(1, it.qty - 1))} className="p-2 hover:bg-linen/40"><Minus className="h-3 w-3" strokeWidth={1.5} /></button>
+                                <button onClick={() => update(it.slug, Math.max(1, it.qty - 1), { variant: it.variant, size: it.size })} className="p-2 hover:bg-linen/40"><Minus className="h-3 w-3" strokeWidth={1.5} /></button>
                                 <span className="w-8 text-center text-sm tabular-nums">{it.qty}</span>
-                                <button onClick={() => update(it.slug, it.qty + 1)} className="p-2 hover:bg-linen/40"><Plus className="h-3 w-3" strokeWidth={1.5} /></button>
+                                <button onClick={() => update(it.slug, it.qty + 1, { variant: it.variant, size: it.size })} className="p-2 hover:bg-linen/40"><Plus className="h-3 w-3" strokeWidth={1.5} /></button>
                               </div>
                               <div className="text-sm font-medium tabular-nums">{formatPrice(it.price * it.qty)}</div>
                             </div>

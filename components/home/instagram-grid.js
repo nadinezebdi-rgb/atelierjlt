@@ -19,7 +19,7 @@ export default function InstagramGrid() {
       <div className="container">
         <div className="text-center mb-12">
           <Instagram className="h-5 w-5 mx-auto text-terracotta" strokeWidth={1.5} />
-          <h2 className="font-display font-bold text-3xl md:text-4xl mt-4">@ginette.creations</h2>
+          <h2 className="font-display font-bold text-3xl md:text-4xl mt-4">@atelier.jlt</h2>
           <p className="text-ink/60 text-sm mt-3">Nos créations dans de vrais intérieurs.</p>
         </div>
 

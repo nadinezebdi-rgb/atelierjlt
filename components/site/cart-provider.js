@@ -26,12 +26,12 @@ export function CartProvider({ children }) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const add = useCallback(async (slug, qty = 1) => {
+  const add = useCallback(async (slug, qty = 1, extra = {}) => {
     const r = await fetch('/api/cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ slug, qty }),
+      body: JSON.stringify({ slug, qty, ...extra }),
     })
     const d = await r.json()
     setItems(d.items || [])
@@ -39,19 +39,22 @@ export function CartProvider({ children }) {
     return d
   }, [])
 
-  const update = useCallback(async (slug, qty) => {
+  const update = useCallback(async (slug, qty, extra = {}) => {
     const r = await fetch('/api/cart', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ slug, qty }),
+      body: JSON.stringify({ slug, qty, ...extra }),
     })
     const d = await r.json()
     setItems(d.items || [])
   }, [])
 
-  const remove = useCallback(async (slug) => {
-    const r = await fetch('/api/cart?slug=' + encodeURIComponent(slug), {
+  const remove = useCallback(async (slug, extra = {}) => {
+    const params = new URLSearchParams({ slug })
+    if (extra.variant) params.set('variant', extra.variant)
+    if (extra.size) params.set('size', extra.size)
+    const r = await fetch('/api/cart?' + params.toString(), {
       method: 'DELETE',
       credentials: 'include',
     })

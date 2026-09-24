@@ -1,57 +1,110 @@
-'use client'
-
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
+import { getDb } from '@/lib/db'
 
-const articles = [
-  { slug: '1', title: 'Comment décorer un salon scandinave', cat: 'Décoration', img: IMAGES.interior1, excerpt: 'Lumière, matières naturelles, silhouettes sobres. Cinq règles simples pour créer un salon aussi apaisé qu’accueillant.' },
-  { slug: '2', title: 'Les tendances déco 2026', cat: 'Tendances', img: IMAGES.ceramic2, excerpt: 'Terres cuites, tons minéraux, retour du crochet. Ce que nous voyons monter dans les intérieurs.' },
-  { slug: '3', title: 'Pourquoi choisir le fait main', cat: 'Manifeste', img: IMAGES.atelier, excerpt: 'Trois raisons profondes de refuser la série et de revenir au geste artisanal.' },
-  { slug: '4', title: 'Les matières naturelles à privilégier', cat: 'Guide', img: IMAGES.weave, excerpt: 'Coton, lin, chanvre, laine : comment choisir, comment entretenir.' },
-  { slug: '5', title: "L'art du crochet moderne", cat: 'Savoir-faire', img: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_16983215-f483-48f9-9efe-e8baea0d1238/artifacts/3xwdj2zc_sacs%20crochet.jpeg', excerpt: 'Loin des napperons, le crochet redevient un langage contemporain.' },
-  { slug: '6', title: 'Créer une ambiance chaleureuse', cat: 'Inspiration', img: IMAGES.interior3, excerpt: 'Textures, couleurs, lumière : les leviers concrets pour transformer une pièce.' },
-]
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-export default function JournalPage() {
+export const metadata = {
+  title: 'Journal · Atelier JLT',
+  description: 'Nos regards sur la décoration, la matière, l’artisanat. Un magazine sur ce que l’on garde.',
+}
+
+// Article vedette éditorial hardcodé (existant)
+const FEATURED = {
+  slug: 'tendances-deco-2026-2027',
+  href: '/journal/tendances-deco-2026-2027',
+  title: 'Tendances déco 2026-2027 : couleurs, matières et crochet',
+  cat: 'Tendances',
+  img: IMAGES.heroBeige,
+  excerpt:
+    'Terre cuite, tons minéraux, retour du crochet et accents Luminous Blue pour 2027. Nos idées pour créer un intérieur chaleureux.',
+  featured: true,
+}
+
+async function getPublishedPosts() {
+  try {
+    const db = await getDb()
+    return await db.collection('blog_posts')
+      .find({ published: true })
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .toArray()
+  } catch (e) { return [] }
+}
+
+export default async function JournalPage() {
+  const dbPosts = await getPublishedPosts()
+
+  // Fusionne : article vedette hardcodé + posts DB (sauf s'il y a doublon slug)
+  const dbSlugs = new Set(dbPosts.map((p) => p.slug))
+  const merged = [
+    ...(dbSlugs.has(FEATURED.slug) ? [] : [FEATURED]),
+    ...dbPosts.map((p) => ({
+      slug: p.slug,
+      href: `/journal/${p.slug}`,
+      title: p.title,
+      cat: p.category || 'Journal',
+      img: p.image || IMAGES.interior1,
+      excerpt: p.excerpt || '',
+      featured: false,
+    })),
+  ]
+
   return (
     <div className="min-h-screen bg-ivory">
       <Header />
       <main>
         <section className="container py-16 md:py-24 border-b border-linen">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9 }}>
+          <div>
             <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Le Journal</span>
-            <h1 className="font-display font-bold text-5xl md:text-7xl mt-4 leading-[0.98] text-balance max-w-3xl">Un magazine sur ce que l'on garde.</h1>
-            <p className="text-ink/60 mt-6 max-w-xl leading-relaxed">Nos regards sur la décoration, la matière, l’artisanat. Écrits lentement, comme le reste.</p>
-          </motion.div>
+            <h1
+              className="font-display font-normal text-5xl md:text-7xl mt-4 leading-[0.98] text-balance max-w-3xl"
+              style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
+            >
+              Un magazine sur ce que l&apos;on garde.
+            </h1>
+            <p className="text-ink/60 mt-6 max-w-xl leading-relaxed">
+              Nos regards sur la décoration, la matière, l&rsquo;artisanat. Écrits lentement, comme le reste.
+            </p>
+          </div>
         </section>
 
-        <section className="container py-16 md:py-24 grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-12">
-          {articles.map((a, i) => (
-            <motion.article
-              key={a.slug}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.9, delay: (i % 3) * 0.08 }}
-            >
-              <Link href="#" className="group block">
-                <div className="aspect-[4/5] overflow-hidden bg-cream">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={a.img} alt={a.title} className="w-full h-full object-cover img-zoom" />
-                </div>
-                <div className="mt-5">
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-terracotta">{a.cat}</div>
-                  <h2 className="font-display text-2xl md:text-3xl mt-2 leading-tight group-hover:text-terracotta transition-colors">{a.title}</h2>
-                  <p className="text-ink/60 mt-3 leading-relaxed">{a.excerpt}</p>
-                </div>
-              </Link>
-            </motion.article>
-          ))}
-        </section>
+        {merged.length === 0 ? (
+          <section className="container py-24 text-center">
+            <p className="text-ink/50 italic">Aucun article publié pour l&rsquo;instant. Revenez bientôt.</p>
+          </section>
+        ) : (
+          <section className="container py-16 md:py-24 grid md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-12">
+            {merged.map((a) => (
+              <article key={a.slug}>
+                <Link href={a.href} className="group block">
+                  <div className="aspect-[4/5] overflow-hidden bg-cream relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a.img} alt={a.title} className="w-full h-full object-cover img-zoom" />
+                    {a.featured && (
+                      <span className="absolute top-4 left-4 bg-emerald text-ivory text-[10px] uppercase tracking-[0.22em] px-3 py-1.5">
+                        À lire
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-5">
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-terracotta">{a.cat}</div>
+                    <h2 className="font-display text-2xl md:text-3xl mt-2 leading-tight group-hover:text-terracotta transition-colors">
+                      {a.title}
+                    </h2>
+                    <p className="text-ink/60 mt-3 leading-relaxed">{a.excerpt}</p>
+                    <span className="inline-block mt-4 text-[10px] uppercase tracking-[0.28em] text-emerald border-b border-emerald/30 group-hover:border-emerald pb-0.5">
+                      Lire l&rsquo;article →
+                    </span>
+                  </div>
+                </Link>
+              </article>
+            ))}
+          </section>
+        )}
       </main>
       <Footer />
       <CartDrawer />

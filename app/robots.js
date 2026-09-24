@@ -3,7 +3,7 @@ export default function robots() {
     rules: [
       { userAgent: '*', allow: '/', disallow: ['/api/', '/compte/'] },
     ],
-    sitemap: 'https://atelierginette.fr/sitemap.xml',
-    host: 'https://atelierginette.fr',
+    sitemap: 'https://atelierjlt.fr/sitemap.xml',
+    host: 'https://atelierjlt.fr',
   }
 }

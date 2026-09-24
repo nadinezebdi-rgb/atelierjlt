@@ -62,10 +62,22 @@ async function writeCart(sid, items) {
     { upsert: true }
   )
 }
-function toCartLine(product, qty) {
+function toCartLine(product, qty, variant, size) {
+  const variantData = variant && product.variants
+    ? product.variants.find((v) => v.name === variant)
+    : null
+  const sizeData = size && product.sizes
+    ? product.sizes.find((s) => s.label === size)
+    : null
+  // Prix : la taille prime sur le variant qui prime sur le prix produit
+  const price = sizeData?.price ?? variantData?.price ?? product.price
   return {
-    slug: product.slug, name: product.name, price: product.price,
-    category: product.category, image: product.images[0], qty,
+    slug: product.slug, name: product.name, price,
+    category: product.category, image: variantData?.image || product.images[0], qty,
+    variant: variant || null,
+    variantHex: variantData?.hex || null,
+    size: size || null,
+    sizeDimensions: sizeData?.dimensions || null,
   }
 }
 
@@ -77,7 +89,7 @@ async function handler(request, { params }) {
   const url = new URL(request.url)
 
   try {
-    if (!root) return NextResponse.json({ message: 'Atelier Ginette API', ok: true })
+    if (!root) return NextResponse.json({ message: 'Atelier JLT API', ok: true })
 
     // ============ PRODUCTS ============
     if (root === 'products') {
@@ -128,13 +140,26 @@ async function handler(request, { params }) {
 
       if (method === 'POST') {
         if (!sid) sid = uuid()
-        const { slug, qty = 1 } = body
+        const { slug, qty = 1, variant = null, size = null } = body
         const product = await findAnyProduct(slug)
         if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         const items = await readCart(sid)
-        const existing = items.find((i) => i.slug === slug)
-        if (existing) existing.qty = Math.min(existing.qty + qty, product.stock || 99)
-        else items.push(toCartLine(product, Math.min(qty, product.stock || 99)))
+        // Ligne différenciée par slug + variant + size
+        const existing = items.find((i) =>
+          i.slug === slug &&
+          (i.variant || null) === variant &&
+          (i.size || null) === size
+        )
+        const variantStock = variant && product.variants ? (product.variants.find((v) => v.name === variant)?.stock || 0) : null
+        const sizeStock = size && product.sizes ? (product.sizes.find((s) => s.label === size)?.stock || 0) : null
+        const maxStock = Math.min(
+          variantStock ?? Infinity,
+          sizeStock ?? Infinity,
+          product.stock || 99
+        )
+        const cap = Number.isFinite(maxStock) ? maxStock : 99
+        if (existing) existing.qty = Math.min(existing.qty + qty, cap || 99)
+        else items.push(toCartLine(product, Math.min(qty, cap || 99), variant, size))
         await writeCart(sid, items)
         const res = NextResponse.json(cartResponse(items))
         setSidCookie(res, sid)
@@ -143,12 +168,27 @@ async function handler(request, { params }) {
 
       if (method === 'PATCH') {
         if (!sid) sid = uuid()
-        const { slug, qty } = body
+        const { slug, qty, variant = null, size = null } = body
         const items = await readCart(sid)
-        const line = items.find((i) => i.slug === slug)
+        // Match précis par slug + variant + size si fournis
+        let line = items.find((i) =>
+          i.slug === slug &&
+          (variant === null || (i.variant || null) === variant) &&
+          (size === null || (i.size || null) === size)
+        )
+        // Fallback slug-only : uniquement s'il n'existe qu'une seule ligne pour ce slug
+        // (évite de muter par erreur une autre déclinaison)
+        if (!line) {
+          const matches = items.filter((i) => i.slug === slug)
+          if (matches.length === 1) line = matches[0]
+        }
         if (line) {
           const p = await findAnyProduct(slug)
-          line.qty = Math.max(1, Math.min(qty, p?.stock || 99))
+          const vStock = line.variant && p?.variants ? (p.variants.find((v) => v.name === line.variant)?.stock || 0) : null
+          const sStock = line.size && p?.sizes ? (p.sizes.find((s) => s.label === line.size)?.stock || 0) : null
+          const cap = Math.min(vStock ?? Infinity, sStock ?? Infinity, p?.stock || 99)
+          const capNum = Number.isFinite(cap) ? cap : 99
+          line.qty = Math.max(1, Math.min(qty, capNum || 99))
         }
         await writeCart(sid, items)
         const res = NextResponse.json(cartResponse(items))
@@ -159,7 +199,14 @@ async function handler(request, { params }) {
       if (method === 'DELETE') {
         if (!sid) return NextResponse.json(cartResponse([]))
         const slug = url.searchParams.get('slug')
-        const items = (await readCart(sid)).filter((i) => i.slug !== slug)
+        const variant = url.searchParams.get('variant')
+        const size = url.searchParams.get('size')
+        const items = (await readCart(sid)).filter((i) => {
+          if (i.slug !== slug) return true
+          if (variant !== null && (i.variant || '') !== (variant || '')) return true
+          if (size !== null && (i.size || '') !== (size || '')) return true
+          return false
+        })
         await writeCart(sid, items)
         return NextResponse.json(cartResponse(items))
       }
@@ -512,6 +559,193 @@ async function handler(request, { params }) {
         const list = await db.collection('gift_cards').find({}).sort({ createdAt: -1 }).toArray()
         return NextResponse.json({ list })
       }
+
+      // === BLOG / JOURNAL — CRUD ===
+      if (sub === 'blog') {
+        if (method === 'GET') {
+          const posts = await db.collection('blog_posts').find({}).sort({ createdAt: -1 }).toArray()
+          return NextResponse.json({ posts })
+        }
+        if (method === 'POST') {
+          const body = await request.json()
+          const slug = (body.slug || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+          if (!slug) return NextResponse.json({ error: 'Slug invalide' }, { status: 400 })
+          // Slug must be unique
+          const existing = await db.collection('blog_posts').findOne({ slug })
+          if (existing) return NextResponse.json({ error: 'Un article utilise déjà ce slug' }, { status: 409 })
+          const now = new Date()
+          const post = {
+            _id: uuid(),
+            slug,
+            title: body.title || 'Nouvel article',
+            category: body.category || 'Journal',
+            excerpt: body.excerpt || '',
+            image: body.image || '',
+            imageAlt: body.imageAlt || '',
+            content: body.content || '',      // Markdown
+            keywords: body.keywords || [],
+            metaTitle: body.metaTitle || body.title || '',
+            metaDescription: body.metaDescription || body.excerpt || '',
+            author: body.author || 'Atelier JLT',
+            readingTime: body.readingTime || '5 min',
+            published: Boolean(body.published),
+            publishedAt: body.published ? now : null,
+            createdAt: now,
+            updatedAt: now,
+          }
+          await db.collection('blog_posts').insertOne(post)
+          return NextResponse.json({ ok: true, post })
+        }
+        if (method === 'PATCH') {
+          const slug = url.searchParams.get('slug')
+          const body = await request.json()
+          const now = new Date()
+          // Si on passe published=true et il n'y a pas encore de date, on la fixe
+          const current = await db.collection('blog_posts').findOne({ slug })
+          if (!current) return NextResponse.json({ error: 'Article introuvable' }, { status: 404 })
+          const publishedAt = body.published && !current.publishedAt ? now : current.publishedAt
+          const update = { ...body, updatedAt: now, publishedAt }
+          delete update._id // sécurité
+          delete update.slug // le slug reste stable
+          await db.collection('blog_posts').updateOne({ slug }, { $set: update })
+          return NextResponse.json({ ok: true })
+        }
+        if (method === 'DELETE') {
+          const slug = url.searchParams.get('slug')
+          await db.collection('blog_posts').deleteOne({ slug })
+          return NextResponse.json({ ok: true })
+        }
+      }
+
+      // === CONTENU DU SITE (hero + collections) ===
+      if (sub === 'site-content') {
+        if (method === 'GET') {
+          const doc = await db.collection('site_content').findOne({ _id: 'home' })
+          return NextResponse.json({ content: doc?.content || null })
+        }
+        if (method === 'PATCH' || method === 'POST') {
+          const body = await request.json()
+          await db.collection('site_content').updateOne(
+            { _id: 'home' },
+            { $set: { content: body, updatedAt: new Date() } },
+            { upsert: true }
+          )
+          return NextResponse.json({ ok: true })
+        }
+      }
+
+      // === PARAMÈTRES DU SITE (email, réseaux…) ===
+      if (sub === 'settings') {
+        if (method === 'GET') {
+          const doc = await db.collection('site_settings').findOne({ _id: 'main' })
+          return NextResponse.json({ settings: doc?.settings || null })
+        }
+        if (method === 'PATCH' || method === 'POST') {
+          const body = await request.json()
+          await db.collection('site_settings').updateOne(
+            { _id: 'main' },
+            { $set: { settings: body, updatedAt: new Date() } },
+            { upsert: true }
+          )
+          return NextResponse.json({ ok: true })
+        }
+      }
+
+      // === UPLOAD FICHIER (image, vidéo, PDF — multipart form-data) ===
+      if (sub === 'upload' && method === 'POST') {
+        try {
+          const formData = await request.formData()
+          const file = formData.get('file')
+          if (!file || typeof file === 'string') {
+            return NextResponse.json({ error: 'Aucun fichier reçu' }, { status: 400 })
+          }
+          const fs = await import('node:fs')
+          const path = await import('node:path')
+          const arrayBuffer = await file.arrayBuffer()
+          const buffer = Buffer.from(arrayBuffer)
+          // Extraction extension propre
+          const original = file.name || 'upload.bin'
+          const rawExt = (original.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+          const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp']
+          const VIDEO_EXTS = ['mp4', 'webm', 'mov']
+          const DOC_EXTS = ['pdf']
+          const ALL_EXTS = [...IMAGE_EXTS, ...VIDEO_EXTS, ...DOC_EXTS]
+          if (!ALL_EXTS.includes(rawExt)) {
+            return NextResponse.json({
+              error: `Extension non supportée : .${rawExt}. Autorisés : ${ALL_EXTS.join(', ')}`
+            }, { status: 400 })
+          }
+          // Limite de taille : 50 Mo pour vidéo/PDF, 8 Mo pour image
+          const maxBytes = IMAGE_EXTS.includes(rawExt) ? 8 * 1024 * 1024 : 50 * 1024 * 1024
+          if (buffer.length > maxBytes) {
+            return NextResponse.json({
+              error: `Fichier trop volumineux (${(buffer.length / 1024 / 1024).toFixed(1)} Mo, max ${maxBytes / 1024 / 1024} Mo)`
+            }, { status: 400 })
+          }
+          const name = 'upload-' + uuid().slice(0, 8) + '.' + rawExt
+          const dir = path.join(process.cwd(), 'lib', 'product-images')
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+          fs.writeFileSync(path.join(dir, name), buffer)
+          // Retourne une URL selon le type :
+          // - image → /api/img/{name-sans-ext} (compat avec système existant)
+          // - vidéo/PDF → /api/file/{name-avec-ext}
+          let kind, publicUrl
+          if (IMAGE_EXTS.includes(rawExt)) {
+            kind = 'image'
+            publicUrl = '/api/img/' + name.replace(/\.(jpe?g|webp|png)$/i, '')
+          } else if (VIDEO_EXTS.includes(rawExt)) {
+            kind = 'video'
+            publicUrl = '/api/file/' + name
+          } else {
+            kind = 'pdf'
+            publicUrl = '/api/file/' + name
+          }
+          return NextResponse.json({
+            ok: true,
+            url: publicUrl,
+            filename: name,
+            kind,
+            size: buffer.length,
+            originalName: original,
+          })
+        } catch (e) {
+          console.error('upload error', e)
+          return NextResponse.json({ error: 'Upload failed', details: String(e?.message || e) }, { status: 500 })
+        }
+      }
+    }
+
+    // ============ BLOG / JOURNAL ============
+    if (root === 'blog') {
+      const db = await getDb()
+
+      // GET /api/blog — liste publique (published only)
+      if (method === 'GET' && !sub) {
+        const list = await db.collection('blog_posts')
+          .find({ published: true })
+          .sort({ publishedAt: -1, createdAt: -1 })
+          .toArray()
+        return NextResponse.json({ posts: list })
+      }
+
+      // GET /api/blog/:slug — article public
+      if (method === 'GET' && sub) {
+        const post = await db.collection('blog_posts').findOne({ slug: sub, published: true })
+        if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        return NextResponse.json({ post })
+      }
+    }
+
+    // ============ PUBLIC SITE CONTENT (lecture seule) ============
+    if (root === 'site-content' && method === 'GET') {
+      const db = await getDb()
+      const doc = await db.collection('site_content').findOne({ _id: 'home' })
+      return NextResponse.json({ content: doc?.content || null })
+    }
+    if (root === 'site-settings' && method === 'GET') {
+      const db = await getDb()
+      const doc = await db.collection('site_settings').findOne({ _id: 'main' })
+      return NextResponse.json({ settings: doc?.settings || null })
     }
 
     // ============ NEWSLETTER ============
@@ -550,4 +784,5 @@ async function handler(request, { params }) {
 export const GET = handler
 export const POST = handler
 export const PATCH = handler
+export const PUT = handler
 export const DELETE = handler

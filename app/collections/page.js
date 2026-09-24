@@ -57,8 +57,9 @@ function CollectionsInner() {
           transition={{ duration: 0.9 }}
           className="container pb-10 md:pb-16 border-b border-linen"
         >
-          <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Collections</span>
-          <h1 className="font-display font-bold text-4xl md:text-6xl mt-4 leading-[1.02] text-balance">{title}</h1>
+          <span className="text-[10px] uppercase tracking-[0.36em] text-emerald">Collections</span>
+          <h1 className="font-display font-normal text-4xl md:text-6xl mt-4 leading-[1.02] text-balance text-emerald"
+              style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>{title}</h1>
           <p className="text-ink/60 mt-4 max-w-xl italic">{subtitle}</p>
         </motion.div>
 

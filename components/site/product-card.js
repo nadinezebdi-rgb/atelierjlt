@@ -62,9 +62,25 @@ export default function ProductCard({ product, index = 0 }) {
           </div>
         </div>
         <div className="pt-4 flex items-start justify-between gap-3">
-          <div>
-            <div className="font-display text-[17px] leading-snug">{product.name}</div>
+          <div className="min-w-0">
+            <div className="font-display text-[17px] leading-snug truncate"
+                 style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>{product.name}</div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-ink/50 mt-1">{product.material}</div>
+            {product.variants && product.variants.length > 1 && (
+              <div className="mt-2 flex items-center gap-1.5">
+                {product.variants.slice(0, 5).map((v) => (
+                  <span
+                    key={v.name}
+                    title={v.name}
+                    className="block h-3 w-3 rounded-full border border-ink/15"
+                    style={{ backgroundColor: v.hex }}
+                  />
+                ))}
+                {product.variants.length > 5 && (
+                  <span className="text-[10px] text-ink/50">+{product.variants.length - 5}</span>
+                )}
+              </div>
+            )}
           </div>
           <div className="font-display text-[17px] tabular-nums whitespace-nowrap">{formatPrice(product.price)}</div>
         </div>

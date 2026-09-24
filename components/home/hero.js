@@ -18,10 +18,11 @@ export default function Hero() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={IMAGES.interior1}
-          alt="Intérieur Ginette"
+          alt="Intérieur Atelier JLT"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/30 via-ink/10 to-ink/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/85 via-ink/25 to-ink/75" />
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-ink/70 to-transparent" />
       </motion.div>
 
       <div className="relative h-full container flex flex-col justify-end pb-16 md:pb-24">
@@ -40,7 +41,7 @@ export default function Hero() {
             une <em className="not-italic text-terracotta">âme</em> à votre intérieur.
           </h1>
           <p className="mt-6 md:mt-8 text-base md:text-lg text-ivory/85 max-w-xl leading-relaxed">
-            Chaque création Ginette est imaginée, fabriquée et assemblée à la main.
+            Chaque création Atelier JLT est imaginée, fabriquée et assemblée à la main.
             Une maison de décoration, pas une simple boutique.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4">

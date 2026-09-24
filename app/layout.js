@@ -1,11 +1,19 @@
 import './globals.css'
 import { Providers } from './providers'
-import { Fraunces, Inter } from 'next/font/google'
+import { Fraunces, Inter, Instrument_Serif } from 'next/font/google'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800', '900'],
   variable: '--font-display',
+  display: 'swap',
+})
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: ['400'],
+  style: ['normal', 'italic'],
+  variable: '--font-logo',
   display: 'swap',
 })
 
@@ -17,35 +25,35 @@ const inter = Inter({
 })
 
 export const metadata = {
-  metadataBase: new URL('https://atelierginette.fr'),
+  metadataBase: new URL('https://atelierjlt.fr'),
   title: {
-    default: 'Atelier Ginette — Maison française de décoration artisanale',
-    template: '%s · Atelier Ginette',
+    default: 'Atelier JLT — Maison française de décoration artisanale',
+    template: '%s · Atelier JLT',
   },
   description:
-    "Les objets qui donnent une âme à votre intérieur. Chaque création Ginette est imaginée, fabriquée et assemblée à la main dans notre atelier français.",
-  applicationName: 'Atelier Ginette',
+    "Les objets qui donnent une âme à votre intérieur. Chaque création Atelier JLT est imaginée, fabriquée et assemblée à la main dans notre atelier français. Plaids, coussins, macramé, tapis, poterie.",
+  applicationName: 'Atelier JLT',
   keywords: [
     'décoration artisanale française',
-    'crochet fait main',
-    'sac crochet',
-    'plaid chunky',
-    'bougies parfumées cristaux',
-    'bijoux artisanaux',
-    'atelier ginette',
+    'plaid crochet',
+    'coussin fait main',
+    'macramé mural',
+    'tapis artisanal',
+    'poterie céramique',
+    'atelier jlt',
   ],
-  authors: [{ name: 'Atelier Ginette', url: 'https://atelierginette.fr' }],
+  authors: [{ name: 'Atelier JLT', url: 'https://atelierjlt.fr' }],
   alternates: {
-    canonical: 'https://atelierginette.fr',
+    canonical: 'https://atelierjlt.fr',
     languages: {
-      'fr-FR': 'https://atelierginette.fr',
+      'fr-FR': 'https://atelierjlt.fr',
     },
   },
   openGraph: {
-    title: 'Atelier Ginette',
+    title: 'Atelier JLT',
     description: 'Maison française de décoration artisanale.',
-    url: 'https://atelierginette.fr',
-    siteName: 'Atelier Ginette',
+    url: 'https://atelierjlt.fr',
+    siteName: 'Atelier JLT',
     locale: 'fr_FR',
     type: 'website',
     images: [
@@ -53,13 +61,13 @@ export const metadata = {
         url: '/api/img/lifestyle-plaid',
         width: 1024,
         height: 1024,
-        alt: 'Une scène chez Ginette — plaid crochet et coussins',
+        alt: 'Une scène Atelier JLT — plaid crochet et coussins',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Atelier Ginette',
+    title: 'Atelier JLT',
     description: 'Maison française de décoration artisanale.',
   },
   icons: {
@@ -69,7 +77,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr" className={`${fraunces.variable} ${inter.variable}`}>
+    <html lang="fr" className={`${fraunces.variable} ${instrumentSerif.variable} ${inter.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{

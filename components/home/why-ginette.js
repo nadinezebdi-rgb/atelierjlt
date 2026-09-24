@@ -16,7 +16,7 @@ export default function WhyGinette() {
     <section className="py-20 md:py-28 bg-cream">
       <div className="container">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Pourquoi Ginette ?</span>
+          <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Pourquoi Atelier JLT ?</span>
           <h2 className="font-display font-bold text-4xl md:text-5xl mt-4 text-balance">Le luxe discret du travail bien fait.</h2>
         </div>
 

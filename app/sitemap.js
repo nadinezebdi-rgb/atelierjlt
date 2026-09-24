@@ -1,6 +1,6 @@
 import { PRODUCTS, CATEGORIES } from '@/lib/data/products'
 
-const BASE = 'https://atelierginette.fr'
+const BASE = 'https://atelierjlt.fr'
 
 export default function sitemap() {
   const now = new Date()

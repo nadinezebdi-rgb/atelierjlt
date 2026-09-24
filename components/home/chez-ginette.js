@@ -146,7 +146,7 @@ export default function ChezGinette() {
       <div className="container relative z-10">
         <div className="flex items-end justify-between mb-10 md:mb-14 gap-4">
           <div>
-            <span className="text-[10px] uppercase tracking-[0.36em] text-plantes">Chez Ginette</span>
+            <span className="text-[10px] uppercase tracking-[0.36em] text-plantes">Chez Atelier JLT</span>
             <h2 className="font-display font-bold text-4xl md:text-5xl mt-4 text-balance">Trois pièces, une même main.</h2>
           </div>
           <div className="hidden md:flex items-center gap-2">
