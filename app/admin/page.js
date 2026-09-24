@@ -996,12 +996,13 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
       <AnimatePresence>
         {pickerOpen && (
           <MediaPickerModal
+            multiSelect
             kindFilter={accept === 'all' ? 'all' : 'image'}
             onClose={() => setPickerOpen(false)}
-            onPick={(url) => {
-              onChange([...(images || []), url])
+            onPickMany={(urls) => {
+              onChange([...(images || []), ...urls])
               setPickerOpen(false)
-              toast.success('Ajouté depuis la bibliothèque')
+              toast.success(`${urls.length} fichier${urls.length > 1 ? 's ajoutés' : ' ajouté'} depuis la bibliothèque`)
             }}
             excludeUrls={images || []}
           />
@@ -1184,10 +1185,11 @@ function TabContent() {
    MediaPickerModal — sélecteur ouvert depuis les éditeurs
    pour insérer un fichier de la bibliothèque en 1 clic.
    ========================================================= */
-function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls = [] }) {
+function MediaPickerModal({ onClose, onPick, onPickMany, kindFilter = 'image', excludeUrls = [], multiSelect = false }) {
   const [files, setFiles] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState(kindFilter === 'all' ? 'all' : 'image')
+  const [selected, setSelected] = useState([]) // array of urls in insertion order
 
   useEffect(() => {
     fetch('/api/admin/site-content', { credentials: 'include' })
@@ -1201,6 +1203,18 @@ function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls =
     if (bytes < 1024) return bytes + ' o'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' Ko'
     return (bytes / 1024 / 1024).toFixed(1) + ' Mo'
+  }
+
+  const toggleSelect = (url) => {
+    setSelected((prev) =>
+      prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]
+    )
+  }
+
+  const confirmSelection = () => {
+    if (selected.length === 0) return
+    if (onPickMany) onPickMany(selected)
+    else if (onPick) selected.forEach((u) => onPick(u))
   }
 
   // Filtrage : par type demandé + recherche + on retire ce qui est déjà utilisé
@@ -1221,6 +1235,17 @@ function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls =
     .filter((f) => !excluded.has(f.url))
     .reduce((acc, f) => { acc[f.kind] = (acc[f.kind] || 0) + 1; return acc }, {})
   const totalAvailable = Object.values(typeCounts).reduce((a, b) => a + b, 0)
+
+  const handleCardClick = (url) => {
+    if (multiSelect) toggleSelect(url)
+    else onPick && onPick(url)
+  }
+
+  const selectAllVisible = () => {
+    const urls = filtered.map((f) => f.url)
+    setSelected((prev) => Array.from(new Set([...prev, ...urls])))
+  }
+  const clearSelection = () => setSelected([])
 
   return (
     <>
@@ -1245,7 +1270,9 @@ function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls =
             </span>
             <h3 className="font-display text-2xl mt-1">Choisir un fichier</h3>
             <p className="text-xs text-ink/60 mt-1">
-              Cliquez sur un fichier pour l’insérer immédiatement.
+              {multiSelect
+                ? 'Cochez plusieurs fichiers puis validez pour tout insérer d’un coup.'
+                : 'Cliquez sur un fichier pour l’insérer immédiatement.'}
             </p>
           </div>
           <button
@@ -1259,6 +1286,35 @@ function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls =
         </div>
 
         <div className="p-6 flex-1 overflow-auto">
+          {/* Barre "sélectionner tout" en multi-select */}
+          {multiSelect && filtered.length > 0 && (
+            <div className="flex items-center justify-between mb-4 text-[10px] uppercase tracking-[0.22em] text-ink/60">
+              <span>
+                {selected.length > 0 ? `${selected.length} sélectionné${selected.length > 1 ? 's' : ''}` : 'Cochez pour sélectionner'}
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={selectAllVisible}
+                  className="hover:text-emerald transition"
+                >
+                  Tout sélectionner
+                </button>
+                {selected.length > 0 && (
+                  <>
+                    <span className="text-ink/25">·</span>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="hover:text-terracotta transition"
+                    >
+                      Tout désélectionner
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
           {/* Barre de recherche + filtres */}
           {(files || []).length > 0 && (
             <div className="mb-5 flex flex-wrap items-center gap-3">
@@ -1319,53 +1375,113 @@ function MediaPickerModal({ onClose, onPick, kindFilter = 'image', excludeUrls =
             </p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filtered.map((f) => (
-                <button
-                  key={f.url}
-                  type="button"
-                  onClick={() => onPick(f.url)}
-                  className="group text-left border border-linen bg-ivory hover:border-emerald hover:shadow-md transition overflow-hidden"
-                >
-                  <div className="relative aspect-[4/3] bg-cream overflow-hidden">
-                    {f.kind === 'image' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.url} alt="" className="w-full h-full object-cover img-zoom" />
-                    ) : f.kind === 'video' ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-ink/50">
-                        <Film className="h-10 w-10" strokeWidth={1.5} />
-                        <span className="text-[10px] uppercase tracking-[0.22em] mt-2">Vidéo</span>
-                      </div>
-                    ) : f.thumbnail ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.thumbnail} alt="" className="w-full h-full object-contain bg-ivory" />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-ink/50">
-                        <FileText className="h-10 w-10" strokeWidth={1.5} />
-                        <span className="text-[10px] uppercase tracking-[0.22em] mt-2">PDF</span>
-                      </div>
+              {filtered.map((f) => {
+                const isSelected = selected.includes(f.url)
+                const selectionIdx = isSelected ? selected.indexOf(f.url) + 1 : null
+                return (
+                  <button
+                    key={f.url}
+                    type="button"
+                    onClick={() => handleCardClick(f.url)}
+                    className={cn(
+                      'group text-left border bg-ivory hover:shadow-md transition overflow-hidden relative',
+                      isSelected ? 'border-emerald ring-2 ring-emerald ring-offset-2 ring-offset-ivory' : 'border-linen hover:border-emerald'
                     )}
-                    <span className="absolute top-2 left-2 bg-ink/70 text-ivory text-[9px] uppercase tracking-[0.22em] px-2 py-0.5 backdrop-blur">
-                      {f.kind}
-                    </span>
-                    <div className="absolute inset-0 bg-emerald/0 group-hover:bg-emerald/20 flex items-center justify-center transition">
-                      <div className="opacity-0 group-hover:opacity-100 bg-emerald text-ivory text-[10px] uppercase tracking-[0.24em] px-4 py-2 transition">
-                        Insérer
+                  >
+                    <div className="relative aspect-[4/3] bg-cream overflow-hidden">
+                      {f.kind === 'image' ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={f.url} alt="" className="w-full h-full object-cover img-zoom" />
+                      ) : f.kind === 'video' ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-ink/50">
+                          <Film className="h-10 w-10" strokeWidth={1.5} />
+                          <span className="text-[10px] uppercase tracking-[0.22em] mt-2">Vidéo</span>
+                        </div>
+                      ) : f.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={f.thumbnail} alt="" className="w-full h-full object-contain bg-ivory" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-ink/50">
+                          <FileText className="h-10 w-10" strokeWidth={1.5} />
+                          <span className="text-[10px] uppercase tracking-[0.22em] mt-2">PDF</span>
+                        </div>
+                      )}
+                      <span className="absolute top-2 left-2 bg-ink/70 text-ivory text-[9px] uppercase tracking-[0.22em] px-2 py-0.5 backdrop-blur">
+                        {f.kind}
+                      </span>
+                      {multiSelect ? (
+                        // Badge de sélection avec ordre
+                        <div className={cn(
+                          'absolute top-2 right-2 h-7 w-7 rounded-full border-2 flex items-center justify-center transition',
+                          isSelected
+                            ? 'bg-emerald border-emerald text-ivory'
+                            : 'bg-ivory/80 border-ivory group-hover:border-emerald'
+                        )}>
+                          {isSelected ? (
+                            <span className="text-[11px] font-semibold tabular-nums">{selectionIdx}</span>
+                          ) : (
+                            <Check className="h-3.5 w-3.5 text-transparent group-hover:text-emerald" strokeWidth={2} />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0 bg-emerald/0 group-hover:bg-emerald/20 flex items-center justify-center transition">
+                          <div className="opacity-0 group-hover:opacity-100 bg-emerald text-ivory text-[10px] uppercase tracking-[0.24em] px-4 py-2 transition">
+                            Insérer
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <div className="text-xs text-ink/80 truncate" title={f.originalName}>
+                        {f.originalName || f.filename}
+                      </div>
+                      <div className="text-[10px] text-ink/40 tabular-nums mt-0.5">
+                        {formatSize(f.size)}
                       </div>
                     </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="text-xs text-ink/80 truncate" title={f.originalName}>
-                      {f.originalName || f.filename}
-                    </div>
-                    <div className="text-[10px] text-ink/40 tabular-nums mt-0.5">
-                      {formatSize(f.size)}
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
+
+        {/* Sticky footer — validation multi-select */}
+        {multiSelect && (
+          <div className="sticky bottom-0 bg-ivory/95 backdrop-blur border-t border-linen p-4 flex items-center justify-between gap-4 flex-shrink-0">
+            <div className="text-xs text-ink/60">
+              {selected.length === 0 ? (
+                <span className="italic">Aucun fichier sélectionné</span>
+              ) : (
+                <span>
+                  <strong className="text-ink">{selected.length}</strong> fichier{selected.length > 1 ? 's' : ''} à insérer
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 border border-ink/25 hover:bg-linen/50 transition"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={confirmSelection}
+                disabled={selected.length === 0}
+                className={cn(
+                  'text-[11px] uppercase tracking-[0.24em] px-6 py-2.5 transition',
+                  selected.length === 0
+                    ? 'bg-ink/20 text-ivory cursor-not-allowed'
+                    : 'bg-emerald text-ivory hover:bg-emeraldDark'
+                )}
+              >
+                Insérer {selected.length > 0 ? `(${selected.length})` : ''}
+              </button>
+            </div>
+          </div>
+        )}
       </motion.div>
     </>
   )
