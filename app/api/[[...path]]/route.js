@@ -662,10 +662,11 @@ async function handler(request, { params }) {
           const fs = await import('node:fs')
           const path = await import('node:path')
           const arrayBuffer = await file.arrayBuffer()
-          const buffer = Buffer.from(arrayBuffer)
+          let buffer = Buffer.from(arrayBuffer)
+          const originalSize = buffer.length
           // Extraction extension propre
           const original = file.name || 'upload.bin'
-          const rawExt = (original.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+          let rawExt = (original.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '')
           const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp']
           const VIDEO_EXTS = ['mp4', 'webm', 'mov']
           const DOC_EXTS = ['pdf']
@@ -675,20 +676,46 @@ async function handler(request, { params }) {
               error: `Extension non supportée : .${rawExt}. Autorisés : ${ALL_EXTS.join(', ')}`
             }, { status: 400 })
           }
-          // Limite de taille : 50 Mo pour vidéo/PDF, 8 Mo pour image
-          const maxBytes = IMAGE_EXTS.includes(rawExt) ? 8 * 1024 * 1024 : 50 * 1024 * 1024
+          // Limite de taille : 50 Mo pour vidéo/PDF, 8 Mo pour image après compression
+          const maxBytes = IMAGE_EXTS.includes(rawExt) ? 25 * 1024 * 1024 : 50 * 1024 * 1024
           if (buffer.length > maxBytes) {
             return NextResponse.json({
               error: `Fichier trop volumineux (${(buffer.length / 1024 / 1024).toFixed(1)} Mo, max ${maxBytes / 1024 / 1024} Mo)`
             }, { status: 400 })
           }
+
+          // === COMPRESSION AUTO — images > 2 Mo (jimp, pure JS) ===
+          let compressed = false
+          let compressedSize = null
+          if (IMAGE_EXTS.includes(rawExt) && buffer.length > 2 * 1024 * 1024 && rawExt !== 'webp') {
+            try {
+              const { Jimp } = await import('jimp')
+              const img = await Jimp.read(buffer)
+              // Resize à max 2400px sur le plus grand côté
+              const w = img.bitmap.width
+              const h = img.bitmap.height
+              const maxSide = 2400
+              if (w > maxSide || h > maxSide) {
+                if (w >= h) img.resize({ w: maxSide })
+                else img.resize({ h: maxSide })
+              }
+              // Encode en JPEG qualité 82 (compact)
+              const outBuf = await img.getBuffer('image/jpeg', { quality: 82 })
+              if (outBuf.length < buffer.length) {
+                buffer = outBuf
+                rawExt = 'jpg'
+                compressed = true
+                compressedSize = outBuf.length
+              }
+            } catch (e) {
+              console.warn('compression skipped', e?.message || e)
+            }
+          }
+
           const name = 'upload-' + uuid().slice(0, 8) + '.' + rawExt
           const dir = path.join(process.cwd(), 'lib', 'product-images')
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
           fs.writeFileSync(path.join(dir, name), buffer)
-          // Retourne une URL selon le type :
-          // - image → /api/img/{name-sans-ext} (compat avec système existant)
-          // - vidéo/PDF → /api/file/{name-avec-ext}
           let kind, publicUrl
           if (IMAGE_EXTS.includes(rawExt)) {
             kind = 'image'
@@ -707,6 +734,9 @@ async function handler(request, { params }) {
             kind,
             size: buffer.length,
             originalName: original,
+            originalSize,
+            compressed,
+            compressedSize,
           })
         } catch (e) {
           console.error('upload error', e)

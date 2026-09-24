@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatPrice } from '@/lib/utils'
-import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown } from 'lucide-react'
 import { HOMEPAGE_SECTION_DEFAULTS, mergeHomepageSections, BANNER_TEMPLATES } from '@/lib/homepage-sections'
 import { cn } from '@/lib/utils'
 
@@ -1155,6 +1155,9 @@ function TabContent() {
 function MediaLibrary({ files, onChange }) {
   const [uploading, setUploading] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(null)
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('date-desc') // date-desc | date-asc | size-desc | size-asc | name-asc | name-desc
+  const [typeFilter, setTypeFilter] = useState('all') // all | image | video | pdf
   const dropRef = useState({ dragging: false })[0]
 
   const handleFiles = async (fileList) => {
@@ -1168,14 +1171,31 @@ function MediaLibrary({ files, onChange }) {
         const r = await fetch('/api/admin/upload', { method: 'POST', credentials: 'include', body: fd })
         const d = await r.json()
         if (r.ok && d.url) {
-          uploaded.push({
+          const entry = {
             url: d.url,
             filename: d.filename,
             kind: d.kind,
             size: d.size,
             originalName: d.originalName || file.name,
             uploadedAt: new Date().toISOString(),
-          })
+            compressed: d.compressed || false,
+            originalSize: d.originalSize || d.size,
+          }
+          // Génère la miniature PDF côté client
+          if (d.kind === 'pdf') {
+            try {
+              const { generatePdfThumbnail } = await import('@/lib/pdf-thumbnail')
+              const thumb = await generatePdfThumbnail(file, 400)
+              if (thumb) entry.thumbnail = thumb
+            } catch (e) {
+              console.warn('PDF thumb skip', e)
+            }
+          }
+          uploaded.push(entry)
+          if (d.compressed) {
+            const saved = ((d.originalSize - d.size) / 1024 / 1024).toFixed(1)
+            toast.success(`${file.name} compressé (−${saved} Mo)`)
+          }
         } else {
           toast.error(d.error || 'Envoi échoué')
         }
@@ -1190,9 +1210,9 @@ function MediaLibrary({ files, onChange }) {
     }
   }
 
-  const remove = (idx) => {
+  const remove = (url) => {
     if (!confirm('Retirer ce fichier de la bibliothèque ? Le fichier reste sur le serveur.')) return
-    onChange(files.filter((_, i) => i !== idx))
+    onChange(files.filter((f) => f.url !== url))
   }
 
   const copy = async (url) => {
@@ -1214,12 +1234,6 @@ function MediaLibrary({ files, onChange }) {
     return (bytes / 1024 / 1024).toFixed(1) + ' Mo'
   }
 
-  const iconFor = (kind) => {
-    if (kind === 'video') return <Film className="h-6 w-6" strokeWidth={1.5} />
-    if (kind === 'pdf') return <FileText className="h-6 w-6" strokeWidth={1.5} />
-    return <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
-  }
-
   const onDrop = async (e) => {
     e.preventDefault()
     dropRef.dragging = false
@@ -1228,16 +1242,48 @@ function MediaLibrary({ files, onChange }) {
     if (dropped.length) await handleFiles(dropped)
   }
 
+  // Filter + sort
+  const filtered = (files || [])
+    .filter((f) => typeFilter === 'all' || f.kind === typeFilter)
+    .filter((f) => {
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return (f.originalName || f.filename || '').toLowerCase().includes(q)
+    })
+    .slice()
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':  return new Date(a.uploadedAt || 0) - new Date(b.uploadedAt || 0)
+        case 'size-desc': return (b.size || 0) - (a.size || 0)
+        case 'size-asc':  return (a.size || 0) - (b.size || 0)
+        case 'name-asc':  return (a.originalName || '').localeCompare(b.originalName || '', 'fr')
+        case 'name-desc': return (b.originalName || '').localeCompare(a.originalName || '', 'fr')
+        case 'date-desc':
+        default:          return new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0)
+      }
+    })
+
+  const totalCount = (files || []).length
+  const typeCounts = (files || []).reduce((acc, f) => {
+    acc[f.kind] = (acc[f.kind] || 0) + 1
+    return acc
+  }, {})
+
   return (
     <section className="border border-linen bg-ivory p-6 md:p-8">
       <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
         <div>
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald flex items-center gap-2">
             <FolderOpen className="h-3.5 w-3.5" strokeWidth={1.5} /> Bibliothèque de fichiers
+            {totalCount > 0 && (
+              <span className="text-ink/40 normal-case tracking-normal">
+                · {totalCount} fichier{totalCount > 1 ? 's' : ''}
+              </span>
+            )}
           </h3>
           <p className="text-xs text-ink/60 mt-2 max-w-2xl">
-            Téléchargez ici vos photos, vidéos et documents pour les réutiliser partout sur le site.
-            Formats acceptés : PNG, JPG, WEBP, MP4, WEBM, PDF.
+            Téléchargez photos, vidéos et documents pour les réutiliser partout.
+            Les images de plus de 2 Mo sont compressées automatiquement.
           </p>
         </div>
         <label
@@ -1276,19 +1322,76 @@ function MediaLibrary({ files, onChange }) {
           Glissez-déposez vos fichiers ici, ou cliquez sur <strong>Télécharger un fichier</strong> ci-dessus
         </p>
         <p className="mt-1 text-[10px] uppercase tracking-[0.24em] text-ink/40">
-          PNG · JPG · WEBP · MP4 · WEBM · PDF · max 50 Mo
+          PNG · JPG · WEBP · MP4 · WEBM · PDF · max 50 Mo · compression auto {'>'}2 Mo
         </p>
       </div>
 
+      {/* Barre de recherche + filtres + tri */}
+      {totalCount > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink/40" strokeWidth={1.5} />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher par nom…"
+              className="w-full bg-transparent border border-ink/15 pl-10 pr-3 py-2 text-sm focus:outline-none focus:border-emerald"
+            />
+          </div>
+          <div className="flex items-center gap-1 flex-wrap">
+            {[
+              { key: 'all',   label: `Tous · ${totalCount}` },
+              { key: 'image', label: `Images · ${typeCounts.image || 0}`, disabled: !typeCounts.image },
+              { key: 'video', label: `Vidéos · ${typeCounts.video || 0}`, disabled: !typeCounts.video },
+              { key: 'pdf',   label: `PDF · ${typeCounts.pdf || 0}`, disabled: !typeCounts.pdf },
+            ].map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTypeFilter(t.key)}
+                disabled={t.disabled}
+                className={cn(
+                  'text-[10px] uppercase tracking-[0.22em] px-3 py-2 border transition',
+                  typeFilter === t.key ? 'bg-ink text-ivory border-ink' : 'border-ink/20 hover:border-ink text-ink/70',
+                  t.disabled && 'opacity-40 cursor-not-allowed'
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-ink/60">
+            <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent border border-ink/15 px-2 py-1.5 text-[11px] uppercase tracking-[0.22em] focus:outline-none focus:border-emerald cursor-pointer"
+            >
+              <option value="date-desc">Récents d'abord</option>
+              <option value="date-asc">Anciens d'abord</option>
+              <option value="size-desc">Plus lourds</option>
+              <option value="size-asc">Plus légers</option>
+              <option value="name-asc">Nom A→Z</option>
+              <option value="name-desc">Nom Z→A</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Grille de fichiers */}
-      {(!files || files.length === 0) ? (
+      {totalCount === 0 ? (
         <p className="text-sm text-ink/50 italic text-center py-6">
           Aucun fichier téléchargé pour l’instant.
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-ink/50 italic text-center py-6">
+          Aucun fichier ne correspond à votre recherche.
+        </p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {files.map((f, i) => (
-            <div key={f.url + i} className="border border-linen bg-ivory group overflow-hidden">
+          {filtered.map((f) => (
+            <div key={f.url} className="border border-linen bg-ivory group overflow-hidden">
               <div className="relative aspect-[4/3] bg-cream overflow-hidden">
                 {f.kind === 'image' ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -1298,6 +1401,10 @@ function MediaLibrary({ files, onChange }) {
                     <Film className="h-10 w-10" strokeWidth={1.5} />
                     <span className="text-[10px] uppercase tracking-[0.22em] mt-2">Vidéo</span>
                   </div>
+                ) : f.thumbnail ? (
+                  // Aperçu PDF (première page)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.thumbnail} alt="" className="w-full h-full object-contain bg-ivory" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-ink/50">
                     <FileText className="h-10 w-10" strokeWidth={1.5} />
@@ -1307,6 +1414,14 @@ function MediaLibrary({ files, onChange }) {
                 <span className="absolute top-2 left-2 bg-ink/70 text-ivory text-[9px] uppercase tracking-[0.22em] px-2 py-0.5 backdrop-blur">
                   {f.kind}
                 </span>
+                {f.compressed && (
+                  <span
+                    className="absolute top-2 right-2 bg-emerald text-ivory text-[9px] uppercase tracking-[0.22em] px-2 py-0.5 backdrop-blur"
+                    title={`Compressé de ${formatSize(f.originalSize)} à ${formatSize(f.size)}`}
+                  >
+                    ↓ Optimisé
+                  </span>
+                )}
               </div>
               <div className="p-3 space-y-2">
                 <div className="text-xs text-ink/80 truncate" title={f.originalName}>
@@ -1336,7 +1451,7 @@ function MediaLibrary({ files, onChange }) {
                   </a>
                   <button
                     type="button"
-                    onClick={() => remove(i)}
+                    onClick={() => remove(f.url)}
                     className="inline-flex items-center justify-center px-2 py-1.5 text-terracotta hover:opacity-70"
                     aria-label="Retirer"
                   >
