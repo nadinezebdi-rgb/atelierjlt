@@ -18,6 +18,11 @@ function setSidCookie(res, sid) {
 }
 
 // ---- Merged product catalogue (base + admin overrides + admin-added) ----
+// Categories to hide from the public catalogue (kept in source for potential
+// future reactivation). Products belonging to these categories are dropped
+// before any consumer sees them.
+const HIDDEN_CATEGORIES = new Set(['terre'])
+
 async function loadProducts() {
   const db = await getDb()
   const overrides = await db.collection('product_overrides').find({}).toArray()
@@ -28,11 +33,16 @@ async function loadProducts() {
     if (!o) return p
     return { ...p, ...o.data, slug: p.slug, id: p.id }
   })
-  // Filter out deleted products
+  // Filter out deleted products AND products in hidden categories
   const deleted = new Set(overrides.filter((o) => o.deleted).map((o) => o.slug))
-  const finalBase = merged.filter((p) => !deleted.has(p.slug))
-  // Add custom products
-  return [...finalBase, ...custom.map((c) => ({ ...c, _custom: true }))]
+  const finalBase = merged.filter(
+    (p) => !deleted.has(p.slug) && !HIDDEN_CATEGORIES.has(p.category)
+  )
+  // Add custom products (respect hidden categories too)
+  const customFiltered = custom
+    .map((c) => ({ ...c, _custom: true }))
+    .filter((c) => !HIDDEN_CATEGORIES.has(c.category))
+  return [...finalBase, ...customFiltered]
 }
 async function findAnyProduct(slug) {
   const all = await loadProducts()
