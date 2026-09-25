@@ -292,6 +292,48 @@ function Field({ label, children }) {
   )
 }
 
+/**
+ * Ligne d'un élément composable du hero.
+ * - Case à cocher "Afficher" à gauche
+ * - Libellé + champ éditable
+ * - Bouton "×" (Vider le champ) à droite
+ * L'ensemble est visuellement grisé quand l'élément est masqué.
+ */
+function HeroElementRow({ show, onToggle, label, onClear, children }) {
+  return (
+    <div className={`border ${show ? 'border-linen bg-cream/20' : 'border-dashed border-ink/15 bg-ink/[0.02]'} p-4 transition`}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!show}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="h-4 w-4"
+          />
+          <span className={`text-[11px] uppercase tracking-[0.22em] ${show ? 'text-emerald' : 'text-ink/40'}`}>
+            {show ? '👁 Affiché' : '👁‍🗨 Masqué'}
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.22em] text-ink/70 ml-2">{label}</span>
+        </label>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            title={`Vider "${label}"`}
+            aria-label={`Vider ${label}`}
+            className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.22em] text-terracotta hover:opacity-70 transition"
+          >
+            <Trash2 className="h-3 w-3" strokeWidth={2} /> Vider
+          </button>
+        )}
+      </div>
+      <div className={show ? '' : 'opacity-50 pointer-events-none'}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function SizesEditor({ sizes, onChange }) {
   const list = sizes || []
   const set = (i, k, v) => {
@@ -1071,12 +1113,22 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
    ========================================================= */
 const DEFAULT_CONTENT = {
   hero: {
+    layout: 'full-image',
+    textPosition: 'bottom-left',
+    overlayIntensity: 30,
     eyebrow: 'Nouvelle Collection · Automne-Hiver 2025',
     title: 'L\u2019art discret\nde la maison.',
     subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.',
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
     ctaSecondary: { label: 'Notre atelier', href: '/atelier' },
-    image: '/api/img/jlt-hero-deco',
+    signature: 'Plaid Sylvestre · Crochet main',
+    image: '/api/img/jlt-hero-beige',
+    showEyebrow: true,
+    showTitle: true,
+    showSubtitle: true,
+    showPrimary: true,
+    showSecondary: true,
+    showSignature: true,
   },
   sectionTitle: 'Trois univers, une même main.',
   sectionEyebrow: 'Nos collections',
@@ -1171,33 +1223,140 @@ function TabContent({ onDirtyChange }) {
       </nav>
       <div className="space-y-10 max-w-5xl">
         {/* BIBLIOTHÈQUE DE FICHIERS — téléchargement direct */}
-        {/* HERO */}
+        {/* HERO — compositeur */}
         <section id="admin-hero" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Hero (accueil)</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Surtitre (petit texte)"><input value={c.hero.eyebrow} onChange={(e) => upd('hero.eyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Titre principal (utilise \n pour passer à la ligne)">
-              <textarea rows={2} value={c.hero.title} onChange={(e) => upd('hero.title', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink font-display text-lg" />
-            </Field>
+          <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+            <div>
+              <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Bannière principale · Compositeur</h3>
+              <p className="text-xs text-ink/60 mt-2 max-w-xl">
+                Choisissez une mise en page, réglez chaque élément indépendamment, masquez ce que vous ne voulez pas garder.
+              </p>
+            </div>
           </div>
-          <Field label="Sous-titre">
-            <textarea rows={3} value={c.hero.subtitle} onChange={(e) => upd('hero.subtitle', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink text-sm" />
-          </Field>
-          <Field label="Média du hero (photo ou vidéo MP4 — glisser-déposer)">
+
+          {/* Média + mise en page */}
+          <Field label="Média du hero (photo ou vidéo MP4)">
             <ImageUploader
               images={c.hero.image ? [c.hero.image] : []}
               onChange={(imgs) => upd('hero.image', imgs[0] || '')}
               accept="all"
             />
             <p className="text-[11px] text-ink/50 italic mt-2">
-              💡 Astuce : vous pouvez insérer une vidéo MP4/WEBM à la place d'une photo. Elle jouera en boucle silencieuse.
+              💡 Astuce : pour la mise en page « Image plein cadre », préférez une image horizontale (canapé beige, etc.).
             </p>
           </Field>
-          <div className="grid md:grid-cols-2 gap-4 mt-2">
-            <Field label="Bouton principal — libellé"><input value={c.hero.ctaPrimary?.label || ''} onChange={(e) => upd('hero.ctaPrimary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton principal — lien"><input value={c.hero.ctaPrimary?.href || ''} onChange={(e) => upd('hero.ctaPrimary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton secondaire — libellé"><input value={c.hero.ctaSecondary?.label || ''} onChange={(e) => upd('hero.ctaSecondary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton secondaire — lien"><input value={c.hero.ctaSecondary?.href || ''} onChange={(e) => upd('hero.ctaSecondary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+
+          <div className="grid md:grid-cols-3 gap-4 mt-6">
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.24em] text-ink/50">Mise en page</label>
+              <select
+                value={c.hero.layout || 'full-image'}
+                onChange={(e) => upd('hero.layout', e.target.value)}
+                className="w-full mt-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald cursor-pointer"
+              >
+                <option value="full-image">Image plein cadre — texte superposé</option>
+                <option value="split">Deux colonnes — texte à gauche, image à droite</option>
+              </select>
+            </div>
+            {(c.hero.layout || 'full-image') === 'full-image' && (
+              <>
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.24em] text-ink/50">Position du texte</label>
+                  <select
+                    value={c.hero.textPosition || 'bottom-left'}
+                    onChange={(e) => upd('hero.textPosition', e.target.value)}
+                    className="w-full mt-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald cursor-pointer"
+                  >
+                    <option value="bottom-left">En bas à gauche</option>
+                    <option value="bottom-right">En bas à droite</option>
+                    <option value="center">Centré</option>
+                    <option value="top-left">En haut à gauche</option>
+                    <option value="top-right">En haut à droite</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.24em] text-ink/50">
+                    Voile assombri ({c.hero.overlayIntensity ?? 30}%)
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={c.hero.overlayIntensity ?? 30}
+                    onChange={(e) => upd('hero.overlayIntensity', Number(e.target.value))}
+                    className="w-full mt-2 accent-emerald"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Éléments avec toggle visible + bouton vider */}
+          <div className="mt-8 space-y-4">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-3">
+              Éléments du hero — cochez ce que vous voulez afficher, cliquez sur × pour vider un champ
+            </p>
+
+            <HeroElementRow
+              show={c.hero.showEyebrow !== false}
+              onToggle={(v) => upd('hero.showEyebrow', v)}
+              label="Surtitre"
+              onClear={() => upd('hero.eyebrow', '')}
+            >
+              <input value={c.hero.eyebrow || ''} onChange={(e) => upd('hero.eyebrow', e.target.value)} placeholder="Nouvelle Collection · Automne-Hiver 2025" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
+            </HeroElementRow>
+
+            <HeroElementRow
+              show={c.hero.showTitle !== false}
+              onToggle={(v) => upd('hero.showTitle', v)}
+              label="Titre principal"
+              onClear={() => upd('hero.title', '')}
+            >
+              <textarea rows={2} value={c.hero.title || ''} onChange={(e) => upd('hero.title', e.target.value)} placeholder="L'art discret&#10;de la maison." className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-emerald font-display text-lg" />
+              <p className="text-[10px] text-ink/40 mt-1">Utilise \n pour passer à la ligne</p>
+            </HeroElementRow>
+
+            <HeroElementRow
+              show={c.hero.showSubtitle !== false}
+              onToggle={(v) => upd('hero.showSubtitle', v)}
+              label="Sous-titre"
+              onClear={() => upd('hero.subtitle', '')}
+            >
+              <textarea rows={2} value={c.hero.subtitle || ''} onChange={(e) => upd('hero.subtitle', e.target.value)} placeholder="Plaids crochet, macramé mural..." className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-emerald text-sm" />
+            </HeroElementRow>
+
+            <HeroElementRow
+              show={c.hero.showPrimary !== false}
+              onToggle={(v) => upd('hero.showPrimary', v)}
+              label="Bouton principal"
+              onClear={() => { upd('hero.ctaPrimary.label', ''); upd('hero.ctaPrimary.href', '') }}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <input value={c.hero.ctaPrimary?.label || ''} onChange={(e) => upd('hero.ctaPrimary.label', e.target.value)} placeholder="Libellé" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
+                <input value={c.hero.ctaPrimary?.href || ''} onChange={(e) => upd('hero.ctaPrimary.href', e.target.value)} placeholder="/collections" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm font-mono" />
+              </div>
+            </HeroElementRow>
+
+            <HeroElementRow
+              show={c.hero.showSecondary !== false}
+              onToggle={(v) => upd('hero.showSecondary', v)}
+              label="Bouton secondaire"
+              onClear={() => { upd('hero.ctaSecondary.label', ''); upd('hero.ctaSecondary.href', '') }}
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <input value={c.hero.ctaSecondary?.label || ''} onChange={(e) => upd('hero.ctaSecondary.label', e.target.value)} placeholder="Libellé" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
+                <input value={c.hero.ctaSecondary?.href || ''} onChange={(e) => upd('hero.ctaSecondary.href', e.target.value)} placeholder="/atelier" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm font-mono" />
+              </div>
+            </HeroElementRow>
+
+            <HeroElementRow
+              show={c.hero.showSignature !== false}
+              onToggle={(v) => upd('hero.showSignature', v)}
+              label="Étiquette signature"
+              onClear={() => upd('hero.signature', '')}
+            >
+              <input value={c.hero.signature || ''} onChange={(e) => upd('hero.signature', e.target.value)} placeholder="Plaid Sylvestre · Crochet main" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
+            </HeroElementRow>
           </div>
         </section>
 

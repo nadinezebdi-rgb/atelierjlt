@@ -110,6 +110,15 @@ async function App() {
           ctaPrimary={hero?.ctaPrimary}
           ctaSecondary={hero?.ctaSecondary}
           signature={hero?.signature}
+          layout={hero?.layout}
+          textPosition={hero?.textPosition}
+          overlayIntensity={hero?.overlayIntensity}
+          showEyebrow={hero?.showEyebrow !== false}
+          showTitle={hero?.showTitle !== false}
+          showSubtitle={hero?.showSubtitle !== false}
+          showPrimary={hero?.showPrimary !== false}
+          showSecondary={hero?.showSecondary !== false}
+          showSignature={hero?.showSignature !== false}
         />
 
         {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
