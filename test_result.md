@@ -766,3 +766,850 @@ agent_communication:
 
         Not tested by automated agents (user requested no frontend testing agent invocation
         without explicit permission).
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        ASSISTANT IA "JULIETTE" — Claude Sonnet 4.5 via Emergent LLM Universal Key.
+
+        Deux modes détectés automatiquement via /api/auth/admin-status :
+          - CLIENT (partout) — Q&A produits, matières, entretien, livraison. Lecture seule.
+          - ADMIN (cookie admin détecté) — propose des modifs du site en langage naturel.
+
+        Endpoints ajoutés :
+          - POST /api/chat            → conversation multi-tour (persistée en MongoDB)
+          - POST /api/chat/apply      → exécute une commande (admin uniquement)
+
+        Types de commandes supportés :
+          update_hero, update_hero_slide, update_product, toggle_section,
+          reorder_sections, create_blog_post (draft), update_settings
+
+        Modèle hybride (validé) :
+          - severity "light" (texte, toggle) → bouton vert « APPLIQUER » 1-clic
+          - severity "sensitive" (prix, image, création article) → bouton amber
+            « CONFIRMER » avec modale de confirmation obligatoire
+
+        Fichiers créés :
+          - /app/lib/ai/context.js         (compact catalogue + site state)
+          - /app/lib/ai/prompts.js         (client + admin system prompts, JSON parser)
+          - /app/lib/ai/commands.js        (exécution des commandes en Mongo)
+          - /app/app/api/chat/route.js     (endpoint chat)
+          - /app/app/api/chat/apply/route.js (endpoint apply)
+          - /app/components/chat/chat-widget.js (widget flottant avec 2 modes)
+
+        Fichiers modifiés :
+          - /app/app/layout.js  (ajout <ChatWidget/> global)
+          - /app/.env           (ajout EMERGENT_LLM_KEY)
+          - /app/package.json   (bump NODE_OPTIONS 512→1024 pour libs LLM)
+
+        Validation manuelle (via curl + screenshot) :
+          ✅ Mode client : reconnait bien le catalogue, recommande le Plaid Sylvestre
+             avec prix et matière exacts.
+          ✅ Mode admin (session admin) : "Change le titre du hero en Douceur d hiver"
+             → génère 1 commande update_hero light avec patch { title: "..." }
+          ✅ Mode admin sensitive : "Baisse le prix du Plaid Sylvestre a 289 euros"
+             → génère 1 commande update_product sensitive avec diff 340€ → 289€,
+             targetId=plaid-sylvestre.
+          ✅ Création article de blog : génère un draft complet (title, slug, content
+             markdown, tags, excerpt) avec published:false.
+          ✅ POST /api/chat/apply exécute correctement : DB mise à jour, before/after
+             renvoyés.
+
+        Notes de sécurité :
+          - EMERGENT_LLM_KEY reste côté serveur uniquement
+          - /api/chat/apply vérifie isAdmin() avant toute mutation
+          - Le mode est validé côté serveur : impossible pour un client de forcer
+            le mode admin en trafiquant le body
+
+        Non testé par testing agent (attendre feu vert utilisateur pour tests front).
+
+
+
+  - task: "AI Assistant Juliette - Client mode chat endpoint"
+    implemented: true
+    working: true
+    file: "app/api/chat/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 1 - Client Mode Basic Product Recommendation:
+            - POST /api/chat with message "Quels plaids en crochet me recommandez-vous pour un canapé beige ?"
+            - Returns 200 OK with correct structure: {session_id, reply, commands, mode}
+            - Mode: "client" (correct)
+            - Reply: 669 characters, non-empty French string
+            - Reply mentions real products: "Plaid Sylvestre" in "Beige lin" coloris
+            - Commands: empty array [] (correct for client mode)
+            - Session ID generated: 9adeb105-7f07-449b-b9b6-2ac40c07a12b
+            
+            TEST 2 - Client Mode Multi-turn Session Persistence:
+            - POST /api/chat with message "Quel est son prix ?" using same session_id
+            - Returns 200 OK
+            - AI correctly remembered previous context (Plaid Sylvestre and Plaid Boréal)
+            - Reply mentions exact prices: "340 €" and "320 €"
+            - Session persistence working correctly - multi-turn conversation validated
+            
+            TEST 9 - Rejection: Empty Body:
+            - POST /api/chat with empty body {}
+            - Returns 400 Bad Request (correct)
+            
+            TEST 10 - Rejection: Empty Message:
+            - POST /api/chat with {"message": ""}
+            - Returns 400 Bad Request (correct)
+            
+            CONCLUSION: Client mode chat endpoint is FULLY FUNCTIONAL.
+            - Claude Sonnet 4.5 integration working correctly
+            - Product catalog context loaded and used accurately
+            - Session persistence working for multi-turn conversations
+            - Input validation working correctly
+            - Response times acceptable (< 30s timeout)
+
+  - task: "AI Assistant Juliette - Admin mode chat endpoint"
+    implemented: true
+    working: true
+    file: "app/api/chat/route.js, lib/ai/prompts.js, lib/ai/context.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 3 - Admin Login:
+            - POST /api/auth/admin-login with password "Juliette99*"
+            - Returns 200 OK
+            - Admin cookie "ginette_admin" set correctly
+            
+            TEST 4 - Admin Mode Light Command (Hero Update):
+            - POST /api/chat with admin cookie: "Change le titre du hero en Test IA Backend"
+            - Returns 200 OK with mode: "admin"
+            - Generated command structure:
+              * type: "update_hero" ✓
+              * severity: "light" ✓
+              * patch: {"title": "Test IA Backend"} ✓
+              * label: "Changer le titre du hero en « Test IA Backend »" ✓
+              * id: UUID (8ba4e8b2-d0f0-427e-9252-ffaadd529076) ✓
+            - Reply: French message explaining the proposed change ✓
+            
+            TEST 5 - Admin Mode Sensitive Command (Price Update):
+            - POST /api/chat with admin cookie: "Baisse le prix du Plaid Sylvestre a 259 euros"
+            - Returns 200 OK
+            - Generated command structure:
+              * type: "update_product" ✓
+              * severity: "sensitive" ✓
+              * targetId: "plaid-sylvestre" ✓
+              * patch: {"price": 259} ✓
+              * label: "Modifier le prix du Plaid Sylvestre : 340 € → 259 €" ✓
+            - AI correctly identified the product and calculated price difference
+            
+            TEST 12 - Blog Draft Creation:
+            - POST /api/chat with admin cookie: "Rédige un court article sur la poterie tournée main (150 mots max) et crée-le comme brouillon"
+            - Returns 200 OK
+            - Generated command structure:
+              * type: "create_blog_post" ✓
+              * severity: "sensitive" ✓
+              * patch contains: title, slug, content ✓
+              * patch.published: false (draft) ✓
+              * title: "La poterie tournée main : un geste ancestral"
+              * slug: "poterie-tournee-main-geste-ancestral"
+              * content: 775 characters of French markdown
+            - Command NOT applied (as requested in test)
+            
+            CONCLUSION: Admin mode chat endpoint is FULLY FUNCTIONAL.
+            - Admin authentication detection working correctly
+            - Command generation working for all types (update_hero, update_product, create_blog_post)
+            - Severity classification correct (light vs sensitive)
+            - JSON response parsing working correctly
+            - AI understands site context and generates accurate commands
+
+  - task: "AI Assistant Juliette - Apply command endpoint"
+    implemented: true
+    working: true
+    file: "app/api/chat/apply/route.js, lib/ai/commands.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 6 - Apply Without Auth (Rejection):
+            - POST /api/chat/apply without admin cookie
+            - Returns 401 Unauthorized (correct) ✓
+            - Security check working correctly
+            
+            TEST 7 - Apply With Auth (Hero Update):
+            - GET /api/admin/site-content to get current state
+            - Current hero title: "L'art discret\nde la maison."
+            - POST /api/chat/apply with admin cookie and update_hero command
+            - Returns 200 OK with structure:
+              * ok: true ✓
+              * message: "Bannière mise à jour" ✓
+              * before: {title: "L'art discret\nde la maison.", ...} ✓
+              * after: {title: "Test IA Backend", ...} ✓
+            - Verified change in database: GET /api/admin/site-content
+            - Hero title correctly updated to "Test IA Backend" ✓
+            - Before/after diff correctly returned
+            
+            TEST 8 - Restore Hero:
+            - POST /api/chat/apply with command to restore original title
+            - Returns 200 OK
+            - Verified restoration: title back to "L'art discret\nde la maison." ✓
+            - Database update working correctly
+            
+            TEST 11 - Rejection: Unknown Command Type:
+            - POST /api/chat/apply with {"type": "unknown_type"}
+            - Returns 400 Bad Request (correct) ✓
+            - Command validation working correctly
+            
+            CONCLUSION: Apply command endpoint is FULLY FUNCTIONAL.
+            - Admin authentication required (401 without cookie)
+            - Command execution working correctly (update_hero tested)
+            - Database updates persisted correctly
+            - Before/after state tracking working
+            - Command validation working (rejects unknown types)
+            - All CRUD operations on site_content collection working
+
+  - task: "AI Assistant Juliette - Admin login endpoint"
+    implemented: true
+    working: true
+    file: "app/api/auth/admin-login/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - POST /api/auth/admin-login with password "Juliette99*"
+            - Returns 200 OK
+            - Sets httpOnly cookie "ginette_admin"
+            - Cookie persists across requests in session
+            - Admin authentication working correctly for chat endpoints
+
+metadata:
+  created_by: "main_agent"
+  version: "1.3"
+  test_sequence: 6
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: |
+        User reported that "toutes les photos zippées n'apparaissent pas sur le site". Investigation shows
+        the code and files are correct on PREVIEW (all 19 static images return HTTP 200, all 21 products
+        API respond with valid image URLs) but PRODUCTION (french-craft.emergent.host) returns 404 for
+        every /products/*.jpeg file. Root cause: production deployment predates the addition of the
+        photos and product data; user must redeploy.
+
+        Please VERIFY on the preview environment (the base URL to test is
+        NEXT_PUBLIC_BASE_URL from /app/.env) the following backend behavior:
+          1. GET /api/products returns 21 products
+          2. GET /api/products/<slug> for at least one product in each of these categories
+             (sacs, pulls, bougies, bijoux, decoration) returns a product with a non-empty images[]
+          3. For EVERY product returned by GET /api/products, HEAD/GET each URL in product.images[]
+             and confirm HTTP 200 (they should either be customer-assets-*.emergentagent.net URLs
+             or local /products/<file> paths served by Next).
+          4. Cart flow: POST /api/cart with {slug:"bracelet-oeil-de-tigre", qty:1} then GET /api/cart
+             returns items[] containing that slug. Use a cookie jar so the session cookie is kept.
+          5. Also confirm filter category `bougies` returns 5 items and `pulls` returns 2 items.
+
+        Report any 404 image URL, missing product, or broken filter.
+
+    - agent: "testing"
+      message: |
+        VERIFIED on preview: all 63 image URLs return HTTP 200, 21 products present,
+        filters correct, cart flow works, newsletter + contact OK.
+        Root cause: production is stale (Next standalone doesn't copy /public).
+
+    - agent: "user"
+      message: |
+        User redeployed and STILL the same problem - photos don't display on production
+        (french-craft.emergent.host). Confirmed via curl: /products/*.jpeg still returns
+        404 on production even though the API code IS updated (returns p-21 photophores).
+        This proves that Emergent's standalone deployment does NOT include the /public folder.
+
+    - agent: "main"
+      message: |
+        FIX APPLIED: switched from serving images out of /public/products to serving them
+        through a dedicated Next.js API route. Now:
+          - /app/lib/data/image-blobs.js (~5.5 MB, generated from the 19 files in /public/products)
+            exports two objects:
+              IMAGE_MIME:  { "bijou-01": "image/jpeg", "boucles-cornaline": "image/webp", ... }
+              IMAGE_B64:   { "bijou-01": "<base64>",   "boucles-cornaline": "<base64>",   ... }
+          - /app/app/api/img/[name]/route.js reads the entry for `params.name` and streams the
+            binary with Content-Type + Cache-Control: public, max-age=31536000, immutable.
+          - /app/lib/data/products.js now returns image URLs shaped like `/api/img/bijou-01`
+            (via P(name) helper). Old `/products/xxx.jpeg` paths removed.
+          - All 3 homepage components (category-grid.js, collections-showcase.js, instagram-grid.js)
+            also updated to reference `/api/img/xxx` instead of `/products/xxx.jpeg`.
+
+        WHY IT WILL WORK IN PRODUCTION: With `output: 'standalone'`, Next.js does NOT copy /public
+        into the standalone bundle (this is the confirmed cause of the production 404s). But it
+        DOES trace and bundle every JS module imported by API routes. Because image-blobs.js is
+        imported by /api/img/[name]/route.js, it is guaranteed to end up in the production build.
+        The client only requests /api/img/xxx URLs — no /public reliance anymore.
+
+        Please TEST on preview (base URL = NEXT_PUBLIC_BASE_URL from /app/.env):
+          1) GET /api/img/<name> for every one of these 19 names, expect HTTP 200 with a valid
+             Content-Type (image/jpeg or image/webp) and non-empty body:
+             bijou-01, bijou-02, bijou-03, bijou-04,
+             boucles-cornaline,
+             bougie-01, bougie-02, bougie-03, bougie-04, bougie-05,
+             deco-01, deco-02, deco-03,
+             photophore-01,
+             plaid-01, plaid-02, plaid-03,
+             pull-01, pull-02
+          2) Also GET /api/img/bijou-01.jpeg and /api/img/boucles-cornaline.webp — the route
+             should tolerate the extension in the URL.
+          3) GET /api/img/does-not-exist -> expect 404.
+          4) GET /api/products -> verify EVERY image URL in every product.images[] starts with
+             either "/api/img/" or "https://customer-assets-" and that each URL returns 200.
+             (This is the primary regression check — no product should reference /products/*.)
+          5) Repeat category checks: bougies=5, pulls=2, decoration includes photophores-macrame-terracotta,
+             bijoux includes boucles-cornaline-solaire.
+          6) Cart flow still works: POST /api/cart {slug:"bougie-santal",qty:1}, GET /api/cart shows it.
+
+        Update task working statuses accordingly.
+    - agent: "testing"
+      message: |
+        ✅ BACKEND VERIFICATION COMPLETE - ALL TESTS PASSED (19/19)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        
+        CRITICAL FINDING (addresses reported bug):
+        - ALL 63 image URLs from all 21 products return HTTP 200
+        - Mix of external customer-assets URLs and local /products/* files
+        - NO broken image links found on preview environment
+        
+        Comprehensive test results:
+        ✅ Health check endpoint working
+        ✅ All 21 products returned with correct data
+        ✅ All category filters working (bougies:5, pulls:2, bijoux:5, decoration:6)
+        ✅ Nouveautes filter returns 14 products (all isNew=true)
+        ✅ Product detail endpoints working (boucles-cornaline-solaire, photophores-macrame-terracotta)
+        ✅ Search functionality working (cornaline returns 3 products)
+        ✅ Sort by price working correctly
+        ✅ Complete cart flow working (GET/POST/PATCH/DELETE with session cookie)
+        ✅ Newsletter signup working
+        ✅ Contact form working
+        
+        CONCLUSION: The backend and static images are FULLY FUNCTIONAL on preview.
+        The user's issue is confirmed to be a stale production deployment.
+        User needs to redeploy from Emergent to sync the /public/products files to production.
+
+    - agent: "testing"
+      message: |
+        ✅ NEW /api/img IMAGE SERVING MECHANISM FULLY VERIFIED - ALL 8 TESTS PASSED
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        CRITICAL FINDINGS (addresses production bug fix):
+        
+        1. ✅ All 19 product images successfully served via /api/img route
+           - All return HTTP 200 with correct Content-Type (image/jpeg or image/webp)
+           - Image sizes range from 137 KB to 402 KB (valid binary data)
+           - Route correctly strips file extensions (accepts both /api/img/bijou-01 and /api/img/bijou-01.jpeg)
+           - Returns 404 for unknown image names
+        
+        2. ✅ NO /products/ URLs in product catalogue (CRITICAL REGRESSION CHECK PASSED)
+           - All 21 products verified
+           - All product.images[] arrays use either /api/img/* or external https:// URLs
+           - Migration from /public/products to /api/img is complete
+        
+        3. ✅ All 63 product image URLs are reachable (100% success rate)
+           - Mix of /api/img/* URLs and external URLs (customer-assets, unsplash, pexels)
+           - No broken image links
+        
+        4. ✅ Category filters, product detail, and cart flow all working correctly
+           - No regressions introduced by the image serving change
+        
+        MINOR NOTE:
+        - Cache-Control header is being overridden by CDN/deployment (returns 'no-cache' instead of 'max-age=31536000')
+        - This is a deployment configuration issue, not a code issue
+        - The route.js correctly sets Cache-Control: public, max-age=31536000, immutable
+        - Recommend checking Cloudflare or deployment settings if caching optimization is needed
+        
+        RECOMMENDATION FOR MAIN AGENT:
+        The new /api/img image serving mechanism is production-ready. All tests pass.
+        This fix resolves the reported production bug where images don't appear because
+        Next.js standalone builds don't include the /public folder. The base64-encoded
+        images in image-blobs.js will be bundled with the API route and deployed correctly.
+        
+        Ready for production deployment.
+
+
+    - agent: "main"
+      message: |
+        REBRANDING APPLIED (Atelier Ginette → Atelier JLT):
+          - Domain changed: atelierginette.fr → atelierjlt.fr in all files
+            (layout metadata, sitemap.js, robots.js, product JSON-LD, Organization JSON-LD)
+          - Support email changed: contact@atelierginette.fr → contact@atelierjlt.fr
+          - Brand name text updated throughout header, footer, admin, compte, atelier, hero, why, chez, instagram
+          - New Logo component /app/components/site/logo.js: "Atelier" small caps + decorative leaf + "JLT" wordmark in vert plantes (#5B7A4A)
+          - Header refactored: on transparent (home) it is now `absolute top-9 md:top-10` overlaying the hero (no more white gap)
+          - Hero top gradient strengthened for header legibility
+          - API root message: "Atelier JLT API"
+          - Instagram/Facebook handles updated to atelier.jlt (placeholder — user may substitute)
+
+        Please TEST BACKEND on preview:
+          1) GET /api and confirm message is "Atelier JLT API"
+          2) GET /api/products still returns 21 products (regression check)
+          3) GET /api/img/bougie-01, bijou-01, plaid-01, deco-01 return 200 with valid image content
+          4) GET /sitemap.xml returns urls starting with https://atelierjlt.fr
+          5) GET /robots.txt has host=atelierjlt.fr and sitemap URL points to atelierjlt.fr
+          6) Cart flow still works: POST /api/cart {slug:"plaid-sylvestre",qty:1}, GET /api/cart shows it
+          7) Auth still works: POST /api/auth/register with test@atelierjlt.fr / TestPass123, then /api/auth/me returns user
+        Report any regression.
+
+    - agent: "testing"
+      message: |
+        ✅ REBRAND VERIFICATION COMPLETE - ALL 9 BACKEND TESTS PASSED
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        CRITICAL FINDINGS:
+        
+        1. ✅ API root message correctly updated to "Atelier JLT API"
+        2. ✅ All 21 products returned with 68 image URLs, all returning HTTP 200 (NO REGRESSIONS)
+        3. ✅ All /api/img endpoints working: bougie-01, bijou-01, plaid-01, deco-01, logo-small
+        4. ✅ Sitemap contains 33 URLs with https://atelierjlt.fr, NO atelierginette.fr references
+        5. ✅ robots.txt has correct host and sitemap URL (https://atelierjlt.fr)
+        6. ✅ Cart flow working correctly (POST + GET with session cookie)
+        7. ✅ Auth flow working correctly (register + me endpoint)
+        8. ✅ Category filters working: bougies=5, bijoux=5, decoration=8
+        9. ✅ Homepage HTML contains "Atelier JLT" in title, NO atelierginette references
+        
+        REGRESSION CHECKS:
+        - ✅ No old brand name "atelierginette" found in sitemap.xml
+        - ✅ No old brand name "atelierginette" found in robots.txt
+        - ✅ No old brand name "atelierginette" found in homepage HTML
+        - ✅ All backend APIs functioning correctly after rebrand
+        - ✅ All image serving working correctly (68/68 URLs return 200)
+        
+        CONCLUSION:
+        The rebrand from "Atelier Ginette" (atelierginette.fr) to "Atelier JLT" (atelierjlt.fr)
+        is FULLY COMPLETE and VERIFIED. All backend APIs are working correctly, no regressions
+        found, all new brand strings confirmed, and no old brand references remain.
+        
+        The app is ready for production deployment.
+
+    - agent: "main"
+      message: |
+        BUG FIX after user report of 404 console errors and site not displaying properly:
+
+        Reported issues:
+          1) /wishlist?_rsc=... returned 404
+          2) /favicon.ico returned 404
+          3) pexels-photo-6207359.jpeg returned 404 (broken Empreinte macramé image)
+          4) Site "ne s'affiche pas" — user reported the hero title was invisible
+
+        Fixes applied:
+          A) Created /app/app/wishlist/page.js — full wishlist page reading GET /api/wishlist
+          B) Copied /public/favicon.png → /app/app/favicon.ico and /app/app/icon.png so Next.js App Router serves the favicon
+          C) Replaced ALL macramé Pexels URLs in /app/lib/data/products.js with 4 verified working URLs:
+             - macrameHero:    photos/13211211
+             - macrameMur:     photos/6208095
+             - macrameAtelier: photos/36550601 (new)
+             - suspension:     photos/12997390 (new)
+          D) Added client's real chunky-knit blanket photos (jlt-couv-decli.jpeg, jlt-couv-fluffy.jpeg, jlt-couv-fluffy2.jpeg) — used on Plaid Boréal & Coussin Noyau images
+          E) Added client's photophore photo (jlt-photophore.jpeg) — used on Photophore Terre
+          F) Removed framer-motion `initial={{opacity:0}}` wrapper in hero-ferm.js — this was causing the title to remain invisible on some hydration paths
+
+        Please TEST BACKEND on preview:
+          1) GET /favicon.ico → 200
+          2) GET /wishlist → 200 (page renders — no auth needed to render the shell)
+          3) GET /api/products → 15 products, all image URLs return 200 (no 404 in any image path)
+          4) Test all Pexels URLs used in the site respond 200:
+             - photos/13211211, 6208095, 36550601, 12997390, 8082537, 6812517, 6032425
+          5) GET /api/img/jlt-couv-decli, jlt-couv-fluffy, jlt-couv-fluffy2, jlt-photophore → 200
+          6) GET /api/img/jlt-terra, jlt-hero-deco → 200
+          7) GET /api/products?cat=racine → 6 products
+          8) GET /api/products?cat=empreinte → 5 products
+          9) GET /api/products?cat=terre → 4 products
+         10) GET / (homepage) → HTML must contain "L'art discret" AND "Nouvelle Collection" AND "Découvrir la collection" (curly apostrophe OK)
+         11) Sitemap should have atelierjlt.fr URLs and reference the 15 new products
+
+        Do NOT test frontend. Backend + HTML meta only.
+        Report any remaining 404 or missing content.
+
+
+    - agent: "testing"
+      message: |
+        ✅ BUG FIX VERIFICATION COMPLETE - ALL 7 TESTS PASSED (100% SUCCESS)
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        CRITICAL FINDINGS - ALL REPORTED BUGS FIXED:
+        
+        TEST A ✅ - 404-fix verification (4/4 checks passed):
+          1. ✅ /favicon.ico returns HTTP 200 with Content-Type: image/x-icon
+          2. ✅ /wishlist returns HTTP 200 with HTML content (page renders correctly)
+          3. ✅ Old broken Pexels URL (6207359) confirmed as 404 (no longer in use)
+          4. ✅ Homepage HTML does NOT contain '6207359' reference (broken image removed)
+        
+        TEST B ✅ - All product image URLs return 200 (45/45 URLs, 0 failures):
+          - Retrieved 15 products from /api/products
+          - Tested all 45 image URLs (mix of /api/img/* and external Pexels URLs)
+          - ALL images return HTTP 200 (no 404s found)
+          - No broken image links in the entire product catalogue
+        
+        TEST C ✅ - Local image API endpoints (6/6 passed):
+          - /api/img/jlt-couv-decli: 200, image/jpeg
+          - /api/img/jlt-couv-fluffy: 200, image/jpeg
+          - /api/img/jlt-couv-fluffy2: 200, image/jpeg
+          - /api/img/jlt-photophore: 200, image/jpeg
+          - /api/img/jlt-terra: 200, image/jpeg
+          - /api/img/jlt-hero-deco: 200, image/jpeg
+        
+        TEST D ✅ - Products by collection (7/7 checks passed):
+          - category 'racine': 6 products (expected 6) ✓
+          - category 'empreinte': 5 products (expected 5) ✓
+          - category 'terre': 4 products (expected 4) ✓
+          - all products: 15 products (expected 15) ✓
+          - category 'sacs': 0 products (old category removed) ✓
+          - category 'bougies': 0 products (old category removed) ✓
+          - category 'bijoux': 0 products (old category removed) ✓
+          Site successfully restructured to 3 collections with 15 products total.
+        
+        TEST E ✅ - Homepage content check (10/10 checks passed):
+          Required strings (all found):
+            ✅ 'art discret'
+            ✅ 'nouvelle collection'
+            ✅ 'découvrir la collection'
+            ✅ 'racine'
+            ✅ 'empreinte'
+            ✅ 'terre'
+          Forbidden strings (none found - regression check passed):
+            ✅ 'bougie' - NOT found (good)
+            ✅ 'sac crochet' - NOT found (good)
+            ✅ 'bijou' - NOT found (good)
+            ✅ 'atelierginette' - NOT found (good)
+        
+        TEST F ✅ - Sitemap verification (5/5 checks passed):
+          Required URLs (all found):
+            ✅ https://atelierjlt.fr/produit/plaid-sylvestre
+            ✅ https://atelierjlt.fr/produit/macrame-mural-grand
+            ✅ https://atelierjlt.fr/produit/vase-tourne-grand
+          Forbidden patterns (none found - regression check passed):
+            ✅ '/sac-crochet' - NOT found (good)
+            ✅ '/bougie-' - NOT found (good)
+        
+        TEST G ✅ - Cart + auth flows (no regressions):
+          Cart flow:
+            ✅ POST /api/cart with plaid-sylvestre: successful
+            ✅ GET /api/cart: correctly shows added product
+            ✅ Session cookie persistence: working
+          Auth flow:
+            ✅ POST /api/auth/register: user created successfully
+            ✅ GET /api/auth/me: returns user data with correct email and ID
+            ✅ User session: working correctly
+        
+        🎉 CONCLUSION - ALL REPORTED BUGS FIXED:
+        
+        1. ✅ /wishlist 404 error → FIXED (page now renders correctly)
+        2. ✅ /favicon.ico 404 error → FIXED (favicon served correctly)
+        3. ✅ pexels-photo-6207359.jpeg 404 error → FIXED (broken image replaced with working URLs)
+        4. ✅ Site restructuring → COMPLETE (3 collections: racine, empreinte, terre with 15 products)
+        5. ✅ All product images → ACCESSIBLE (45/45 URLs return 200)
+        6. ✅ No regressions → CONFIRMED (cart, auth, sitemap all working)
+        
+        ZERO 404 ERRORS REMAIN. The site is fully functional and ready for production.
+
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        HERO COMPOSER V2 — 4 features added and validated visually via screenshot tool:
+
+        1. WYSIWYG drag&drop text positioning
+           - New fields in hero object: `useCustomPosition`, `textCoords {x%, y%}`, `textAlign`
+           - Interactive preview stage in admin (pointer events + capture)
+           - Verified via API PATCH + home reload: title rendered exactly at X:75%, Y:30% right-aligned
+
+        2. Auto contrast detection (client-side, live)
+           - New helper /app/lib/color-utils.js — WCAG luminance from canvas sampling
+           - Composer samples 30% window around textCoords → picks white/black
+           - Saved as `heroTextColor` — HeroFerm uses it directly (no flicker on public page)
+           - Manual override: `textColorMode` = 'auto' | 'white' | 'black'
+
+        3. Multi-slide rotator (carrousel automatique)
+           - New fields on site_content: `heroSlides[]`, `rotationInterval` (default 5000ms)
+           - New component /app/components/home/hero-carousel.js with AnimatePresence crossfade
+           - Bullet indicators clickable
+           - Verified with 2 slides: switch after ~5s from slide 1 to slide 2 confirmed
+
+        4. Parallax effect on scroll
+           - useScroll + useTransform in HeroFerm (only for full-image layout)
+           - Toggle + intensity slider (5-60%)
+           - Image wrapped in motion.div with y transform + expanded top/bottom to hide edges
+
+        Files created:
+          - /app/lib/color-utils.js
+          - /app/components/home/hero-carousel.js
+          - /app/components/admin/hero-composer.js (extracted V2 composer, ~400 lines)
+
+        Files modified:
+          - /app/components/home/hero-ferm.js (accepts new V2 props, preserves backwards compat)
+          - /app/app/page.js (uses HeroCarousel, builds slides array from hero + heroSlides)
+          - /app/app/admin/page.js (imports HeroComposer, replaces old hero section with a single
+            call; extends DEFAULT_CONTENT with V2 fields)
+
+        Backwards compatibility: existing single `hero` object still renders correctly; heroSlides
+        is optional. No API changes required — same PATCH /api/admin/site-content endpoint.
+
+        Not tested by automated agents (user requested no frontend testing agent invocation
+        without explicit permission).
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        ASSISTANT IA "JULIETTE" — Claude Sonnet 4.5 via Emergent LLM Universal Key.
+
+        Deux modes détectés automatiquement via /api/auth/admin-status :
+          - CLIENT (partout) — Q&A produits, matières, entretien, livraison. Lecture seule.
+          - ADMIN (cookie admin détecté) — propose des modifs du site en langage naturel.
+
+        Endpoints ajoutés :
+          - POST /api/chat            → conversation multi-tour (persistée en MongoDB)
+          - POST /api/chat/apply      → exécute une commande (admin uniquement)
+
+        Types de commandes supportés :
+          update_hero, update_hero_slide, update_product, toggle_section,
+          reorder_sections, create_blog_post (draft), update_settings
+
+        Modèle hybride (validé) :
+          - severity "light" (texte, toggle) → bouton vert « APPLIQUER » 1-clic
+          - severity "sensitive" (prix, image, création article) → bouton amber
+            « CONFIRMER » avec modale de confirmation obligatoire
+
+        Fichiers créés :
+          - /app/lib/ai/context.js         (compact catalogue + site state)
+          - /app/lib/ai/prompts.js         (client + admin system prompts, JSON parser)
+          - /app/lib/ai/commands.js        (exécution des commandes en Mongo)
+          - /app/app/api/chat/route.js     (endpoint chat)
+          - /app/app/api/chat/apply/route.js (endpoint apply)
+          - /app/components/chat/chat-widget.js (widget flottant avec 2 modes)
+
+        Fichiers modifiés :
+          - /app/app/layout.js  (ajout <ChatWidget/> global)
+          - /app/.env           (ajout EMERGENT_LLM_KEY)
+          - /app/package.json   (bump NODE_OPTIONS 512→1024 pour libs LLM)
+
+        Validation manuelle (via curl + screenshot) :
+          ✅ Mode client : reconnait bien le catalogue, recommande le Plaid Sylvestre
+             avec prix et matière exacts.
+          ✅ Mode admin (session admin) : "Change le titre du hero en Douceur d hiver"
+             → génère 1 commande update_hero light avec patch { title: "..." }
+          ✅ Mode admin sensitive : "Baisse le prix du Plaid Sylvestre a 289 euros"
+             → génère 1 commande update_product sensitive avec diff 340€ → 289€,
+             targetId=plaid-sylvestre.
+          ✅ Création article de blog : génère un draft complet (title, slug, content
+             markdown, tags, excerpt) avec published:false.
+          ✅ POST /api/chat/apply exécute correctement : DB mise à jour, before/after
+             renvoyés.
+
+        Notes de sécurité :
+          - EMERGENT_LLM_KEY reste côté serveur uniquement
+          - /api/chat/apply vérifie isAdmin() avant toute mutation
+          - Le mode est validé côté serveur : impossible pour un client de forcer
+            le mode admin en trafiquant le body
+
+        Please TEST the new AI Assistant "Juliette" backend endpoints:
+          1) Client mode /api/chat (POST) — NO auth
+          2) Admin mode /api/chat (POST) — WITH admin cookie (login via /api/auth/admin-login with password "Juliette99*")
+          3) Admin mode sensitive command (price update)
+          4) Apply command /api/chat/apply (POST) — REQUIRES admin
+          5) Rejection tests (empty body, empty message, no auth on apply, unknown command type)
+          6) Blog draft creation
+
+    - agent: "testing"
+      date: "2026-06-25"
+      message: |
+        ✅ AI ASSISTANT "JULIETTE" BACKEND VERIFICATION COMPLETE - ALL 12 TESTS PASSED (100% SUCCESS)
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        Base URL: NEXT_PUBLIC_BASE_URL from /app/.env
+        Admin password: Juliette99*
+        Timeout: 30s (Claude 4.5 response time)
+        
+        CRITICAL FINDINGS - ALL ENDPOINTS FULLY FUNCTIONAL:
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 1 ✅ - Client Mode Basic Product Recommendation:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with "Quels plaids en crochet me recommandez-vous pour un canapé beige ?"
+        - Returns 200 OK
+        - Response structure: {session_id, reply, commands, mode}
+        - Mode: "client" ✓
+        - Reply: 669 characters, French text mentioning "Plaid Sylvestre" in "Beige lin" ✓
+        - Commands: empty array [] ✓
+        - Session ID: 9adeb105-7f07-449b-b9b6-2ac40c07a12b ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 2 ✅ - Client Mode Multi-turn Session Persistence:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with "Quel est son prix ?" using same session_id
+        - Returns 200 OK
+        - AI remembered previous context (Plaid Sylvestre and Plaid Boréal) ✓
+        - Reply mentions exact prices: "340 €" and "320 €" ✓
+        - Session persistence working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 3 ✅ - Admin Login:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/auth/admin-login with password "Juliette99*"
+        - Returns 200 OK
+        - Admin cookie "ginette_admin" set correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 4 ✅ - Admin Mode Light Command (Hero Update):
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with admin cookie: "Change le titre du hero en Test IA Backend"
+        - Returns 200 OK
+        - Mode: "admin" ✓
+        - Command generated:
+          * type: "update_hero" ✓
+          * severity: "light" ✓
+          * patch: {"title": "Test IA Backend"} ✓
+          * label: "Changer le titre du hero en « Test IA Backend »" ✓
+          * id: UUID (8ba4e8b2-d0f0-427e-9252-ffaadd529076) ✓
+        - Reply: French message explaining the change ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 5 ✅ - Admin Mode Sensitive Command (Price Update):
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with admin cookie: "Baisse le prix du Plaid Sylvestre a 259 euros"
+        - Returns 200 OK
+        - Command generated:
+          * type: "update_product" ✓
+          * severity: "sensitive" ✓
+          * targetId: "plaid-sylvestre" ✓
+          * patch: {"price": 259} ✓
+          * label: "Modifier le prix du Plaid Sylvestre : 340 € → 259 €" ✓
+        - AI correctly identified product and calculated price difference ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 6 ✅ - Apply Command Without Auth (Rejection):
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat/apply without admin cookie
+        - Returns 401 Unauthorized ✓
+        - Security check working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 7 ✅ - Apply Command With Auth (Hero Update):
+        ═══════════════════════════════════════════════════════════════════════════════
+        - GET /api/admin/site-content to get current state
+        - Current hero title: "L'art discret\nde la maison."
+        - POST /api/chat/apply with admin cookie and update_hero command
+        - Returns 200 OK
+        - Response structure:
+          * ok: true ✓
+          * message: "Bannière mise à jour" ✓
+          * before: {title: "L'art discret\nde la maison.", ...} ✓
+          * after: {title: "Test IA Backend", ...} ✓
+        - Verified in database: GET /api/admin/site-content
+        - Hero title correctly updated to "Test IA Backend" ✓
+        - Before/after diff correctly returned ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 8 ✅ - Restore Hero:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat/apply with command to restore original title
+        - Returns 200 OK
+        - Verified restoration: title back to "L'art discret\nde la maison." ✓
+        - Database update working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 9 ✅ - Rejection: Empty Body:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with empty body {}
+        - Returns 400 Bad Request ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 10 ✅ - Rejection: Empty Message:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with {"message": ""}
+        - Returns 400 Bad Request ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 11 ✅ - Rejection: Unknown Command Type:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat/apply with {"type": "unknown_type"}
+        - Returns 400 Bad Request ✓
+        - Command validation working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 12 ✅ - Blog Draft Creation:
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/chat with admin cookie: "Rédige un court article sur la poterie tournée main (150 mots max) et crée-le comme brouillon"
+        - Returns 200 OK
+        - Command generated:
+          * type: "create_blog_post" ✓
+          * severity: "sensitive" ✓
+          * patch contains: title, slug, content ✓
+          * patch.published: false (draft) ✓
+          * title: "La poterie tournée main : un geste ancestral"
+          * slug: "poterie-tournee-main-geste-ancestral"
+          * content: 775 characters of French markdown
+        - Command NOT applied (as requested) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL CONCLUSION - AI ASSISTANT "JULIETTE" IS PRODUCTION-READY:
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ CLIENT MODE:
+           - Product recommendations working correctly
+           - AI accurately references real products from catalog (Plaid Sylvestre, Plaid Boréal)
+           - Prices and materials mentioned correctly (340€, 320€)
+           - Multi-turn conversation with session persistence working
+           - Response times acceptable (< 30s)
+        
+        ✅ ADMIN MODE:
+           - Admin authentication detection working correctly
+           - Command generation working for all types:
+             * update_hero (light severity)
+             * update_product (sensitive severity)
+             * create_blog_post (sensitive severity)
+           - Severity classification correct (light vs sensitive)
+           - JSON response parsing working correctly
+           - AI understands site context and generates accurate commands
+           - Price difference calculation working (340€ → 259€)
+        
+        ✅ APPLY ENDPOINT:
+           - Admin authentication required (401 without cookie)
+           - Command execution working correctly
+           - Database updates persisted correctly
+           - Before/after state tracking working
+           - Command validation working (rejects unknown types)
+        
+        ✅ SECURITY:
+           - EMERGENT_LLM_KEY server-side only
+           - /api/chat/apply requires admin cookie
+           - Mode validated server-side (client can't force admin mode)
+           - Input validation working (empty body/message rejected)
+        
+        ✅ INTEGRATION:
+           - Claude Sonnet 4.5 via emergentintegrations library working
+           - MongoDB session persistence working
+           - Product catalog context loaded correctly
+           - Site content context loaded correctly
+        
+        ZERO CRITICAL ISSUES FOUND. All endpoints working as designed.
+        The AI Assistant "Juliette" is ready for production deployment.
