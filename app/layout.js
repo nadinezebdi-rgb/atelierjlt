@@ -1,6 +1,7 @@
 import './globals.css'
 import { Providers } from './providers'
 import { Fraunces, Inter, Instrument_Serif } from 'next/font/google'
+import ChatWidget from '@/components/chat/chat-widget'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -87,7 +88,10 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="font-sans antialiased bg-ivory text-ink selection:bg-terracotta/20 selection:text-ink">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <ChatWidget />
+        </Providers>
       </body>
     </html>
   )
