@@ -1244,6 +1244,36 @@ function TabContent({ onDirtyChange }) {
           }}
           ImageUploader={ImageUploader}
         />
+        {/* BIBLIOTHÈQUE DE FICHIERS — téléchargement direct */}
+        {/* HERO */}
+        <section id="admin-hero" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Hero (accueil)</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Surtitre (petit texte)"><input value={c.hero.eyebrow} onChange={(e) => upd('hero.eyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Titre principal (utilise \n pour passer à la ligne)">
+              <textarea rows={2} value={c.hero.title} onChange={(e) => upd('hero.title', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink font-display text-lg" />
+            </Field>
+          </div>
+          <Field label="Sous-titre">
+            <textarea rows={3} value={c.hero.subtitle} onChange={(e) => upd('hero.subtitle', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink text-sm" />
+          </Field>
+          <Field label="Média du hero (photo ou vidéo MP4 — glisser-déposer)">
+            <ImageUploader
+              images={c.hero.image ? [c.hero.image] : []}
+              onChange={(imgs) => upd('hero.image', imgs[0] || '')}
+              accept="all"
+            />
+            <p className="text-[11px] text-ink/50 italic mt-2">
+              💡 Astuce : vous pouvez insérer une vidéo MP4/WEBM à la place d'une photo. Elle jouera en boucle silencieuse.
+            </p>
+          </Field>
+          <div className="grid md:grid-cols-2 gap-4 mt-2">
+            <Field label="Bouton principal — libellé"><input value={c.hero.ctaPrimary?.label || ''} onChange={(e) => upd('hero.ctaPrimary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Bouton principal — lien"><input value={c.hero.ctaPrimary?.href || ''} onChange={(e) => upd('hero.ctaPrimary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Bouton secondaire — libellé"><input value={c.hero.ctaSecondary?.label || ''} onChange={(e) => upd('hero.ctaSecondary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Bouton secondaire — lien"><input value={c.hero.ctaSecondary?.href || ''} onChange={(e) => upd('hero.ctaSecondary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+          </div>
+        </section>
 
         {/* COLLECTIONS */}
         <section id="admin-collections" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
