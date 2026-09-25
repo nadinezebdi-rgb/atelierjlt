@@ -191,6 +191,26 @@ function TabProducts() {
     load()
   }
 
+  const resetPhotos = async (slug, name) => {
+    if (!confirm(`Réinitialiser toutes les photos de « ${name} » aux valeurs par défaut du catalogue ?\n\nLes photos que vous aviez uploadées ne s'afficheront plus (elles restent dans la médiathèque). Réversible via le bouton Annuler dans le chat Juliette.`)) return
+    try {
+      const r = await fetch('/api/admin/reset-product-photos', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      })
+      const data = await r.json()
+      if (r.ok && data.ok) {
+        toast.success(data.message || 'Photos réinitialisées')
+        load()
+      } else {
+        toast.error(data.error || 'Impossible de réinitialiser')
+      }
+    } catch (e) {
+      toast.error('Erreur réseau')
+    }
+  }
+
   const create = async () => {
     const r = await fetch('/api/admin/products', {
       method: 'POST', credentials: 'include',
@@ -232,6 +252,13 @@ function TabProducts() {
               </div>
               <button onClick={() => setEditing(editing === p.slug ? null : p.slug)} className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-ink transition">
                 {editing === p.slug ? 'Fermer' : 'Modifier'}
+              </button>
+              <button
+                onClick={() => resetPhotos(p.slug, p.name)}
+                className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 text-ink/70 hover:border-terracotta hover:text-terracotta transition"
+                title="Retirer toutes les photos uploadées et remettre celles du catalogue par défaut"
+              >
+                Réinit. photos
               </button>
               <button onClick={() => remove(p.slug)} className="text-terracotta hover:opacity-70" aria-label="Supprimer">
                 <Trash2 className="h-4 w-4" strokeWidth={1.5} />
