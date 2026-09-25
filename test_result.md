@@ -2252,3 +2252,33 @@ agent_communication:
         À tester : Le user peut maintenant uploader ses 20 photos en une fois via
         le bouton "Auto-assigner" et laisser Juliette les trier automatiquement par
         couleur.
+
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        JULIETTE PEUT MAINTENANT SUPPRIMER ET REMPLACER (7 nouveaux types de commandes).
+
+          - delete_product         : soft delete produit de base / hard delete custom
+          - remove_product_image   : retire UNE photo (par index ou URL)
+          - replace_product_image  : remplace UNE photo à un index précis
+          - add_product_image      : ajoute UNE photo à la galerie
+          - delete_hero_slide      : supprime une slide du carrousel
+          - delete_section         : supprime une section d'accueil
+          - delete_blog_post       : supprime un article de blog
+
+        Tous "sensitive" → modale de confirmation. Tous annulables via undo
+        (before/after journalisés dans chat_actions).
+
+        Prompt système enrichi + contexte admin élargi (chaque produit inclut
+        maintenant `images: []` et `variantCount` pour que Juliette propose la
+        bonne URL/index).
+
+        Validation manuelle :
+          ✅ "Supprime le photophore terre" → delete_product severity=sensitive
+             → applique → catalog 15→14 → undo → catalog 15
+          ✅ "Enleve la 1ere photo du tapis empreinte et mets ambiance-canape"
+             → replace_product_image {index:0, imageUrl:"/api/img/ambiance-canape"}
+             (une seule commande propre au lieu de 2)
+          ✅ Juliette détecte l'inexistence (0 brouillon, 0 slide, 0 newsletter)
+             et pose une question au lieu d'inventer une commande
