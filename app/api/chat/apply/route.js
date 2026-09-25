@@ -16,8 +16,9 @@ export async function POST(request) {
   }
   const body = await request.json().catch(() => ({}))
   const cmd = body.command
+  const sessionId = body.session_id || null
   if (!cmd) return NextResponse.json({ error: 'Commande manquante' }, { status: 400 })
-  const result = await executeCommand(cmd)
+  const result = await executeCommand(cmd, sessionId)
   if (!result.ok) return NextResponse.json({ error: result.error || 'Échec' }, { status: 400 })
   return NextResponse.json(result)
 }
