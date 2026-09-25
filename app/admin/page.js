@@ -1880,6 +1880,15 @@ function HomeSectionsEditor({ sections, onChange }) {
   }
   const onDragEnd = () => { setDragIdx(null); setOverIdx(null) }
 
+  // Boutons ↑ ↓ (alternative accessible / mobile)
+  const moveSection = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= sections.length) return
+    const next = sections.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+
   return (
     <section className="border border-linen bg-ivory p-6 md:p-8">
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -1888,7 +1897,8 @@ function HomeSectionsEditor({ sections, onChange }) {
             <Layers className="h-3.5 w-3.5" strokeWidth={1.5} /> Sections page d’accueil
           </h3>
           <p className="text-xs text-ink/60 mt-2 max-w-2xl">
-            Glissez-déposez pour réordonner. Cliquez sur une section pour modifier son contenu.
+            Réordonnez les bannières comme vous voulez : <strong>glissez-déposez la poignée</strong> à gauche,
+            ou utilisez les <strong>flèches ↑ ↓</strong>. Cliquez sur une section pour modifier son contenu.
             Le Hero reste toujours visible (édité plus haut).
           </p>
         </div>
@@ -1930,16 +1940,47 @@ function HomeSectionsEditor({ sections, onChange }) {
               )}
             >
               <div className="flex items-center gap-3 p-4">
-                {/* Drag handle */}
+                {/* Zone de réordonnancement : poignée + flèches ↑↓ */}
                 <div
-                  className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 text-ink/30 hover:text-ink"
-                  title="Glisser pour réordonner"
+                  className="flex-shrink-0 flex items-center bg-cream border border-linen hover:border-emerald transition"
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <GripVertical className="h-4 w-4" strokeWidth={1.5} />
+                  {/* Poignée de glisser — plus large, coloré au hover */}
+                  <div
+                    className="cursor-grab active:cursor-grabbing p-2 text-ink/40 hover:text-emerald hover:bg-emerald/5 transition"
+                    title="Glisser pour réordonner"
+                  >
+                    <GripVertical className="h-4 w-4" strokeWidth={2} />
+                  </div>
+                  {/* Boutons ↑ ↓ — accessibles clavier/mobile */}
+                  <div className="flex flex-col border-l border-linen">
+                    <button
+                      type="button"
+                      draggable={false}
+                      onClick={(e) => { e.stopPropagation(); moveSection(i, -1) }}
+                      disabled={i === 0}
+                      aria-label="Monter"
+                      title="Monter"
+                      className="px-2 py-0.5 hover:bg-emerald/10 hover:text-emerald disabled:opacity-25 disabled:cursor-not-allowed transition"
+                    >
+                      <ArrowUp className="h-3 w-3" strokeWidth={2} />
+                    </button>
+                    <button
+                      type="button"
+                      draggable={false}
+                      onClick={(e) => { e.stopPropagation(); moveSection(i, 1) }}
+                      disabled={i === sections.length - 1}
+                      aria-label="Descendre"
+                      title="Descendre"
+                      className="px-2 py-0.5 border-t border-linen hover:bg-emerald/10 hover:text-emerald disabled:opacity-25 disabled:cursor-not-allowed transition"
+                    >
+                      <ArrowDown className="h-3 w-3" strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Order number */}
-                <span className="w-6 text-center text-[11px] tabular-nums text-ink/40">
+                {/* Numéro d'ordre */}
+                <span className="w-6 text-center text-[11px] tabular-nums font-semibold text-emerald bg-emerald/10 rounded-full py-0.5 flex-shrink-0">
                   {i + 1}
                 </span>
 
