@@ -1,7 +1,7 @@
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
-import HeroFerm from '@/components/home/hero-ferm'
+import HeroCarousel from '@/components/home/hero-carousel'
 import CategoryTiles from '@/components/home/category-tiles'
 import EditorialBanner from '@/components/home/editorial-banner'
 import ProductCarousel from '@/components/home/product-carousel'
@@ -46,9 +46,40 @@ async function loadHomeContent() {
     return {
       sections: mergeHomepageSections(doc?.content?.sections || []),
       hero: doc?.content?.hero || null,
+      heroSlides: doc?.content?.heroSlides || [],
+      rotationInterval: doc?.content?.rotationInterval || 5000,
     }
   } catch (e) {
-    return { sections: mergeHomepageSections(null), hero: null }
+    return { sections: mergeHomepageSections(null), hero: null, heroSlides: [], rotationInterval: 5000 }
+  }
+}
+
+function heroToProps(h) {
+  if (!h) return null
+  return {
+    media: h.image,
+    eyebrow: h.eyebrow,
+    title: h.title,
+    subtitle: h.subtitle,
+    ctaPrimary: h.ctaPrimary,
+    ctaSecondary: h.ctaSecondary,
+    signature: h.signature,
+    layout: h.layout,
+    textPosition: h.textPosition,
+    overlayIntensity: h.overlayIntensity,
+    showEyebrow: h.showEyebrow !== false,
+    showTitle: h.showTitle !== false,
+    showSubtitle: h.showSubtitle !== false,
+    showPrimary: h.showPrimary !== false,
+    showSecondary: h.showSecondary !== false,
+    showSignature: h.showSignature !== false,
+    useCustomPosition: !!h.useCustomPosition,
+    textCoords: h.textCoords || { x: 8, y: 65 },
+    textAlign: h.textAlign || 'left',
+    textColorMode: h.textColorMode || 'auto',
+    heroTextColor: h.heroTextColor || 'white',
+    parallaxEnabled: !!h.parallaxEnabled,
+    parallaxIntensity: h.parallaxIntensity ?? 25,
   }
 }
 
@@ -92,7 +123,8 @@ function renderSection(s) {
 }
 
 async function App() {
-  const { sections, hero } = await loadHomeContent()
+  const { sections, hero, heroSlides, rotationInterval } = await loadHomeContent()
+  const slides = [heroToProps(hero), ...(heroSlides || []).map(heroToProps)].filter(Boolean)
   return (
     <div className="min-h-screen bg-ivory">
       <script
@@ -101,25 +133,8 @@ async function App() {
       />
       <Header />
       <main>
-        {/* HERO — non-toggleable */}
-        <HeroFerm
-          media={hero?.image}
-          eyebrow={hero?.eyebrow}
-          title={hero?.title}
-          subtitle={hero?.subtitle}
-          ctaPrimary={hero?.ctaPrimary}
-          ctaSecondary={hero?.ctaSecondary}
-          signature={hero?.signature}
-          layout={hero?.layout}
-          textPosition={hero?.textPosition}
-          overlayIntensity={hero?.overlayIntensity}
-          showEyebrow={hero?.showEyebrow !== false}
-          showTitle={hero?.showTitle !== false}
-          showSubtitle={hero?.showSubtitle !== false}
-          showPrimary={hero?.showPrimary !== false}
-          showSecondary={hero?.showSecondary !== false}
-          showSignature={hero?.showSignature !== false}
-        />
+        {/* HERO — carrousel si plusieurs compositions, sinon rendu unique */}
+        <HeroCarousel slides={slides} intervalMs={rotationInterval} />
 
         {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
         {sections.map(renderSection)}

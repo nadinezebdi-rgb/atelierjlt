@@ -721,3 +721,48 @@ agent_communication:
         6. ✅ No regressions → CONFIRMED (cart, auth, sitemap all working)
         
         ZERO 404 ERRORS REMAIN. The site is fully functional and ready for production.
+
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        HERO COMPOSER V2 — 4 features added and validated visually via screenshot tool:
+
+        1. WYSIWYG drag&drop text positioning
+           - New fields in hero object: `useCustomPosition`, `textCoords {x%, y%}`, `textAlign`
+           - Interactive preview stage in admin (pointer events + capture)
+           - Verified via API PATCH + home reload: title rendered exactly at X:75%, Y:30% right-aligned
+
+        2. Auto contrast detection (client-side, live)
+           - New helper /app/lib/color-utils.js — WCAG luminance from canvas sampling
+           - Composer samples 30% window around textCoords → picks white/black
+           - Saved as `heroTextColor` — HeroFerm uses it directly (no flicker on public page)
+           - Manual override: `textColorMode` = 'auto' | 'white' | 'black'
+
+        3. Multi-slide rotator (carrousel automatique)
+           - New fields on site_content: `heroSlides[]`, `rotationInterval` (default 5000ms)
+           - New component /app/components/home/hero-carousel.js with AnimatePresence crossfade
+           - Bullet indicators clickable
+           - Verified with 2 slides: switch after ~5s from slide 1 to slide 2 confirmed
+
+        4. Parallax effect on scroll
+           - useScroll + useTransform in HeroFerm (only for full-image layout)
+           - Toggle + intensity slider (5-60%)
+           - Image wrapped in motion.div with y transform + expanded top/bottom to hide edges
+
+        Files created:
+          - /app/lib/color-utils.js
+          - /app/components/home/hero-carousel.js
+          - /app/components/admin/hero-composer.js (extracted V2 composer, ~400 lines)
+
+        Files modified:
+          - /app/components/home/hero-ferm.js (accepts new V2 props, preserves backwards compat)
+          - /app/app/page.js (uses HeroCarousel, builds slides array from hero + heroSlides)
+          - /app/app/admin/page.js (imports HeroComposer, replaces old hero section with a single
+            call; extends DEFAULT_CONTENT with V2 fields)
+
+        Backwards compatibility: existing single `hero` object still renders correctly; heroSlides
+        is optional. No API changes required — same PATCH /api/admin/site-content endpoint.
+
+        Not tested by automated agents (user requested no frontend testing agent invocation
+        without explicit permission).
