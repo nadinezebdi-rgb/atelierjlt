@@ -279,7 +279,7 @@ function ProductEditor({ product, onSave }) {
         <SizesEditor sizes={p.sizes || []} onChange={(sz) => upd('sizes', sz)} />
       </Field>
       <Field label="Couleurs disponibles (variantes)">
-        <VariantsEditor variants={p.variants || []} onChange={(vs) => upd('variants', vs)} />
+        <VariantsEditor slug={p.slug} variants={p.variants || []} onChange={(vs) => upd('variants', vs)} />
       </Field>
       <Field label="Photos du produit">
         <ImageUploader images={p.images || []} onChange={(imgs) => upd('images', imgs)} />

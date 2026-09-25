@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Trash2, Plus, Upload, Loader2, Check, AlertTriangle, Sparkles } from 'lucide-react'
+import { Trash2, Plus, Upload, Loader2, Check, AlertTriangle, Sparkles, Wand2, X, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 /**
@@ -11,7 +11,7 @@ import { toast } from 'sonner'
  * Optionnel : vérification Claude Vision → détecte si la couleur photo
  *             correspond au hex de la variante (nécessite backend /api/admin/check-variant-color).
  */
-export default function VariantsEditor({ variants, onChange }) {
+export default function VariantsEditor({ slug, variants, onChange }) {
   const list = variants || []
 
   const set = (i, k, v) => {
@@ -52,8 +52,11 @@ export default function VariantsEditor({ variants, onChange }) {
 
   return (
     <div className="mt-1 space-y-3">
-      <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50 mb-1">
-        {list.length} variante{list.length > 1 ? 's' : ''} de couleur
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
+        <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50">
+          {list.length} variante{list.length > 1 ? 's' : ''} de couleur
+        </span>
+        <AutoAssignBulk slug={slug} variants={list} onApplied={(next) => onChange(next)} />
       </div>
       {list.map((v, i) => (
         <VariantRow
@@ -252,3 +255,189 @@ function ColorCheckBadge({ check }) {
     </div>
   )
 }
+
+/* ============ AUTO-ASSIGN BULK ============ */
+function AutoAssignBulk({ slug, variants, onApplied }) {
+  const [open, setOpen] = useState(false)
+  const [step, setStep] = useState('idle')      // 'idle' | 'analyzing' | 'preview' | 'applying'
+  const [uploads, setUploads] = useState([])
+  const fileRef = useRef(null)
+
+  const handleFiles = async (files) => {
+    if (!slug) { toast.error('Enregistre d\'abord le produit'); return }
+    if (!variants?.length) { toast.error('Ajoute des variantes de couleur d\'abord'); return }
+    if (!files || files.length === 0) return
+    setStep('analyzing')
+    const fd = new FormData()
+    fd.append('slug', slug)
+    fd.append('apply', 'false')
+    for (const f of files) fd.append('files', f)
+    try {
+      const r = await fetch('/api/admin/auto-assign-variant', { method: 'POST', body: fd, credentials: 'include' })
+      const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'Analyse échouée')
+      setUploads(d.uploads || [])
+      setStep('preview')
+    } catch (err) {
+      toast.error(err.message)
+      setStep('idle')
+    }
+  }
+
+  const applyAssignments = async () => {
+    setStep('applying')
+    // Applique côté client sans nouveau upload
+    const nextVariants = variants.slice()
+    for (const u of uploads) {
+      if (u.error || u.variantIndex == null || !u.url) continue
+      nextVariants[u.variantIndex] = { ...nextVariants[u.variantIndex], image: u.url }
+    }
+    onApplied(nextVariants)
+    toast.success(`${uploads.filter((u) => u.url).length} photo(s) assignée(s) — clique sur Enregistrer`)
+    reset()
+  }
+
+  const overrideAssignment = (uploadIdx, variantIdx) => {
+    setUploads((u) => u.map((x, i) => i === uploadIdx ? { ...x, variantIndex: variantIdx, variantName: variants[variantIdx]?.name, variantHex: variants[variantIdx]?.hex } : x))
+  }
+
+  const removeUpload = (idx) => setUploads((u) => u.filter((_, i) => i !== idx))
+
+  const reset = () => {
+    setStep('idle')
+    setUploads([])
+    setOpen(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setOpen(true); fileRef.current?.click() }}
+        disabled={!variants?.length}
+        className="inline-flex items-center gap-2 border border-emerald text-emerald px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] hover:bg-emerald hover:text-ivory transition disabled:opacity-40 disabled:cursor-not-allowed"
+        title={!variants?.length ? 'Ajoute d\'abord une couleur' : 'Uploader plusieurs photos, Juliette les triera'}
+      >
+        <Wand2 className="h-3.5 w-3.5" strokeWidth={1.6} />
+        Auto-assigner avec l'IA
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+
+      {open && step !== 'idle' && (
+        <div className="fixed inset-0 z-50 bg-ink/60 flex items-center justify-center p-4" onClick={reset}>
+          <div className="bg-ivory max-w-3xl w-full max-h-[90vh] overflow-auto border border-linen shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-linen flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Wand2 className="h-4 w-4 text-emerald" strokeWidth={1.6} /> Auto-assignation par couleur
+                </h3>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-ink/50 mt-1">
+                  Chaque photo est analysée puis assignée à la variante la plus proche
+                </p>
+              </div>
+              <button onClick={reset} className="text-ink/40 hover:text-ink" aria-label="Fermer"><X className="h-5 w-5" /></button>
+            </div>
+
+            {step === 'analyzing' && (
+              <div className="p-16 text-center text-ink/50">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald mx-auto mb-3" />
+                <p className="text-sm">Juliette analyse les couleurs…</p>
+              </div>
+            )}
+
+            {step === 'preview' && (
+              <>
+                <div className="p-4 text-xs text-ink/60 bg-cream/40 border-b border-linen">
+                  {uploads.length} photo{uploads.length > 1 ? 's' : ''} analysée{uploads.length > 1 ? 's' : ''}.
+                  Change l'assignation si besoin, puis clique sur « Appliquer » pour affecter chaque image à sa variante.
+                </div>
+                <div className="p-4 space-y-3">
+                  {uploads.map((u, i) => (
+                    <UploadRow
+                      key={i}
+                      upload={u}
+                      variants={variants}
+                      onChangeVariant={(idx) => overrideAssignment(i, idx)}
+                      onRemove={() => removeUpload(i)}
+                    />
+                  ))}
+                </div>
+                <div className="p-4 border-t border-linen flex items-center justify-between bg-cream/40">
+                  <button onClick={reset} className="text-[11px] uppercase tracking-[0.24em] text-ink/60 hover:text-ink">Annuler</button>
+                  <button
+                    onClick={applyAssignments}
+                    disabled={uploads.length === 0}
+                    className="bg-emerald text-ivory px-6 py-2.5 text-[11px] uppercase tracking-[0.24em] hover:bg-emeraldDark transition inline-flex items-center gap-2 disabled:opacity-50"
+                  >
+                    Appliquer {uploads.filter((u) => u.url && u.variantIndex != null).length} assignation{uploads.filter((u) => u.url && u.variantIndex != null).length > 1 ? 's' : ''}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function UploadRow({ upload: u, variants, onChangeVariant, onRemove }) {
+  if (u.error) {
+    return (
+      <div className="border border-red-300 bg-red-50 p-3 flex items-center gap-3">
+        <AlertTriangle className="h-4 w-4 text-red-600" />
+        <span className="text-xs flex-1">{u.originalName || 'photo'} — <span className="text-red-700">{u.error}</span></span>
+        <button onClick={onRemove} className="text-red-600 hover:text-red-800"><X className="h-3.5 w-3.5" /></button>
+      </div>
+    )
+  }
+  const goodMatch = u.distance < 30
+  const okMatch = u.distance < 50
+  return (
+    <div className={`border ${goodMatch ? 'border-emerald/40 bg-emerald/5' : okMatch ? 'border-amber-300 bg-amber-50/40' : 'border-red-200 bg-red-50/30'} p-3 flex items-start gap-3`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={u.url} alt={u.originalName} className="w-16 h-16 object-cover border border-ink/10 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-xs font-medium truncate">{u.originalName || u.filename}</p>
+          <span className="text-[9px] uppercase tracking-[0.18em] text-ink/40 shrink-0">
+            couleur détectée : {u.dominant}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50 shrink-0">Assigner à :</span>
+          <select
+            value={u.variantIndex ?? ''}
+            onChange={(e) => onChangeVariant(Number(e.target.value))}
+            className="flex-1 bg-transparent border-b border-ink/20 py-1 text-xs focus:outline-none focus:border-emerald"
+          >
+            <option value="">— aucune —</option>
+            {variants.map((v, i) => (
+              <option key={i} value={i}>
+                {v.name} ({v.hex}) — {u.variantIndex === i ? `ΔE ${u.distance}` : ''}
+              </option>
+            ))}
+          </select>
+          {u.variantHex && (
+            <span className="w-5 h-5 rounded-full border border-ink/20" style={{ backgroundColor: u.variantHex }} title={u.variantName} />
+          )}
+        </div>
+        <p className={`text-[10px] mt-1 ${goodMatch ? 'text-emerald' : okMatch ? 'text-amber-700' : 'text-red-600'}`}>
+          {goodMatch ? '✓ Correspondance forte' : okMatch ? '~ Correspondance modérée — vérifie' : '⚠ Correspondance faible — envisage une autre variante'}
+          {u.confidence === 'low' && ' (photo peu contrastée)'}
+        </p>
+      </div>
+      <button onClick={onRemove} className="text-ink/30 hover:text-red-600 shrink-0" title="Retirer"><X className="h-3.5 w-3.5" /></button>
+    </div>
+  )
+}
+

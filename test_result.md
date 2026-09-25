@@ -2197,3 +2197,58 @@ agent_communication:
             avec un mobilier + un plaid, le fond peut dominer.
           - Suffisant comme SIGNAL d'alerte, pas un jugement absolu.
 
+
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        AUTO-ASSIGN IA + ZOOM PRODUIT — 2 features livrées.
+
+        1. AUTO-ASSIGN IA (variantes)
+           - Endpoint /api/admin/auto-assign-variant
+             * Mode JSON (dry-run) : { slug, imageUrls[] } → analyse chaque URL, retourne
+               la variante la plus proche par distance Lab.
+             * Mode multipart (bulk upload + apply) : { slug, files[], apply=true } →
+               upload chaque photo dans MongoDB, détecte la couleur dominante,
+               affecte à la variante la plus proche, applique dans product_overrides.
+           - Analyse extraite dans /app/lib/color-analysis.js (partagé avec
+             check-variant-color) : histogramme HSV 12 bins, crop central 50%×60%,
+             distance CIE-Lab.
+           - UI dans /app/components/admin/variants-editor.js :
+             * Bouton "AUTO-ASSIGNER AVEC L'IA" à côté du compteur de variantes
+             * Modal avec preview par photo : thumbnail, couleur détectée, dropdown
+               d'override, badge Correspondance forte/modérée/faible (couleurs vert/
+               amber/rouge selon ΔE < 30 / 50 / plus)
+             * CTA "Appliquer N assignations" → applique côté client puis onChange
+
+        2. ZOOM PRODUIT (hover fluide)
+           - Composant /app/components/site/zoomable-image.js
+             * Mouse-tracked origin (transform-origin: X% Y%)
+             * scale 2.2x avec transition duration-500 ease-out
+             * Indicateur "Survoler pour zoomer" (hidden md:flex) discret en coin
+             * Clic → zoom fullscreen (via prop onClickZoom conservée)
+             * Sur mobile/touch (pas d'onmouseenter), aucune interférence
+           - Intégré dans /app/app/produit/[slug]/page.js à la place du motion.div
+             existant, préservant tout le comportement (variant swap, thumbnails, badge)
+
+        Fichiers créés :
+          - /app/lib/color-analysis.js
+          - /app/app/api/admin/auto-assign-variant/route.js
+          - /app/components/site/zoomable-image.js
+
+        Fichiers modifiés :
+          - /app/app/api/admin/check-variant-color/route.js (refactor pour utiliser
+            color-analysis.js)
+          - /app/components/admin/variants-editor.js (ajout AutoAssignBulk + UploadRow)
+          - /app/app/admin/page.js (VariantsEditor reçoit prop slug)
+          - /app/app/produit/[slug]/page.js (import + <ZoomableImage/>)
+
+        Validation manuelle :
+          ✅ Auto-assign dry-run : 5 photos → assignations avec ΔE et confidence
+          ✅ Modal : 3 photos → 3 rows avec dropdowns et Correspondance forte
+          ✅ Hover zoom : image scale 2.2x, origin suit la souris (texture visible)
+          ✅ Mobile 390px : produit rendu correctement, 0 overflow
+
+        À tester : Le user peut maintenant uploader ses 20 photos en une fois via
+        le bouton "Auto-assigner" et laisser Juliette les trier automatiquement par
+        couleur.
