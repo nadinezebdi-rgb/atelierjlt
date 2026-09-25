@@ -1,52 +1,24 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { loadMedia } from '@/lib/media-storage'
 
-// Images are stored in /app/lib/product-images/ (mirrored from /public/products) and
-// explicitly included in the Next standalone build via outputFileTracingIncludes.
-// This is a lightweight disk-based serving route (no huge JS blob in memory).
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-const IMG_DIR = path.join(process.cwd(), 'lib', 'product-images')
-const FALLBACK_DIR = path.join(process.cwd(), 'public', 'products')
-
-const EXTENSIONS = ['jpeg', 'jpg', 'webp', 'png']
-
-function mimeFor(ext) {
-  const e = ext.toLowerCase()
-  if (e === 'jpg' || e === 'jpeg') return 'image/jpeg'
-  if (e === 'webp') return 'image/webp'
-  if (e === 'png') return 'image/png'
-  return 'application/octet-stream'
-}
-
-function resolveImage(nameArg) {
-  const raw = decodeURIComponent(nameArg || '')
-  // strip extension if present
-  const key = raw.replace(/\.(jpe?g|webp|png)$/i, '')
-  for (const dir of [IMG_DIR, FALLBACK_DIR]) {
-    for (const ext of EXTENSIONS) {
-      const p = path.join(dir, `${key}.${ext}`)
-      if (fs.existsSync(p)) return { path: p, ext }
-    }
-  }
-  return null
-}
-
+/**
+ * Sert une image par nom.
+ *   1. Cherche sur disque (images versionnées `jlt-*`, etc.)
+ *   2. Fallback vers MongoDB (uploads persistés)
+ * Renvoie 404 si non trouvée.
+ */
 export async function GET(_request, { params }) {
   const p = await params
-  const found = resolveImage(p.name)
-  if (!found) return new Response('Not found', { status: 404 })
-  try {
-    const buffer = fs.readFileSync(found.path)
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': mimeFor(found.ext),
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Content-Length': String(buffer.length),
-      },
-    })
-  } catch (err) {
-    console.error('img read error', err)
-    return new Response('Server error', { status: 500 })
-  }
+  const media = await loadMedia(p.name)
+  if (!media) return new Response('Not found', { status: 404 })
+  return new Response(media.buffer, {
+    status: 200,
+    headers: {
+      'Content-Type': media.contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Content-Length': String(media.buffer.length),
+    },
+  })
 }

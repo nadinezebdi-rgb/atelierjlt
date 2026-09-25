@@ -7,6 +7,8 @@ import { formatPrice } from '@/lib/utils'
 import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown } from 'lucide-react'
 import { HOMEPAGE_SECTION_DEFAULTS, mergeHomepageSections, BANNER_TEMPLATES } from '@/lib/homepage-sections'
 import HeroComposer from '@/components/admin/hero-composer'
+import MissingMediaRecovery from '@/components/admin/missing-media-recovery'
+import VariantsEditor from '@/components/admin/variants-editor'
 import { cn } from '@/lib/utils'
 
 export default function AdminPage() {
@@ -206,7 +208,9 @@ function TabProducts() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
+      <MissingMediaRecovery />
+      <div className="flex items-center justify-between mb-6 mt-8">
         <h2 className="font-display text-3xl">Produits ({products.length})</h2>
         <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
           <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
@@ -273,6 +277,9 @@ function ProductEditor({ product, onSave }) {
       </Field>
       <Field label="Tailles (Ø petit / moyen / grand — optionnel)">
         <SizesEditor sizes={p.sizes || []} onChange={(sz) => upd('sizes', sz)} />
+      </Field>
+      <Field label="Couleurs disponibles (variantes)">
+        <VariantsEditor variants={p.variants || []} onChange={(vs) => upd('variants', vs)} />
       </Field>
       <Field label="Photos du produit">
         <ImageUploader images={p.images || []} onChange={(imgs) => upd('images', imgs)} />
