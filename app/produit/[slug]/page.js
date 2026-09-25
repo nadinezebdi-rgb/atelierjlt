@@ -12,6 +12,7 @@ import { useCart } from '@/components/site/cart-provider'
 import { formatPrice } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Minus, Plus, Heart, Truck, Shield, Sparkles, ChevronDown } from 'lucide-react'
+import ZoomableImage from '@/components/site/zoomable-image'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -144,20 +145,13 @@ export default function ProductPage() {
         <section className="container grid md:grid-cols-2 gap-8 md:gap-16 py-8 md:py-14">
           {/* Gallery */}
           <div className="space-y-3">
-            <motion.div
-              key={selectedVariant?.name + '-' + active}
-              initial={{ opacity: 0.5 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="relative aspect-[4/5] bg-cream overflow-hidden cursor-zoom-in"
-              onClick={() => setZoom(galleryImages[active])}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={galleryImages[active]} alt={p.name} className="w-full h-full object-cover" />
-              {p.isLimited && (
-                <span className="absolute top-6 left-6 bg-brique text-ivory text-[10px] uppercase tracking-[0.22em] px-3 py-1.5">Édition limitée</span>
-              )}
-            </motion.div>
+            <ZoomableImage
+              src={galleryImages[active]}
+              alt={p.name}
+              keyId={selectedVariant?.name + '-' + active}
+              onClickZoom={() => setZoom(galleryImages[active])}
+              badge={p.isLimited ? 'Édition limitée' : null}
+            />
             <div className="grid grid-cols-3 gap-3">
               {galleryImages.map((img, i) => (
                 <button

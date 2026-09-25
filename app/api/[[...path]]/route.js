@@ -815,9 +815,24 @@ async function handler(request, { params }) {
           }
 
           const name = 'upload-' + uuid().slice(0, 8) + '.' + rawExt
+          // PERSISTANCE — stocker dans MongoDB (résistant au redéploiement du pod).
+          // On écrit AUSSI sur disque pour le hot-caching pendant la session.
+          try {
+            const { saveMedia, mimeFor } = await import('@/lib/media-storage')
+            await saveMedia({
+              filename: name,
+              buffer,
+              contentType: mimeFor(rawExt),
+              originalName: original,
+            })
+          } catch (mongoErr) {
+            console.error('mongo save failed, continuing to disk', mongoErr)
+          }
           const dir = path.join(process.cwd(), 'lib', 'product-images')
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-          fs.writeFileSync(path.join(dir, name), buffer)
+          try { fs.writeFileSync(path.join(dir, name), buffer) } catch (diskErr) {
+            console.warn('disk write skipped', diskErr?.message)
+          }
           let kind, publicUrl
           if (IMAGE_EXTS.includes(rawExt)) {
             kind = 'image'
