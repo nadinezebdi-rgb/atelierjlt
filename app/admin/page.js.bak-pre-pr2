@@ -12,8 +12,6 @@ export default function AdminPage() {
   const [status, setStatus] = useState('loading') // loading | out | in
   const [pw, setPw] = useState('')
   const [tab, setTab] = useState('dashboard')
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [contentDirty, setContentDirty] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/admin-status', { credentials: 'include' }).then((r) => r.json()).then((d) => setStatus(d.isAdmin ? 'in' : 'out'))
@@ -54,72 +52,50 @@ export default function AdminPage() {
     )
   }
 
-  const groups = [
-    { title: 'Vue générale', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
-    { title: 'Site & contenu', items: [
-      { key: 'content', label: 'Éditeur de l’accueil', icon: Layers },
-      { key: 'blog', label: 'Journal', icon: BookOpen },
-      { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
-    ] },
-    { title: 'Boutique', items: [
-      { key: 'products', label: 'Produits', icon: Package },
-      { key: 'orders', label: 'Commandes', icon: ShoppingBag },
-      { key: 'coupons', label: 'Codes promo', icon: Ticket },
-    ] },
-    { title: 'Audience', items: [
-      { key: 'users', label: 'Clients', icon: Users },
-      { key: 'newsletter', label: 'Newsletter', icon: Mail },
-    ] },
+  const tabs = [
+    { key: 'dashboard',   label: 'Tableau de bord', icon: LayoutDashboard },
+    { key: 'content',     label: 'Contenu du site', icon: FileText },
+    { key: 'products',    label: 'Produits',        icon: Package },
+    { key: 'blog',        label: 'Journal',         icon: BookOpen },
+    { key: 'orders',      label: 'Commandes',       icon: ShoppingBag },
+    { key: 'coupons',     label: 'Coupons',         icon: Ticket },
+    { key: 'newsletter',  label: 'Newsletter',      icon: Mail },
+    { key: 'users',       label: 'Clients',         icon: Users },
+    { key: 'settings',    label: 'Paramètres',      icon: SettingsIcon },
   ]
-  const activeLabel = groups.flatMap((group) => group.items).find((item) => item.key === tab)?.label
-  const selectTab = (key) => {
-    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’accueil ne sont pas enregistrées. Quitter sans enregistrer ?')) return
-    setTab(key)
-    setMobileNavOpen(false)
-    if (key !== 'content') setContentDirty(false)
-  }
-  const navigation = (
-    <nav aria-label="Navigation de l’administration" className="space-y-7">
-      {groups.map((group) => (
-        <div key={group.title}>
-          <p className="px-3 mb-2 text-[10px] uppercase tracking-[0.22em] text-ink/45">{group.title}</p>
-          <div className="space-y-1">
-            {group.items.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" onClick={() => selectTab(key)} aria-current={tab === key ? 'page' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition ${tab === key ? 'bg-emerald text-ivory' : 'text-ink/75 hover:bg-linen/50 hover:text-ink'}`}>
-                <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />{label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </nav>
-  )
 
   return (
     <div className="min-h-screen bg-ivory">
       <header className="border-b border-linen sticky top-0 bg-ivory/95 backdrop-blur z-30">
-        <div className="px-5 lg:px-8 flex items-center justify-between h-16 gap-3">
-          <div className="flex items-center gap-4 min-w-0">
-            <button type="button" className="lg:hidden border border-linen px-3 py-2 text-xs" onClick={() => setMobileNavOpen(!mobileNavOpen)} aria-expanded={mobileNavOpen} aria-controls="admin-mobile-nav">Menu</button>
-            <div className="font-display text-lg sm:text-xl font-black truncate">Atelier <span className="text-emerald">JLT</span> <span className="font-normal text-ink/40">/ Admin</span></div>
+        <div className="container flex items-center justify-between h-16">
+          <div className="flex items-center gap-6">
+            <div className="font-display text-xl font-black">Atelier <span className="text-emerald">JLT</span> — Admin</div>
+            <div className="hidden md:flex items-center gap-1">
+              {tabs.map((t) => (
+                <button key={t.key} onClick={() => setTab(t.key)} className={`text-[11px] uppercase tracking-[0.22em] px-3 py-1.5 transition ${tab === t.key ? 'bg-ink text-ivory' : 'hover:bg-linen/50'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <a href="/" target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 text-xs hover:text-emerald"><Eye className="h-4 w-4" /> Voir le site</a>
-            <button onClick={logout} className="flex items-center gap-2 text-xs text-ink/60 hover:text-terracotta" aria-label="Déconnexion"><LogOut className="h-4 w-4" strokeWidth={1.5} /><span className="hidden sm:inline">Déconnexion</span></button>
-          </div>
+          <button onClick={logout} className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-ink/60 hover:text-terracotta">
+            <LogOut className="h-4 w-4" strokeWidth={1.5} /> Déconnexion
+          </button>
         </div>
-        {mobileNavOpen && <div id="admin-mobile-nav" className="lg:hidden border-t border-linen p-5 max-h-[70vh] overflow-auto">{navigation}</div>}
+        <div className="md:hidden container pb-3 flex gap-1 overflow-auto no-scrollbar">
+          {tabs.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={`text-[10px] uppercase tracking-[0.22em] px-3 py-1.5 whitespace-nowrap transition ${tab === t.key ? 'bg-ink text-ivory' : 'bg-linen/40'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
-        <aside className="hidden lg:block w-64 shrink-0 border-r border-linen bg-cream/30 p-5" aria-label="Espaces d’administration">{navigation}</aside>
-        <main className="min-w-0 flex-1 px-5 py-8 lg:px-10 lg:py-10">
-          <div className="text-[10px] uppercase tracking-[0.22em] text-ink/45 mb-5">Atelier JLT / {activeLabel}</div>
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+      <main className="container py-10">
+        <AnimatePresence mode="wait">
+          <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
             {tab === 'dashboard' && <TabDashboard />}
-            {tab === 'content' && <TabContent onDirtyChange={setContentDirty} />}
+            {tab === 'content' && <TabContent />}
             {tab === 'products' && <TabProducts />}
             {tab === 'blog' && <TabBlog />}
             {tab === 'orders' && <TabOrders />}
@@ -127,10 +103,9 @@ export default function AdminPage() {
             {tab === 'newsletter' && <TabNewsletter />}
             {tab === 'users' && <TabUsers />}
             {tab === 'settings' && <TabSettings />}
-            </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
+          </motion.div>
+        </AnimatePresence>
+      </main>
     </div>
   )
 }
@@ -1089,17 +1064,9 @@ const DEFAULT_CONTENT = {
   mediaLibrary: [],
 }
 
-function TabContent({ onDirtyChange }) {
+function TabContent() {
   const [c, setC] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState(false)
-  useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
-  useEffect(() => {
-    if (!dirty) return
-    const warn = (event) => { event.preventDefault(); event.returnValue = '' }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
 
   useEffect(() => {
     fetch('/api/admin/site-content', { credentials: 'include' })
@@ -1121,12 +1088,11 @@ function TabContent({ onDirtyChange }) {
       body: JSON.stringify(c),
     })
     setSaving(false)
-    if (r.ok) { setDirty(false); toast.success('Contenu enregistré') }
+    if (r.ok) toast.success('Contenu enregistré')
     else toast.error('Erreur')
   }
 
   const upd = (path, value) => {
-    setDirty(true)
     setC((prev) => {
       const next = structuredClone(prev)
       const parts = path.split('.')
@@ -1138,7 +1104,6 @@ function TabContent({ onDirtyChange }) {
   }
 
   const updColl = (idx, key, val) => {
-    setDirty(true)
     setC((prev) => {
       const next = structuredClone(prev)
       next.collections[idx][key] = val
@@ -1150,29 +1115,22 @@ function TabContent({ onDirtyChange }) {
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h2 className="font-display text-3xl">Éditeur de l’accueil</h2>
-          <p className="text-sm text-ink/60 mt-2">Personnalisez les textes, les images et l’ordre des sections de la page d’accueil.</p>
-          <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <a href="/" target="_blank" rel="noopener noreferrer" className="border border-ink/20 px-4 py-3 text-xs flex gap-2 items-center hover:border-ink"><Eye className="h-4 w-4" /> Voir la page publiée</a>
-          <button onClick={save} disabled={saving || !dirty} className="bg-emerald text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.18em] hover:bg-emeraldDark transition flex items-center gap-2 disabled:opacity-50">
-            <Save className="h-4 w-4" strokeWidth={1.5} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h2 className="font-display text-3xl">Contenu du site</h2>
+        <button onClick={save} disabled={saving} className="bg-emerald text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-emeraldDark transition flex items-center gap-2 disabled:opacity-60">
+          <Save className="h-4 w-4" strokeWidth={1.5} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
       </div>
 
-      <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-collections', 'Collections'], ['#admin-sections', 'Sections de la page'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
-          <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
-        ))}
-      </nav>
-      <div className="space-y-10 max-w-5xl">
+      <div className="space-y-10 max-w-4xl">
         {/* BIBLIOTHÈQUE DE FICHIERS — téléchargement direct */}
+        <MediaLibrary
+          files={c.mediaLibrary || []}
+          onChange={(files) => upd('mediaLibrary', files)}
+        />
+
         {/* HERO */}
-        <section id="admin-hero" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+        <section className="border border-linen bg-ivory p-6 md:p-8">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Hero (accueil)</h3>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Surtitre (petit texte)"><input value={c.hero.eyebrow} onChange={(e) => upd('hero.eyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -1202,7 +1160,7 @@ function TabContent({ onDirtyChange }) {
         </section>
 
         {/* COLLECTIONS */}
-        <section id="admin-collections" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+        <section className="border border-linen bg-ivory p-6 md:p-8">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Collections</h3>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Surtitre section"><input value={c.sectionEyebrow} onChange={(e) => upd('sectionEyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -1233,9 +1191,10 @@ function TabContent({ onDirtyChange }) {
         </section>
 
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
-        <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
-
-        <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
+        <HomeSectionsEditor
+          sections={c.sections}
+          onChange={(next) => upd('sections', next)}
+        />
 
         <div className="text-[11px] text-ink/50 italic">
           ✨ Astuce : pour changer une photo, va d\u2019abord dans <b>Produits → Modifier</b> → <b>Photos du produit</b> pour uploader ta nouvelle image,
