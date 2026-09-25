@@ -19,7 +19,6 @@ export default function ProductPage() {
   const [active, setActive] = useState(0)
   const [qty, setQty] = useState(1)
   const [openInfo, setOpenInfo] = useState('desc')
-  const [zoom, setZoom] = useState(null)
   const [variantIdx, setVariantIdx] = useState(0)
   const [sizeIdx, setSizeIdx] = useState(0)
   const { add } = useCart()
@@ -149,8 +148,7 @@ export default function ProductPage() {
               initial={{ opacity: 0.5 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
-              className="relative aspect-[4/5] bg-cream overflow-hidden cursor-zoom-in"
-              onClick={() => setZoom(galleryImages[active])}
+              className="relative aspect-[4/5] bg-cream overflow-hidden"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={galleryImages[active]} alt={p.name} className="w-full h-full object-cover" />
@@ -360,20 +358,6 @@ export default function ProductPage() {
       </main>
       <Footer />
       <CartDrawer />
-
-      {/* Zoom lightbox */}
-      <AnimatePresence>
-        {zoom && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-ink/95 z-[70] flex items-center justify-center p-6 cursor-zoom-out"
-            onClick={() => setZoom(null)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={zoom} alt="" className="max-h-full max-w-full object-contain" />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
