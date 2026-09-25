@@ -874,6 +874,8 @@ function TabUsers() {
 function ImageUploader({ images, onChange, accept = 'images' }) {
   const [uploading, setUploading] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [dragIdx, setDragIdx] = useState(null)
+  const [overIdx, setOverIdx] = useState(null)
 
   // accept: 'images' (par défaut) | 'all' (images + mp4 + pdf)
   const acceptAttr = accept === 'all'
@@ -925,8 +927,35 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
       <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mb-4">
         {(images || []).map((url, i) => {
           const kind = kindOf(url)
+          const isDragging = dragIdx === i
+          const isOver = overIdx === i && dragIdx !== i
           return (
-            <div key={url + i} className="relative aspect-square bg-cream border border-linen group overflow-hidden">
+            <div
+              key={url + i}
+              draggable
+              onDragStart={(e) => {
+                setDragIdx(i)
+                e.dataTransfer.effectAllowed = 'move'
+                try { e.dataTransfer.setData('text/plain', String(i)) } catch {}
+              }}
+              onDragOver={(e) => { e.preventDefault(); if (i !== overIdx) setOverIdx(i) }}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragIdx === null || dragIdx === i) { setDragIdx(null); setOverIdx(null); return }
+                const next = images.slice()
+                const [moved] = next.splice(dragIdx, 1)
+                next.splice(i, 0, moved)
+                onChange(next)
+                setDragIdx(null); setOverIdx(null)
+              }}
+              onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
+              className={cn(
+                'relative aspect-square bg-cream border group overflow-hidden cursor-grab active:cursor-grabbing transition',
+                'border-linen',
+                isDragging && 'opacity-40',
+                isOver && 'ring-2 ring-emerald ring-offset-2 ring-offset-ivory'
+              )}
+            >
               {kind === 'image' ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={url} alt="" className="w-full h-full object-cover" />
@@ -1112,11 +1141,15 @@ function TabContent() {
           <Field label="Sous-titre">
             <textarea rows={3} value={c.hero.subtitle} onChange={(e) => upd('hero.subtitle', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink text-sm" />
           </Field>
-          <Field label="Photo du hero (glisser-déposer une image)">
+          <Field label="Média du hero (photo ou vidéo MP4 — glisser-déposer)">
             <ImageUploader
               images={c.hero.image ? [c.hero.image] : []}
               onChange={(imgs) => upd('hero.image', imgs[0] || '')}
+              accept="all"
             />
+            <p className="text-[11px] text-ink/50 italic mt-2">
+              💡 Astuce : vous pouvez insérer une vidéo MP4/WEBM à la place d'une photo. Elle jouera en boucle silencieuse.
+            </p>
           </Field>
           <div className="grid md:grid-cols-2 gap-4 mt-2">
             <Field label="Bouton principal — libellé"><input value={c.hero.ctaPrimary?.label || ''} onChange={(e) => upd('hero.ctaPrimary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -1492,8 +1525,11 @@ function MediaLibrary({ files, onChange }) {
   const [uploading, setUploading] = useState(false)
   const [copiedUrl, setCopiedUrl] = useState(null)
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState('date-desc') // date-desc | date-asc | size-desc | size-asc | name-asc | name-desc
-  const [typeFilter, setTypeFilter] = useState('all') // all | image | video | pdf
+  const [sortBy, setSortBy] = useState('date-desc')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState(null)
+  const [editingTagsUrl, setEditingTagsUrl] = useState(null)
+  const [showOrphans, setShowOrphans] = useState(false)
   const dropRef = useState({ dragging: false })[0]
 
   const handleFiles = async (fileList) => {
@@ -1581,6 +1617,7 @@ function MediaLibrary({ files, onChange }) {
   // Filter + sort
   const filtered = (files || [])
     .filter((f) => typeFilter === 'all' || f.kind === typeFilter)
+    .filter((f) => !tagFilter || (f.tags || []).includes(tagFilter))
     .filter((f) => {
       if (!search.trim()) return true
       const q = search.toLowerCase()
@@ -1604,6 +1641,16 @@ function MediaLibrary({ files, onChange }) {
     acc[f.kind] = (acc[f.kind] || 0) + 1
     return acc
   }, {})
+
+  // Tous les tags uniques + comptage
+  const allTags = Array.from(new Set(
+    (files || []).flatMap((f) => f.tags || [])
+  )).sort()
+
+  const updateTags = (url, tags) => {
+    const clean = tags.map((t) => t.trim()).filter(Boolean)
+    onChange((files || []).map((f) => f.url === url ? { ...f, tags: clean } : f))
+  }
 
   return (
     <section className="border border-linen bg-ivory p-6 md:p-8">
@@ -1715,6 +1762,49 @@ function MediaLibrary({ files, onChange }) {
         </div>
       )}
 
+      {/* Rangée des tags */}
+      {totalCount > 0 && allTags.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.24em] text-ink/50">Tags :</span>
+          <button
+            type="button"
+            onClick={() => setTagFilter(null)}
+            className={cn(
+              'text-[10px] uppercase tracking-[0.22em] px-2.5 py-1 border transition',
+              !tagFilter ? 'bg-emerald text-ivory border-emerald' : 'border-ink/20 hover:border-emerald text-ink/70'
+            )}
+          >
+            Tous
+          </button>
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+              className={cn(
+                'text-[10px] uppercase tracking-[0.22em] px-2.5 py-1 border transition',
+                tagFilter === tag ? 'bg-emerald text-ivory border-emerald' : 'border-ink/20 hover:border-emerald text-ink/70'
+              )}
+            >
+              # {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Bouton nettoyage — analyse des orphelins */}
+      {totalCount > 0 && (
+        <div className="mb-5 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => setShowOrphans(true)}
+            className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-terracotta hover:text-terracotta transition"
+          >
+            🧹 Analyser les fichiers orphelins
+          </button>
+        </div>
+      )}
+
       {/* Grille de fichiers */}
       {totalCount === 0 ? (
         <p className="text-sm text-ink/50 italic text-center py-6">
@@ -1763,7 +1853,28 @@ function MediaLibrary({ files, onChange }) {
                 <div className="text-xs text-ink/80 truncate" title={f.originalName}>
                   {f.originalName || f.filename}
                 </div>
-                <div className="text-[10px] text-ink/40 tabular-nums">{formatSize(f.size)}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] text-ink/40 tabular-nums">{formatSize(f.size)}</div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTagsUrl(f.url)}
+                    className="text-[9px] uppercase tracking-[0.22em] text-ink/50 hover:text-emerald transition"
+                  >
+                    # tags
+                  </button>
+                </div>
+                {(f.tags || []).length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {(f.tags || []).slice(0, 3).map((t) => (
+                      <span key={t} className="text-[9px] uppercase tracking-[0.2em] bg-emerald/10 text-emerald px-1.5 py-0.5">
+                        {t}
+                      </span>
+                    ))}
+                    {(f.tags || []).length > 3 && (
+                      <span className="text-[9px] text-ink/40">+{(f.tags || []).length - 3}</span>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 pt-1">
                   <button
                     type="button"
@@ -1803,7 +1914,267 @@ function MediaLibrary({ files, onChange }) {
       <p className="mt-4 text-[10px] uppercase tracking-[0.22em] text-ink/45">
         💡 Astuce : cliquez sur <strong>Lien</strong> pour copier l’URL et la coller dans un article ou une bannière.
       </p>
+
+      {/* Modale édition tags */}
+      <AnimatePresence>
+        {editingTagsUrl && (
+          <TagEditorModal
+            file={(files || []).find((f) => f.url === editingTagsUrl)}
+            existingTags={allTags}
+            onSave={(tags) => { updateTags(editingTagsUrl, tags); setEditingTagsUrl(null) }}
+            onClose={() => setEditingTagsUrl(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modale nettoyage orphelins */}
+      <AnimatePresence>
+        {showOrphans && (
+          <OrphanCleanupModal onClose={() => setShowOrphans(false)} />
+        )}
+      </AnimatePresence>
     </section>
+  )
+}
+
+/* Modale — édition des tags d'un fichier */
+function TagEditorModal({ file, existingTags, onSave, onClose }) {
+  const [tags, setTags] = useState(file?.tags || [])
+  const [input, setInput] = useState('')
+
+  if (!file) return null
+
+  const add = (t) => {
+    const clean = t.trim().toLowerCase().replace(/[^a-z0-9àâäéèêëïîôöùûüÿç\- ]/g, '')
+    if (!clean) return
+    if (tags.includes(clean)) return
+    setTags([...tags, clean])
+    setInput('')
+  }
+  const remove = (t) => setTags(tags.filter((x) => x !== t))
+  const suggestions = existingTags.filter((t) => !tags.includes(t)).slice(0, 12)
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-ink/50 z-50" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.98 }}
+        className="fixed inset-x-4 top-[15vh] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:top-[15vh] md:w-[min(560px,92vw)] bg-ivory z-50 shadow-2xl"
+      >
+        <div className="border-b border-linen p-6 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <span className="text-[10px] uppercase tracking-[0.32em] text-emerald">Tags</span>
+            <h3 className="font-display text-2xl mt-1 truncate">{file.originalName || file.filename}</h3>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="hover:opacity-60 flex-shrink-0">
+            <X className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => remove(t)}
+                  className="text-[10px] uppercase tracking-[0.22em] bg-emerald text-ivory px-3 py-1.5 flex items-center gap-2 hover:bg-terracotta transition"
+                >
+                  # {t} <X className="h-3 w-3" strokeWidth={2} />
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); add(input) }
+                if (e.key === ',') { e.preventDefault(); add(input) }
+              }}
+              placeholder="Ajouter un tag (ex: hero, produit, promo)…"
+              className="flex-1 bg-transparent border border-ink/15 px-3 py-2 text-sm focus:outline-none focus:border-emerald"
+            />
+            <button
+              type="button"
+              onClick={() => add(input)}
+              className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition"
+            >
+              Ajouter
+            </button>
+          </div>
+          {suggestions.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Suggestions</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => add(t)}
+                    className="text-[10px] uppercase tracking-[0.22em] border border-ink/15 px-2.5 py-1 hover:border-emerald hover:text-emerald transition"
+                  >
+                    + {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="border-t border-linen p-4 flex items-center justify-end gap-3">
+          <button type="button" onClick={onClose} className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 border border-ink/25 hover:bg-linen/50 transition">
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(tags)}
+            className="text-[11px] uppercase tracking-[0.24em] px-6 py-2.5 bg-emerald text-ivory hover:bg-emeraldDark transition"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </motion.div>
+    </>
+  )
+}
+
+/* Modale — analyse et nettoyage des fichiers orphelins */
+function OrphanCleanupModal({ onClose }) {
+  const [scan, setScan] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch('/api/admin/files', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => setScan(d))
+      .catch(() => setScan({ orphans: [], error: true }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const deleteOne = async (filename) => {
+    if (!confirm(`Supprimer définitivement ${filename} ?`)) return
+    setDeleting(true)
+    try {
+      const r = await fetch('/api/admin/files?filename=' + encodeURIComponent(filename), {
+        method: 'DELETE', credentials: 'include',
+      })
+      if (r.ok) {
+        toast.success('Fichier supprimé')
+        setScan((prev) => ({
+          ...prev,
+          orphans: prev.orphans.filter((o) => o.filename !== filename),
+        }))
+      } else toast.error('Suppression échouée')
+    } finally { setDeleting(false) }
+  }
+
+  const deleteAll = async () => {
+    if (!scan?.orphans?.length) return
+    if (!confirm(`Supprimer définitivement les ${scan.orphans.length} fichiers orphelins ? Cette action est irréversible.`)) return
+    setDeleting(true)
+    let success = 0
+    for (const o of scan.orphans) {
+      try {
+        const r = await fetch('/api/admin/files?filename=' + encodeURIComponent(o.filename), {
+          method: 'DELETE', credentials: 'include',
+        })
+        if (r.ok) success++
+      } catch {}
+    }
+    toast.success(`${success} fichier(s) supprimé(s)`)
+    setScan((prev) => ({ ...prev, orphans: [] }))
+    setDeleting(false)
+  }
+
+  const formatSize = (bytes) => {
+    if (!bytes) return ''
+    if (bytes < 1024) return bytes + ' o'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' Ko'
+    return (bytes / 1024 / 1024).toFixed(1) + ' Mo'
+  }
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-ink/50 z-50" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.98 }}
+        className="fixed inset-x-4 top-[8vh] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:top-[8vh] md:w-[min(800px,94vw)] max-h-[84vh] overflow-hidden flex flex-col bg-ivory z-50 shadow-2xl"
+      >
+        <div className="border-b border-linen p-6 flex items-start justify-between gap-4 flex-shrink-0">
+          <div>
+            <span className="text-[10px] uppercase tracking-[0.32em] text-terracotta">Nettoyage</span>
+            <h3 className="font-display text-2xl mt-1">Fichiers orphelins</h3>
+            <p className="text-xs text-ink/60 mt-1">
+              Ces fichiers sont sur le serveur mais ne sont plus référencés nulle part (retirés d'une bannière, article, produit…).
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="hover:opacity-60 flex-shrink-0">
+            <X className="h-5 w-5" strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className="p-6 flex-1 overflow-auto">
+          {loading ? (
+            <p className="text-sm text-ink/50 italic text-center py-12">Analyse en cours…</p>
+          ) : !scan?.orphans || scan.orphans.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-3">✨</div>
+              <p className="text-ink/70">Aucun fichier orphelin détecté.</p>
+              <p className="text-[11px] text-ink/40 mt-2">
+                Tous les fichiers téléchargés sont utilisés quelque part.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-center justify-between bg-terracotta/10 border border-terracotta/20 p-4">
+                <div>
+                  <div className="text-sm font-medium text-ink">
+                    {scan.orphans.length} fichier{scan.orphans.length > 1 ? 's' : ''} orphelin{scan.orphans.length > 1 ? 's' : ''}
+                  </div>
+                  <div className="text-[11px] text-ink/60 mt-0.5">
+                    {formatSize(scan.totalOrphanSize)} d'espace récupérable
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={deleteAll}
+                  disabled={deleting}
+                  className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 bg-terracotta text-ivory hover:opacity-90 disabled:opacity-50 transition"
+                >
+                  🗑️ Tout supprimer
+                </button>
+              </div>
+              <ul className="divide-y divide-linen">
+                {scan.orphans.map((o) => (
+                  <li key={o.filename} className="py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm text-ink/85 truncate font-mono">{o.filename}</div>
+                      <div className="text-[10px] text-ink/40 mt-0.5">
+                        {formatSize(o.size)} · {new Date(o.mtime).toLocaleDateString('fr-FR')}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteOne(o.filename)}
+                      disabled={deleting}
+                      className="text-[10px] uppercase tracking-[0.22em] px-3 py-1.5 border border-terracotta text-terracotta hover:bg-terracotta hover:text-ivory disabled:opacity-40 transition flex-shrink-0"
+                    >
+                      Supprimer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </>
   )
 }
 

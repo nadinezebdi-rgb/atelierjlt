@@ -651,6 +651,108 @@ async function handler(request, { params }) {
         }
       }
 
+      // === CLEANUP FICHIERS ORPHELINS ===
+      // Analyse tous les URLs référencés dans site_content, products, blog_posts
+      // et compare avec les fichiers sur disque pour trouver les orphelins.
+      if (sub === 'files' && method === 'GET') {
+        try {
+          const fs = await import('node:fs')
+          const path = await import('node:path')
+          const dir = path.join(process.cwd(), 'lib', 'product-images')
+          if (!fs.existsSync(dir)) return NextResponse.json({ orphans: [], total: 0, referenced: 0 })
+          const onDisk = fs.readdirSync(dir).filter((f) => !f.startsWith('.'))
+
+          // Collecte des URLs référencés
+          const referenced = new Set()
+          const scanForUrls = (val) => {
+            if (!val) return
+            if (typeof val === 'string') {
+              // Match /api/img/xxx et /api/file/xxx.ext
+              const matches = val.match(/\/api\/(img|file)\/[a-zA-Z0-9._-]+/g)
+              if (matches) matches.forEach((m) => referenced.add(m))
+            } else if (Array.isArray(val)) {
+              val.forEach(scanForUrls)
+            } else if (typeof val === 'object') {
+              Object.values(val).forEach(scanForUrls)
+            }
+          }
+
+          // Site content
+          const site = await db.collection('site_content').findOne({ _id: 'home' })
+          if (site) scanForUrls(site.content)
+          // Products
+          const products = await db.collection('products').find({}).toArray()
+          scanForUrls(products)
+          // Blog posts
+          const posts = await db.collection('blog_posts').find({}).toArray()
+          scanForUrls(posts)
+          // Users (avatars éventuels)
+          const users = await db.collection('users').find({}, { projection: { avatar: 1 } }).toArray()
+          scanForUrls(users)
+
+          // Convertit les URLs en noms de fichiers sur disque
+          const referencedFiles = new Set()
+          referenced.forEach((url) => {
+            const name = url.split('/').pop()
+            if (url.includes('/api/img/')) {
+              // Extension ambiguë : cherche le fichier réel qui commence par ce nom
+              const match = onDisk.find((f) => {
+                const base = f.replace(/\.(jpe?g|webp|png|gif)$/i, '')
+                return base === name
+              })
+              if (match) referencedFiles.add(match)
+              else referencedFiles.add(name) // fallback
+            } else {
+              referencedFiles.add(name)
+            }
+          })
+
+          // On ne considère orphelins que les fichiers `upload-*` (téléchargés depuis l'admin) —
+          // les images fixes (jlt-*, deco-*) fournies dans le repo restent intouchées.
+          const orphans = onDisk
+            .filter((f) => f.startsWith('upload-'))
+            .filter((f) => !referencedFiles.has(f))
+            .map((f) => {
+              const stat = fs.statSync(path.join(dir, f))
+              return { filename: f, size: stat.size, mtime: stat.mtime }
+            })
+            .sort((a, b) => b.size - a.size)
+
+          const totalOrphanSize = orphans.reduce((sum, f) => sum + f.size, 0)
+
+          return NextResponse.json({
+            orphans,
+            total: onDisk.length,
+            referenced: referencedFiles.size,
+            totalOrphanSize,
+            uploadCount: onDisk.filter((f) => f.startsWith('upload-')).length,
+          })
+        } catch (e) {
+          console.error('files scan error', e)
+          return NextResponse.json({ error: 'Scan failed', details: String(e?.message || e) }, { status: 500 })
+        }
+      }
+
+      if (sub === 'files' && method === 'DELETE') {
+        try {
+          const filename = url.searchParams.get('filename')
+          if (!filename || !/^upload-[a-zA-Z0-9._-]+$/.test(filename)) {
+            return NextResponse.json({ error: 'Nom de fichier invalide (uploads seulement)' }, { status: 400 })
+          }
+          const fs = await import('node:fs')
+          const path = await import('node:path')
+          const filePath = path.join(process.cwd(), 'lib', 'product-images', filename)
+          if (!fs.existsSync(filePath)) {
+            return NextResponse.json({ error: 'Fichier introuvable' }, { status: 404 })
+          }
+          fs.unlinkSync(filePath)
+          return NextResponse.json({ ok: true })
+        } catch (e) {
+          console.error('file delete error', e)
+          return NextResponse.json({ error: 'Delete failed', details: String(e?.message || e) }, { status: 500 })
+        }
+      }
+
       // === UPLOAD FICHIER (image, vidéo, PDF — multipart form-data) ===
       if (sub === 'upload' && method === 'POST') {
         try {

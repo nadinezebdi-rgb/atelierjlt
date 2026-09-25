@@ -39,13 +39,16 @@ const jsonLd = {
   },
 }
 
-async function loadHomepageSections() {
+async function loadHomeContent() {
   try {
     const db = await getDb()
     const doc = await db.collection('site_content').findOne({ _id: 'home' })
-    return mergeHomepageSections(doc?.content?.sections || [])
+    return {
+      sections: mergeHomepageSections(doc?.content?.sections || []),
+      hero: doc?.content?.hero || null,
+    }
   } catch (e) {
-    return mergeHomepageSections(null)
+    return { sections: mergeHomepageSections(null), hero: null }
   }
 }
 
@@ -89,7 +92,7 @@ function renderSection(s) {
 }
 
 async function App() {
-  const sections = await loadHomepageSections()
+  const { sections, hero } = await loadHomeContent()
   return (
     <div className="min-h-screen bg-ivory">
       <script
@@ -99,7 +102,15 @@ async function App() {
       <Header />
       <main>
         {/* HERO — non-toggleable */}
-        <HeroFerm />
+        <HeroFerm
+          media={hero?.image}
+          eyebrow={hero?.eyebrow}
+          title={hero?.title}
+          subtitle={hero?.subtitle}
+          ctaPrimary={hero?.ctaPrimary}
+          ctaSecondary={hero?.ctaSecondary}
+          signature={hero?.signature}
+        />
 
         {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
         {sections.map(renderSection)}
