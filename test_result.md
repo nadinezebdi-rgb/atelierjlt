@@ -2508,3 +2508,115 @@ agent_communication:
            - Site content endpoint working
         
         ZERO CRITICAL ISSUES FOUND. Both features are production-ready.
+
+    - agent: "main"
+      date: "2026-06-25"
+      message: |
+        IMAGE FALLBACK FEATURE — Added fallback for missing upload-* images.
+
+        CHANGE:
+        - Modified /app/app/api/img/[name]/route.js to serve a default catalog image
+          (jlt-hero-beige.jpeg) when a missing image name starts with "upload-*"
+        - Returns 200 status with X-Fallback-Image: 1 header instead of 404
+        - Fallback only applies to upload-* prefix (user-uploaded files)
+        - Non-upload-* missing images still return 404 as expected
+        - Shorter cache (300s) for fallback images in case admin re-uploads
+
+        WHY:
+        - Prevents broken image placeholders on frontend after redeploys/migrations
+        - Graceful degradation for lost user uploads
+        - Better UX than gray boxes
+
+        Please TEST BACKEND:
+          1. GET /api/img/jlt-plaid-01 → 200, real image bytes, NO X-Fallback-Image header
+          2. GET /api/img/upload-a48de122 → 200 (doesn't exist), Content-Type: image/jpeg, X-Fallback-Image: 1 header present, non-empty body
+          3. GET /api/img/upload-does-not-exist-xyz → 200 with fallback (same as above)
+          4. GET /api/img/nonexistent-thing-no-upload-prefix → 404 (fallback only applies to upload-*)
+          5. GET /api/img/jlt-plaid-01?xyz=1 → 200 still works with query params
+
+        REGRESSION CHECKS:
+          6. GET /api/products → 200, 11 products, no 'terre' category
+          7. GET /api/products/plaid-sylvestre → 200
+          8. POST /api/admin/reset-product-photos with admin cookie (password Juliette99*) with body {"slug":"plaid-sylvestre"} → 200 with ok:true and actionId
+          9. POST /api/chat/actions with {"actionId": "<returned actionId>"} → 200 undo works
+
+    - agent: "testing"
+      date: "2026-06-25"
+      message: |
+        ✅ IMAGE FALLBACK FEATURE + REGRESSION TESTS - ALL 9 TESTS PASSED (100%)
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        PART 1: IMAGE FALLBACK FEATURE ✅ (5/5 tests passed)
+        
+        ✅ Test 1: Real image no fallback
+           - GET /api/img/jlt-plaid-01 → 200 OK
+           - Content-Type: image/jpeg
+           - Content size: 151,073 bytes (valid image data)
+           - NO X-Fallback-Image header (correct for real images)
+        
+        ✅ Test 2: Missing upload-* with fallback
+           - GET /api/img/upload-a48de122 → 200 OK (fallback served)
+           - Content-Type: image/jpeg
+           - Content size: 264,400 bytes (jlt-hero-beige.jpeg)
+           - X-Fallback-Image: 1 header present ✓
+        
+        ✅ Test 3: Another missing upload-* with fallback
+           - GET /api/img/upload-does-not-exist-xyz → 200 OK (fallback served)
+           - Content size: 264,400 bytes (same fallback image)
+           - X-Fallback-Image: 1 header present ✓
+        
+        ✅ Test 4: Non-upload-* missing returns 404
+           - GET /api/img/nonexistent-thing-no-upload-prefix → 404 Not Found
+           - NO X-Fallback-Image header (correct)
+           - Fallback only applies to upload-* prefix as designed ✓
+        
+        ✅ Test 5: Query params work
+           - GET /api/img/jlt-plaid-01?xyz=1 → 200 OK
+           - Content size: 151,073 bytes (same as without query params)
+           - Query params correctly ignored ✓
+        
+        PART 2: REGRESSION TESTS ✅ (4/4 tests passed)
+        
+        ✅ Test 6: Products API
+           - GET /api/products → 200 OK
+           - Returns 11 products (total: 11)
+           - NO products with category='terre' (hidden category working correctly)
+        
+        ✅ Test 7: Product detail
+           - GET /api/products/plaid-sylvestre → 200 OK
+           - Product name: "Plaid Sylvestre"
+           - Price: 340€
+        
+        ✅ Test 8: Reset product photos
+           - POST /api/admin/reset-product-photos with admin cookie + {"slug":"plaid-sylvestre"}
+           - Returns 200 OK with {ok: true, actionId: "1f081cc4-8f99-4085-9cb0-aaaa4e8e6e0e"}
+           - actionId returned for undo support ✓
+        
+        ✅ Test 9: Undo action
+           - POST /api/chat/actions with {"actionId":"1f081cc4-8f99-4085-9cb0-aaaa4e8e6e0e"}
+           - Returns 200 OK with {ok: true}
+           - Message: "Action « Réinitialiser les photos de « plaid-sylvestre » » annulée"
+           - Undo mechanism working correctly ✓
+        
+        🎉 CONCLUSION - IMAGE FALLBACK FEATURE FULLY FUNCTIONAL:
+        
+        1. ✅ Fallback mechanism working correctly
+           - Missing upload-* images serve jlt-hero-beige.jpeg with 200 status
+           - X-Fallback-Image: 1 header correctly set for fallback responses
+           - Real images serve normally without fallback header
+           - Non-upload-* missing images still return 404 (no fallback)
+           - Query parameters handled correctly
+        
+        2. ✅ No regressions in existing functionality
+           - Products API working (11 products, no terre category)
+           - Product detail endpoint working
+           - Reset product photos endpoint working with actionId
+           - Undo mechanism working correctly
+        
+        3. ✅ UX improvement achieved
+           - Prevents broken image placeholders on frontend
+           - Graceful degradation for lost user uploads
+           - Better user experience than gray boxes
+        
+        ZERO CRITICAL ISSUES FOUND. Feature is production-ready.
