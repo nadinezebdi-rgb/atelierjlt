@@ -7,10 +7,9 @@ export default function sitemap() {
   const staticPages = [
     '',
     '/collections',
-    '/atelier',
+    '/a-propos',
     '/journal',
     '/contact',
-    '/histoire',
   ].map((p) => ({
     url: `${BASE}${p}`,
     lastModified: now,
@@ -25,12 +24,16 @@ export default function sitemap() {
     priority: 0.6,
   }))
 
-  const productPages = PRODUCTS.map((p) => ({
-    url: `${BASE}/produit/${p.slug}`,
-    lastModified: now,
-    changeFrequency: 'weekly',
-    priority: 0.8,
-  }))
+  // La collection Terre a été retirée du site public : on filtre ses produits
+  // pour ne pas renvoyer de 404 depuis le sitemap aux moteurs de recherche.
+  const productPages = PRODUCTS
+    .filter((p) => p.category !== 'terre')
+    .map((p) => ({
+      url: `${BASE}/produit/${p.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }))
 
   return [...staticPages, ...categoryPages, ...productPages]
 }

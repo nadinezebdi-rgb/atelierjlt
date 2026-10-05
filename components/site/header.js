@@ -13,7 +13,7 @@ const nav = [
   { name: 'Collections',        href: '/collections' },
   { name: 'Nouveautés',         href: '/collections?cat=nouveautes' },
   { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees' },
-  { name: 'Notre Atelier',      href: '/atelier' },
+  { name: 'À propos de nous',    href: '/a-propos' },
   { name: 'Journal',            href: '/journal' },
   { name: 'Contact',            href: '/contact' },
 ]
