@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Backend test for Atelier JLT - Media Persistence & Recovery Tool
-Tests the CRITICAL fix for media persistence + recovery tool
+Backend test for Atelier JLT - Image Fallback Feature + Regression Tests
+Tests the new fallback feature for missing upload-* images
 """
 
 import requests
 import json
-import os
 import sys
-from pathlib import Path
 
 # Base URL from environment
 BASE_URL = "https://french-craft.preview.emergentagent.com/api"
@@ -48,422 +46,245 @@ def admin_login():
         print_result(False, f"Admin login error: {str(e)}")
         return False
 
-def test_1_upload_stores_in_mongodb():
-    """Test 1: Upload endpoint stores in MongoDB"""
-    print_test(1, "Upload endpoint stores in MongoDB")
+def test_1_real_image_no_fallback():
+    """Test 1: Real image returns 200 with NO X-Fallback-Image header"""
+    print_test(1, "GET /api/img/jlt-plaid-01 → 200, real image, NO X-Fallback-Image header")
     
     try:
-        # Use an existing test image
-        test_image_path = "/app/lib/product-images/ambiance-canape.jpeg"
-        
-        if not os.path.exists(test_image_path):
-            return print_result(False, f"Test image not found: {test_image_path}")
-        
-        with open(test_image_path, 'rb') as f:
-            files = {'file': ('test-upload.jpg', f, 'image/jpeg')}
-            response = session.post(
-                f"{BASE_URL}/admin/upload",
-                files=files,
-                timeout=60
-            )
+        response = session.get(f"{BASE_URL}/img/jlt-plaid-01", timeout=30)
         
         if response.status_code != 200:
-            return print_result(False, f"Upload failed: {response.status_code} - {response.text}")
+            return print_result(False, f"Expected 200, got {response.status_code}")
+        
+        # Check Content-Type
+        content_type = response.headers.get('Content-Type', '')
+        if not content_type.startswith('image/'):
+            return print_result(False, f"Expected image/* Content-Type, got '{content_type}'")
+        
+        # Check NO X-Fallback-Image header
+        if 'X-Fallback-Image' in response.headers:
+            return print_result(False, f"X-Fallback-Image header should NOT be present for real images")
+        
+        # Check non-empty body
+        if len(response.content) < 1000:
+            return print_result(False, f"Image content too small: {len(response.content)} bytes")
+        
+        return print_result(True, f"Real image served correctly: {len(response.content)} bytes, Content-Type: {content_type}, NO X-Fallback-Image header")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_2_upload_missing_fallback():
+    """Test 2: Missing upload-* image returns 200 with fallback"""
+    print_test(2, "GET /api/img/upload-a48de122 → 200 with fallback (X-Fallback-Image: 1)")
+    
+    try:
+        response = session.get(f"{BASE_URL}/img/upload-a48de122", timeout=30)
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200 (fallback), got {response.status_code}")
+        
+        # Check Content-Type
+        content_type = response.headers.get('Content-Type', '')
+        if content_type != 'image/jpeg':
+            return print_result(False, f"Expected 'image/jpeg', got '{content_type}'")
+        
+        # Check X-Fallback-Image header
+        fallback_header = response.headers.get('X-Fallback-Image', '')
+        if fallback_header != '1':
+            return print_result(False, f"Expected X-Fallback-Image: 1, got '{fallback_header}'")
+        
+        # Check non-empty body
+        if len(response.content) < 1000:
+            return print_result(False, f"Fallback image content too small: {len(response.content)} bytes")
+        
+        return print_result(True, f"Fallback served correctly: {len(response.content)} bytes, Content-Type: {content_type}, X-Fallback-Image: 1")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_3_upload_missing_fallback_2():
+    """Test 3: Another missing upload-* image returns 200 with fallback"""
+    print_test(3, "GET /api/img/upload-does-not-exist-xyz → 200 with fallback")
+    
+    try:
+        response = session.get(f"{BASE_URL}/img/upload-does-not-exist-xyz", timeout=30)
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200 (fallback), got {response.status_code}")
+        
+        # Check X-Fallback-Image header
+        fallback_header = response.headers.get('X-Fallback-Image', '')
+        if fallback_header != '1':
+            return print_result(False, f"Expected X-Fallback-Image: 1, got '{fallback_header}'")
+        
+        # Check non-empty body
+        if len(response.content) < 1000:
+            return print_result(False, f"Fallback image content too small: {len(response.content)} bytes")
+        
+        return print_result(True, f"Fallback served correctly: {len(response.content)} bytes, X-Fallback-Image: 1")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_4_nonupload_missing_404():
+    """Test 4: Missing non-upload-* image returns 404"""
+    print_test(4, "GET /api/img/nonexistent-thing-no-upload-prefix → 404 (no fallback)")
+    
+    try:
+        response = session.get(f"{BASE_URL}/img/nonexistent-thing-no-upload-prefix", timeout=30)
+        
+        if response.status_code != 404:
+            return print_result(False, f"Expected 404, got {response.status_code}")
+        
+        # Should NOT have X-Fallback-Image header
+        if 'X-Fallback-Image' in response.headers:
+            return print_result(False, f"X-Fallback-Image header should NOT be present for 404 responses")
+        
+        return print_result(True, f"Correctly returns 404 for non-upload-* missing images")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_5_query_params():
+    """Test 5: Real image with query params still works"""
+    print_test(5, "GET /api/img/jlt-plaid-01?xyz=1 → 200 (query params ignored)")
+    
+    try:
+        response = session.get(f"{BASE_URL}/img/jlt-plaid-01?xyz=1", timeout=30)
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200, got {response.status_code}")
+        
+        # Check Content-Type
+        content_type = response.headers.get('Content-Type', '')
+        if not content_type.startswith('image/'):
+            return print_result(False, f"Expected image/* Content-Type, got '{content_type}'")
+        
+        # Check NO X-Fallback-Image header
+        if 'X-Fallback-Image' in response.headers:
+            return print_result(False, f"X-Fallback-Image header should NOT be present for real images")
+        
+        # Check non-empty body
+        if len(response.content) < 1000:
+            return print_result(False, f"Image content too small: {len(response.content)} bytes")
+        
+        return print_result(True, f"Real image served correctly with query params: {len(response.content)} bytes")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_6_products_api():
+    """Test 6: GET /api/products returns products, no 'terre' category"""
+    print_test(6, "REGRESSION: GET /api/products → 200, products returned, no 'terre' category")
+    
+    try:
+        response = session.get(f"{BASE_URL}/products", timeout=30)
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200, got {response.status_code}")
         
         data = response.json()
         
-        # Verify response structure
-        required_fields = ['ok', 'url', 'filename', 'kind', 'size', 'originalName']
-        missing_fields = [f for f in required_fields if f not in data]
-        if missing_fields:
-            return print_result(False, f"Missing fields in response: {missing_fields}")
+        if 'products' not in data:
+            return print_result(False, f"Missing 'products' in response")
+        
+        products = data.get('products', [])
+        total = data.get('total', 0)
+        
+        if len(products) == 0:
+            return print_result(False, f"No products returned")
+        
+        # Check no 'terre' category
+        terre_products = [p for p in products if p.get('category') == 'terre']
+        if len(terre_products) > 0:
+            return print_result(False, f"Found {len(terre_products)} products with 'terre' category (should be hidden)")
+        
+        return print_result(True, f"Products API working: {len(products)} products returned (total: {total}), no 'terre' category")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_7_product_detail():
+    """Test 7: GET /api/products/plaid-sylvestre returns product detail"""
+    print_test(7, "REGRESSION: GET /api/products/plaid-sylvestre → 200")
+    
+    try:
+        response = session.get(f"{BASE_URL}/products/plaid-sylvestre", timeout=30)
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200, got {response.status_code}")
+        
+        data = response.json()
+        
+        if 'product' not in data:
+            return print_result(False, f"Missing 'product' in response")
+        
+        product = data.get('product', {})
+        
+        if product.get('slug') != 'plaid-sylvestre':
+            return print_result(False, f"Expected slug 'plaid-sylvestre', got '{product.get('slug')}'")
+        
+        return print_result(True, f"Product detail working: {product.get('name', 'N/A')}, price: {product.get('price', 0)}€")
+        
+    except Exception as e:
+        return print_result(False, f"Exception: {str(e)}")
+
+def test_8_reset_product_photos():
+    """Test 8: POST /api/admin/reset-product-photos returns actionId"""
+    print_test(8, "REGRESSION: POST /api/admin/reset-product-photos → 200 with actionId")
+    
+    try:
+        response = session.post(
+            f"{BASE_URL}/admin/reset-product-photos",
+            json={"slug": "plaid-sylvestre"},
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            return print_result(False, f"Expected 200, got {response.status_code} - {response.text}")
+        
+        data = response.json()
         
         if not data.get('ok'):
-            return print_result(False, f"Upload returned ok=false")
+            return print_result(False, f"Expected ok: true, got {data}")
         
-        if data.get('kind') != 'image':
-            return print_result(False, f"Expected kind='image', got '{data.get('kind')}'")
+        action_id = data.get('actionId')
+        if not action_id:
+            return print_result(False, f"Missing 'actionId' in response")
         
-        filename = data.get('filename', '')
-        if not filename.startswith('upload-'):
-            return print_result(False, f"Filename doesn't start with 'upload-': {filename}")
+        # Store for next test
+        global reset_action_id
+        reset_action_id = action_id
         
-        # Store filename for later tests
-        global uploaded_filename, uploaded_url
-        uploaded_filename = filename
-        uploaded_url = data.get('url', '')
-        
-        # Verify the image is accessible
-        img_name = uploaded_url.replace('/api/img/', '')
-        img_response = session.get(f"{BASE_URL}/img/{img_name}", timeout=30)
-        
-        if img_response.status_code != 200:
-            return print_result(False, f"Uploaded image not accessible: {img_response.status_code}")
-        
-        if len(img_response.content) < 1000:
-            return print_result(False, f"Image content too small: {len(img_response.content)} bytes")
-        
-        return print_result(True, f"Upload successful: {filename}, URL: {uploaded_url}, size: {data.get('size')} bytes, accessible via GET")
+        return print_result(True, f"Reset product photos working: actionId={action_id}")
         
     except Exception as e:
         return print_result(False, f"Exception: {str(e)}")
 
-def test_2_mongodb_fallback_after_disk_deletion():
-    """Test 2: MongoDB fallback after disk deletion"""
-    print_test(2, "MongoDB fallback after disk deletion")
+def test_9_undo_action():
+    """Test 9: POST /api/chat/actions with actionId undoes the action"""
+    print_test(9, "REGRESSION: POST /api/chat/actions (undo) → 200")
     
     try:
-        if not uploaded_filename:
-            return print_result(False, "No uploaded file from test 1")
+        if not reset_action_id:
+            return print_result(False, "No actionId from test 8")
         
-        # Get the image first to verify it works
-        img_name = uploaded_url.replace('/api/img/', '')
-        response1 = session.get(f"{BASE_URL}/img/{img_name}", timeout=30)
+        response = session.post(
+            f"{BASE_URL}/chat/actions",
+            json={"actionId": reset_action_id},
+            timeout=30
+        )
         
-        if response1.status_code != 200:
-            return print_result(False, f"Image not accessible before deletion: {response1.status_code}")
-        
-        original_size = len(response1.content)
-        
-        # Delete the file from disk
-        disk_path = f"/app/lib/product-images/{uploaded_filename}"
-        if os.path.exists(disk_path):
-            os.remove(disk_path)
-            print(f"   Deleted file from disk: {disk_path}")
-        else:
-            print(f"   File not on disk (already in MongoDB only): {disk_path}")
-        
-        # Try to access again - should fallback to MongoDB
-        response2 = session.get(f"{BASE_URL}/img/{img_name}", timeout=30)
-        
-        if response2.status_code != 200:
-            return print_result(False, f"MongoDB fallback failed: {response2.status_code}")
-        
-        fallback_size = len(response2.content)
-        
-        if fallback_size != original_size:
-            return print_result(False, f"Size mismatch: original={original_size}, fallback={fallback_size}")
-        
-        return print_result(True, f"MongoDB fallback working: {fallback_size} bytes served from MongoDB after disk deletion")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_3_nonexistent_file_returns_404():
-    """Test 3: Non-existent file returns 404"""
-    print_test(3, "Non-existent file returns 404")
-    
-    try:
-        # Test /api/img
-        response1 = session.get(f"{BASE_URL}/img/definitely-not-a-file", timeout=30)
-        if response1.status_code != 404:
-            return print_result(False, f"/api/img returned {response1.status_code} instead of 404")
-        
-        # Test /api/file
-        response2 = session.get(f"{BASE_URL}/file/definitely-not-a-file.mp4", timeout=30)
-        if response2.status_code != 404:
-            return print_result(False, f"/api/file returned {response2.status_code} instead of 404")
-        
-        return print_result(True, "Both /api/img and /api/file return 404 for non-existent files")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_4_path_traversal_blocked():
-    """Test 4: Path traversal blocked"""
-    print_test(4, "Path traversal blocked")
-    
-    try:
-        # Test various path traversal attempts
-        traversal_attempts = [
-            "../etc/passwd",
-            "..%2F..%2Fetc%2Fpasswd",
-            "../secret",
-            "../../secret",
-        ]
-        
-        for attempt in traversal_attempts:
-            response = session.get(f"{BASE_URL}/img/{attempt}", timeout=30)
-            if response.status_code != 404:
-                return print_result(False, f"Path traversal not blocked for '{attempt}': returned {response.status_code}")
-        
-        return print_result(True, "All path traversal attempts correctly blocked (404)")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_5_get_broken_media():
-    """Test 5: GET /api/admin/broken-media"""
-    print_test(5, "GET /api/admin/broken-media")
-    
-    try:
-        # Test without admin (should be 401)
-        no_auth_session = requests.Session()
-        response_no_auth = no_auth_session.get(f"{BASE_URL}/admin/broken-media", timeout=30)
-        if response_no_auth.status_code != 401:
-            return print_result(False, f"Expected 401 without admin, got {response_no_auth.status_code}")
-        
-        print("   ✓ Returns 401 without admin auth")
-        
-        # Test with admin
-        response = session.get(f"{BASE_URL}/admin/broken-media", timeout=60)
         if response.status_code != 200:
-            return print_result(False, f"Failed with admin: {response.status_code} - {response.text}")
+            return print_result(False, f"Expected 200, got {response.status_code} - {response.text}")
         
         data = response.json()
         
-        # Verify structure
-        if 'products' not in data or 'summary' not in data:
-            return print_result(False, f"Missing 'products' or 'summary' in response")
+        if not data.get('ok'):
+            return print_result(False, f"Expected ok: true, got {data}")
         
-        summary = data.get('summary', {})
-        if 'productsWithMissing' not in summary or 'totalMissing' not in summary:
-            return print_result(False, f"Missing fields in summary")
-        
-        print(f"   ✓ Response structure correct")
-        print(f"   ✓ Products with missing media: {summary['productsWithMissing']}")
-        print(f"   ✓ Total missing: {summary['totalMissing']}")
-        
-        # On healthy DB, should be 0
-        if summary['totalMissing'] == 0:
-            print(f"   ✓ Healthy state: no broken media")
-        
-        # Store for later tests
-        global initial_broken_count
-        initial_broken_count = summary['totalMissing']
-        
-        return print_result(True, f"Endpoint working correctly, found {summary['totalMissing']} broken media")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_5b_trigger_broken_state():
-    """Test 5b: Trigger broken state by updating product with non-existent images"""
-    print_test("5b", "Trigger broken state")
-    
-    try:
-        # Apply command to break plaid-sylvestre images
-        command = {
-            "command": {
-                "id": "test-break",
-                "type": "update_product",
-                "label": "break images for test",
-                "severity": "light",
-                "patch": {
-                    "images": [
-                        "/api/img/upload-NOTEXIST-1",
-                        "/api/img/upload-NOTEXIST-2"
-                    ]
-                },
-                "targetId": "plaid-sylvestre"
-            },
-            "session_id": "break-test"
-        }
-        
-        response = session.post(
-            f"{BASE_URL}/chat/apply",
-            json=command,
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            return print_result(False, f"Failed to apply break command: {response.status_code} - {response.text}")
-        
-        print("   ✓ Applied command to break plaid-sylvestre images")
-        
-        # Check broken-media again
-        response2 = session.get(f"{BASE_URL}/admin/broken-media", timeout=60)
-        if response2.status_code != 200:
-            return print_result(False, f"Failed to get broken-media: {response2.status_code}")
-        
-        data = response2.json()
-        summary = data.get('summary', {})
-        
-        if summary.get('totalMissing', 0) < 2:
-            return print_result(False, f"Expected at least 2 broken images, got {summary.get('totalMissing')}")
-        
-        # Find plaid-sylvestre in products
-        products = data.get('products', [])
-        plaid = next((p for p in products if p['slug'] == 'plaid-sylvestre'), None)
-        
-        if not plaid:
-            return print_result(False, "plaid-sylvestre not found in broken products")
-        
-        broken = plaid.get('broken', [])
-        if len(broken) < 2:
-            return print_result(False, f"Expected 2 broken slots, got {len(broken)}")
-        
-        # Verify slots are images:0 and images:1
-        slots = [b['slot'] for b in broken]
-        if 'images:0' not in slots or 'images:1' not in slots:
-            return print_result(False, f"Expected images:0 and images:1, got {slots}")
-        
-        return print_result(True, f"Broken state triggered: plaid-sylvestre has {len(broken)} broken images at slots {slots}")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_6_post_broken_media_replace():
-    """Test 6: POST /api/admin/broken-media (replace)"""
-    print_test(6, "POST /api/admin/broken-media (replace)")
-    
-    try:
-        # Test without admin (should be 401)
-        no_auth_session = requests.Session()
-        test_image_path = "/app/lib/product-images/ambiance-lin.jpeg"
-        with open(test_image_path, 'rb') as f:
-            files = {'file': ('replacement.jpg', f, 'image/jpeg')}
-            data = {'slug': 'plaid-sylvestre', 'slot': 'images:0'}
-            response_no_auth = no_auth_session.post(
-                f"{BASE_URL}/admin/broken-media",
-                files=files,
-                data=data,
-                timeout=60
-            )
-        
-        if response_no_auth.status_code != 401:
-            return print_result(False, f"Expected 401 without admin, got {response_no_auth.status_code}")
-        
-        print("   ✓ Returns 401 without admin auth")
-        
-        # Test with admin - replace images:0
-        with open(test_image_path, 'rb') as f:
-            files = {'file': ('replacement.jpg', f, 'image/jpeg')}
-            data = {'slug': 'plaid-sylvestre', 'slot': 'images:0'}
-            response = session.post(
-                f"{BASE_URL}/admin/broken-media",
-                files=files,
-                data=data,
-                timeout=60
-            )
-        
-        if response.status_code != 200:
-            return print_result(False, f"Replace failed: {response.status_code} - {response.text}")
-        
-        result = response.json()
-        
-        if not result.get('ok'):
-            return print_result(False, f"Replace returned ok=false")
-        
-        new_url = result.get('url', '')
-        if not new_url.startswith('/api/img/'):
-            return print_result(False, f"Invalid URL returned: {new_url}")
-        
-        print(f"   ✓ Replace successful: {new_url}")
-        
-        # Verify the new URL is accessible
-        img_name = new_url.replace('/api/img/', '')
-        img_response = session.get(f"{BASE_URL}/img/{img_name}", timeout=30)
-        if img_response.status_code != 200:
-            return print_result(False, f"New image not accessible: {img_response.status_code}")
-        
-        print(f"   ✓ New image accessible via GET")
-        
-        # Verify the product was updated
-        # Check via broken-media endpoint
-        response2 = session.get(f"{BASE_URL}/admin/broken-media", timeout=60)
-        if response2.status_code != 200:
-            return print_result(False, f"Failed to verify update: {response2.status_code}")
-        
-        data2 = response2.json()
-        products = data2.get('products', [])
-        plaid = next((p for p in products if p['slug'] == 'plaid-sylvestre'), None)
-        
-        if plaid:
-            broken = plaid.get('broken', [])
-            # Should now have only 1 broken image (images:1)
-            if len(broken) != 1:
-                return print_result(False, f"Expected 1 broken image after replace, got {len(broken)}")
-            if broken[0]['slot'] != 'images:1':
-                return print_result(False, f"Expected images:1 to be broken, got {broken[0]['slot']}")
-            print(f"   ✓ Product updated: 1 broken image remaining (images:1)")
-        else:
-            # If plaid not in broken products, it means all images are fixed (shouldn't happen yet)
-            return print_result(False, "plaid-sylvestre not found in broken products (expected 1 broken)")
-        
-        # Test missing params
-        response3 = session.post(f"{BASE_URL}/admin/broken-media", data={}, timeout=30)
-        if response3.status_code != 400:
-            return print_result(False, f"Expected 400 for missing params, got {response3.status_code}")
-        
-        print(f"   ✓ Returns 400 for missing params")
-        
-        # Test unsupported extension
-        with open('/app/package.json', 'rb') as f:
-            files = {'file': ('test.exe', f, 'application/octet-stream')}
-            data = {'slug': 'plaid-sylvestre', 'slot': 'images:1'}
-            response4 = session.post(
-                f"{BASE_URL}/admin/broken-media",
-                files=files,
-                data=data,
-                timeout=60
-            )
-        
-        if response4.status_code != 400:
-            return print_result(False, f"Expected 400 for unsupported extension, got {response4.status_code}")
-        
-        print(f"   ✓ Returns 400 for unsupported extension")
-        
-        return print_result(True, "Replace endpoint working correctly with all validations")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_7_cleanup_and_restore():
-    """Test 7: Cleanup and restore"""
-    print_test(7, "Cleanup and restore")
-    
-    try:
-        # Restore plaid-sylvestre images
-        command = {
-            "command": {
-                "id": "restore",
-                "type": "update_product",
-                "label": "restore images",
-                "severity": "light",
-                "patch": {
-                    "images": [
-                        "/api/img/jlt-plaid-01",
-                        "/api/img/jlt-plaid-02",
-                        "/api/img/jlt-plaid-03"
-                    ]
-                },
-                "targetId": "plaid-sylvestre"
-            },
-            "session_id": "cleanup"
-        }
-        
-        response = session.post(
-            f"{BASE_URL}/chat/apply",
-            json=command,
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            return print_result(False, f"Failed to restore: {response.status_code} - {response.text}")
-        
-        print("   ✓ Restore command applied")
-        
-        # Verify broken-media returns 0
-        response2 = session.get(f"{BASE_URL}/admin/broken-media", timeout=60)
-        if response2.status_code != 200:
-            return print_result(False, f"Failed to verify: {response2.status_code}")
-        
-        data = response2.json()
-        summary = data.get('summary', {})
-        
-        # Check if plaid-sylvestre still has broken images
-        products = data.get('products', [])
-        plaid = next((p for p in products if p['slug'] == 'plaid-sylvestre'), None)
-        
-        if plaid:
-            broken = plaid.get('broken', [])
-            return print_result(False, f"plaid-sylvestre still has {len(broken)} broken images after restore")
-        
-        print(f"   ✓ plaid-sylvestre no longer in broken products list")
-        print(f"   ✓ Total missing media: {summary.get('totalMissing', 0)}")
-        
-        return print_result(True, f"Cleanup successful: plaid-sylvestre restored, total missing: {summary.get('totalMissing', 0)}")
+        return print_result(True, f"Undo action working: {data.get('message', 'Action annulée')}")
         
     except Exception as e:
         return print_result(False, f"Exception: {str(e)}")
@@ -471,17 +292,15 @@ def test_7_cleanup_and_restore():
 def main():
     """Run all tests"""
     print("\n" + "="*80)
-    print("ATELIER JLT - MEDIA PERSISTENCE & RECOVERY TOOL - BACKEND TESTS")
+    print("ATELIER JLT - IMAGE FALLBACK FEATURE + REGRESSION TESTS")
     print("="*80)
     print(f"Base URL: {BASE_URL}")
     print(f"Testing environment: Preview")
     print("="*80)
     
     # Initialize globals
-    global uploaded_filename, uploaded_url, initial_broken_count
-    uploaded_filename = None
-    uploaded_url = None
-    initial_broken_count = 0
+    global reset_action_id
+    reset_action_id = None
     
     results = []
     
@@ -491,14 +310,22 @@ def main():
         sys.exit(1)
     
     # Run tests
-    results.append(("Test 1: Upload stores in MongoDB", test_1_upload_stores_in_mongodb()))
-    results.append(("Test 2: MongoDB fallback after disk deletion", test_2_mongodb_fallback_after_disk_deletion()))
-    results.append(("Test 3: Non-existent file returns 404", test_3_nonexistent_file_returns_404()))
-    results.append(("Test 4: Path traversal blocked", test_4_path_traversal_blocked()))
-    results.append(("Test 5: GET /api/admin/broken-media", test_5_get_broken_media()))
-    results.append(("Test 5b: Trigger broken state", test_5b_trigger_broken_state()))
-    results.append(("Test 6: POST /api/admin/broken-media (replace)", test_6_post_broken_media_replace()))
-    results.append(("Test 7: Cleanup and restore", test_7_cleanup_and_restore()))
+    print("\n" + "="*80)
+    print("PART 1: IMAGE FALLBACK FEATURE TESTS")
+    print("="*80)
+    results.append(("Test 1: Real image no fallback", test_1_real_image_no_fallback()))
+    results.append(("Test 2: Missing upload-* with fallback", test_2_upload_missing_fallback()))
+    results.append(("Test 3: Another missing upload-* with fallback", test_3_upload_missing_fallback_2()))
+    results.append(("Test 4: Non-upload-* missing returns 404", test_4_nonupload_missing_404()))
+    results.append(("Test 5: Query params work", test_5_query_params()))
+    
+    print("\n" + "="*80)
+    print("PART 2: REGRESSION TESTS")
+    print("="*80)
+    results.append(("Test 6: Products API", test_6_products_api()))
+    results.append(("Test 7: Product detail", test_7_product_detail()))
+    results.append(("Test 8: Reset product photos", test_8_reset_product_photos()))
+    results.append(("Test 9: Undo action", test_9_undo_action()))
     
     # Summary
     print("\n" + "="*80)
@@ -517,7 +344,7 @@ def main():
     print("="*80)
     
     if passed == total:
-        print("\n🎉 ALL TESTS PASSED - Media persistence & recovery tool is FULLY FUNCTIONAL")
+        print("\n🎉 ALL TESTS PASSED - Image fallback feature working correctly, no regressions")
         sys.exit(0)
     else:
         print(f"\n⚠️  {total - passed} test(s) failed")

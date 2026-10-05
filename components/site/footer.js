@@ -24,8 +24,7 @@ export default function Footer() {
             </div>
           </div>
           <FooterCol title="Maison" items={[
-            ['Notre histoire', '/histoire'],
-            ["L'atelier", '/atelier'],
+            ['À propos de nous', '/a-propos'],
             ['Journal', '/journal'],
             ['Nous contacter', '/contact'],
           ]} />

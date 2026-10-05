@@ -24,21 +24,11 @@ const themes = [
   {
     name: 'Empreinte',
     tagline: 'Les traces qui habillent les murs — tapis, macramés et suspensions comme des signatures textiles.',
-    image: IMAGES.photMacrame,
+    image: IMAGES.macrameMur,
     links: [
       { label: 'Tapis',             href: '/collections?cat=empreinte' },
       { label: 'Macramé mural',     href: '/collections?cat=empreinte' },
       { label: 'Suspensions',       href: '/collections?cat=empreinte' },
-    ],
-  },
-  {
-    name: 'Terre',
-    tagline: 'La poterie tournée à la main — chaque pièce garde la mémoire du geste.',
-    image: IMAGES.terra,
-    links: [
-      { label: 'Vases',             href: '/collections?cat=terre' },
-      { label: 'Bols & Coupes',     href: '/collections?cat=terre' },
-      { label: 'Photophores',       href: '/collections?cat=terre' },
     ],
   },
 ]
@@ -53,7 +43,7 @@ export default function CollectionsThemes() {
             className="text-4xl md:text-6xl leading-[1.02] text-balance text-emerald"
             style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
           >
-            Trois collections,<br className="hidden md:block"/> un seul atelier.
+            Deux collections,<br className="hidden md:block"/> un seul atelier.
           </h2>
         </div>
 

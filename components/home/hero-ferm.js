@@ -96,6 +96,14 @@ export default function HeroFerm({
       alt="Atelier JLT — Salon crème avec plaid beige"
       className="absolute inset-0 w-full h-full object-cover"
       draggable={false}
+      onError={(e) => {
+        // Fallback : si l'image du hero est cassée (upload perdu…),
+        // on repasse sur le visuel par défaut du catalogue.
+        if (e.currentTarget.src !== IMAGES.heroBeige && !e.currentTarget.dataset.fallback) {
+          e.currentTarget.dataset.fallback = '1'
+          e.currentTarget.src = IMAGES.heroBeige
+        }
+      }}
     />
   )
 

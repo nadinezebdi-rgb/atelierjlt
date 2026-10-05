@@ -1,11 +1,16 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 
 /**
  * Bannière éditoriale plein-écran style Ferm Living
  * — image + petit label + gros titre + CTA (lien).
+ *
+ * Auto-hide : si aucune image n'est fournie ou si l'image ne peut pas
+ * être chargée (404, upload perdu…), la bannière disparaît complètement
+ * pour ne pas laisser de bloc gris disgracieux sur la page d'accueil.
  *
  * Props :
  *  - image (url)
@@ -19,6 +24,11 @@ import { motion } from 'framer-motion'
 export default function EditorialBanner({
   image, eyebrow, title, cta, align = 'left', overlay = 'dark', height = 'lg',
 }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  // Bannière masquée si pas d'image OU si l'image renvoie une erreur
+  const validImage = typeof image === 'string' && image.trim().length > 0
+  if (!validImage || imgFailed) return null
+
   const heights = { lg: 'h-[70vh] min-h-[540px]', md: 'h-[54vh] min-h-[420px]' }
   const isDark = overlay === 'dark'
   const textColor = isDark ? 'text-ivory' : 'text-ink'
@@ -39,7 +49,12 @@ export default function EditorialBanner({
         className="absolute inset-0"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image} alt={title} className="w-full h-full object-cover" />
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
         {isDark && <div className="absolute inset-0 bg-ink/35" />}
       </motion.div>
 

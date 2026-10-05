@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
 
 /**
- * Grille 3 collections — Racine · Empreinte · Terre.
+ * Grille des collections — Racine · Empreinte.
  * Chaque vignette : grande image portrait, label émeraude en-dessous.
  */
 const tiles = [
@@ -19,13 +19,7 @@ const tiles = [
     name: 'Empreinte',
     tagline: 'Tapis · Macramé mural · Suspensions',
     href: '/collections?cat=empreinte',
-    image: IMAGES.photMacrame,
-  },
-  {
-    name: 'Terre',
-    tagline: 'Poterie tournée main · Céramique',
-    href: '/collections?cat=terre',
-    image: IMAGES.terra,
+    image: IMAGES.macrameMur,
   },
 ]
 
@@ -39,11 +33,11 @@ export default function CategoryTiles() {
             className="font-display text-4xl md:text-6xl leading-[1.02] text-balance text-emerald"
             style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
           >
-            Trois univers,<br className="hidden md:block"/> une même main.
+            Deux collections,<br className="hidden md:block"/> une même main.
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-5xl mx-auto">
           {tiles.map((t, i) => (
             <motion.div
               key={t.name}
