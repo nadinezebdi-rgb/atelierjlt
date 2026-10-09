@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatPrice } from '@/lib/utils'
@@ -171,9 +171,30 @@ function TabDashboard() {
 function TabProducts() {
   const [products, setProducts] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [search, setSearch] = useState('')
+  const [catFilter, setCatFilter] = useState('all')
 
   const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
   useEffect(() => { load() }, [])
+
+  // Produits filtrés par recherche + catégorie — permet à la fille de trouver
+  // instantanément « Plaid Sylvestre » sans faire défiler toute la liste.
+  const filtered = useMemo(() => {
+    if (!products) return []
+    const q = search.trim().toLowerCase()
+    return products.filter((p) => {
+      if (catFilter !== 'all' && p.category !== catFilter) return false
+      if (!q) return true
+      const hay = `${p.name} ${p.slug} ${p.category}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [products, search, catFilter])
+
+  const cats = useMemo(() => {
+    if (!products) return []
+    const set = new Set(products.map((p) => p.category).filter(Boolean))
+    return Array.from(set).sort()
+  }, [products])
 
   const save = async (p) => {
     const r = await fetch('/api/admin/products?slug=' + p.slug, {
@@ -227,18 +248,76 @@ function TabProducts() {
 
   if (!products) return <div className="text-ink/50">Chargement…</div>
 
+  const CAT_LABELS = { racine: 'Racine', empreinte: 'Empreinte', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+
   return (
     <div>
       {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
       <MissingMediaRecovery />
-      <div className="flex items-center justify-between mb-6 mt-8">
-        <h2 className="font-display text-3xl">Produits ({products.length})</h2>
+
+      {/* En-tête + action principale */}
+      <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">
+        <div>
+          <h2 className="font-display text-3xl">Produits <span className="text-ink/40 font-normal text-xl">({filtered.length} / {products.length})</span></h2>
+          <p className="text-xs text-ink/60 mt-1">Toute la boutique est ici. Cherchez un produit par son nom pour le trouver vite.</p>
+        </div>
         <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
           <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
         </button>
       </div>
+
+      {/* Barre de recherche + filtres de catégorie */}
+      <div className="bg-cream/50 border border-linen p-3 md:p-4 mb-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1">
+          <Search className="h-4 w-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un produit (ex. plaid sylvestre, coussin, panier…)"
+            className="w-full bg-ivory border border-ink/15 pl-10 pr-10 py-2.5 text-sm rounded-sm focus:outline-none focus:border-emerald"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center text-ink/50 hover:text-ink"
+              aria-label="Effacer la recherche"
+              type="button"
+            >
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1 p-1 bg-ivory border border-ink/15 rounded-sm overflow-x-auto">
+          {['all', ...cats].map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCatFilter(c)}
+              className={`px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] rounded-sm whitespace-nowrap transition ${
+                catFilter === c ? 'bg-ink text-ivory' : 'text-ink/60 hover:text-ink'
+              }`}
+            >
+              {c === 'all' ? 'Toutes' : CAT_LABELS[c] || c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Résultat vide */}
+      {filtered.length === 0 && (
+        <div className="border border-dashed border-ink/20 bg-cream/40 p-8 text-center">
+          <p className="text-sm text-ink/60">Aucun produit ne correspond à votre recherche.</p>
+          {search && (
+            <button onClick={() => { setSearch(''); setCatFilter('all') }} className="mt-3 text-[10px] uppercase tracking-[0.22em] text-emerald hover:underline">
+              Effacer les filtres
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {products.map((p) => (
+        {filtered.map((p) => (
           <div key={p.slug} className="border border-linen bg-ivory">
             <div className="flex items-center gap-4 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1281,7 +1360,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-collections', 'Collections'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-collection-pe', 'Collection Printemps/Été 2026-2027'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1328,37 +1407,6 @@ function TabContent({ onDirtyChange }) {
           </div>
         </section>
 
-        {/* COLLECTIONS */}
-        <section id="admin-collections" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Collections</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Surtitre section"><input value={c.sectionEyebrow} onChange={(e) => upd('sectionEyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Titre section"><input value={c.sectionTitle} onChange={(e) => upd('sectionTitle', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-          </div>
-          <div className="mt-6 space-y-6">
-            {c.collections.map((coll, i) => (
-              <div key={coll.key} className="border border-linen p-4 bg-cream/30">
-                <div className="grid md:grid-cols-3 gap-4 items-start">
-                  <div className="md:col-span-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={coll.image} alt={coll.name} className="w-full aspect-[4/5] object-cover bg-cream" />
-                  </div>
-                  <div className="md:col-span-2 space-y-3">
-                    <Field label={`Nom collection ${i + 1}`}><input value={coll.name} onChange={(e) => updColl(i, 'name', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink font-display text-lg" /></Field>
-                    <Field label="Accroche (sous-titre)"><input value={coll.tagline} onChange={(e) => updColl(i, 'tagline', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-                    <Field label="Photo de la collection (glisser-déposer)">
-                      <ImageUploader
-                        images={coll.image ? [coll.image] : []}
-                        onChange={(imgs) => updColl(i, 'image', imgs[0] || '')}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
 
@@ -1386,6 +1434,12 @@ function TabContent({ onDirtyChange }) {
             />
           </Field>
         </section>
+
+        {/* ===== PAGE COLLECTION "PRINTEMPS / ÉTÉ 2026-2027" — hero, ambiance, palette, matières ===== */}
+        <CollectionPEEditor
+          value={c.collectionPE2027 || {}}
+          onChange={(patch) => upd('collectionPE2027', { ...(c.collectionPE2027 || {}), ...patch })}
+        />
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
 
@@ -2378,6 +2432,46 @@ function HomeSectionsEditor({ sections, onChange }) {
   const [expandedId, setExpandedId] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
+  // Vocabulaire humain par type de section — pour que la nouvelle administratrice
+  // comprenne immédiatement ce que fait chaque bannière, sans jargon technique.
+  const SECTION_INFO = {
+    'editorial-banner': {
+      niceName: 'Bannière éditoriale',
+      icon: '🖼️',
+      explain: 'Grande image plein-écran avec un titre et un bouton. Idéal pour mettre en avant un produit, une collection ou une actualité.',
+    },
+    'product-carousel': {
+      niceName: 'Carrousel de produits',
+      icon: '🛍️',
+      explain: 'Rangée de produits qui défile — nouveautés, meilleures ventes, favoris… ou vos propres photos si vous préférez.',
+    },
+    'category-tiles': {
+      niceName: 'Grille des collections',
+      icon: '🗂️',
+      explain: 'Les deux grandes vignettes « Racine » et « Empreinte » cliquables.',
+    },
+    'collections-themes': {
+      niceName: 'Détail des collections',
+      icon: '✨',
+      explain: 'Présentation plus détaillée de chaque collection avec sous-liens (plaids, coussins…).',
+    },
+    'lifestyle': {
+      niceName: 'Scène de vie',
+      icon: '🏡',
+      explain: 'Bloc d\'inspiration : une grande photo d\'ambiance avec un texte.',
+    },
+    'iconic-plaid': {
+      niceName: 'Pièce iconique',
+      icon: '⭐',
+      explain: 'Mise en avant d\'une pièce phare (actuellement : le Plaid Sylvestre).',
+    },
+    'newsletter': {
+      niceName: 'Inscription newsletter',
+      icon: '✉️',
+      explain: 'Le bloc en bas de page pour que les visiteuses laissent leur email.',
+    },
+  }
+
   if (!Array.isArray(sections)) return null
 
   const toggleEnabled = (i) => {
@@ -2458,12 +2552,14 @@ function HomeSectionsEditor({ sections, onChange }) {
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald flex items-center gap-2">
-            <Layers className="h-3.5 w-3.5" strokeWidth={1.5} /> Sections page d’accueil
+            <Layers className="h-3.5 w-3.5" strokeWidth={1.5} /> Sections de la page d'accueil
           </h3>
-          <p className="text-xs text-ink/60 mt-2 max-w-2xl">
-            Réordonnez les bannières comme vous voulez : <strong>glissez-déposez la poignée</strong> à gauche,
-            ou utilisez les <strong>flèches ↑ ↓</strong>. Cliquez sur une section pour modifier son contenu.
-            Le Hero reste toujours visible (édité plus haut).
+          <p className="text-xs text-ink/70 mt-2 max-w-2xl leading-relaxed">
+            Chaque ligne ci-dessous est <strong>un bloc visible sur la page d'accueil</strong>.
+            L'icône à gauche aide à reconnaître ce que c'est : 🖼️ grande image, 🛍️ carrousel de produits, 🗂️ grille de collections, ✉️ newsletter…
+            <br/><br/>
+            <strong>Pour la nouvelle administratrice :</strong> glissez la poignée ou utilisez ↑↓ pour réordonner,
+            cliquez sur une ligne pour modifier son contenu, décochez « Visible » pour la masquer temporairement sans la supprimer.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -2554,16 +2650,17 @@ function HomeSectionsEditor({ sections, onChange }) {
                   onClick={() => setExpandedId(isExpanded ? null : s.id)}
                   className="flex-1 min-w-0 text-left group"
                 >
-                  <div className="font-display text-base leading-tight truncate group-hover:text-emerald transition">
-                    {s.label}
+                  <div className="font-display text-base leading-tight truncate group-hover:text-emerald transition flex items-center gap-2">
+                    <span className="text-base leading-none">{SECTION_INFO[s.type]?.icon || '📄'}</span>
+                    <span className="truncate">{s.label}</span>
                     {s.custom && (
-                      <span className="ml-2 text-[9px] uppercase tracking-[0.24em] bg-terracotta/15 text-terracotta px-2 py-0.5 align-middle">
+                      <span className="ml-1 text-[9px] uppercase tracking-[0.24em] bg-terracotta/15 text-terracotta px-2 py-0.5 align-middle">
                         Perso
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-ink/45 mt-0.5">
-                    {s.type} {s.type === 'editorial-banner' || s.type === 'product-carousel' ? '· clic pour modifier' : ''}
+                  <div className="text-xs text-ink/55 mt-1 leading-snug line-clamp-1">
+                    {SECTION_INFO[s.type]?.explain || s.type}
                   </div>
                 </button>
 
@@ -3065,5 +3162,113 @@ function TabSettings() {
         </section>
       </div>
     </div>
+  )
+}
+
+/* ============================================================================
+   CollectionPEEditor — Admin editor for /collection/printemps-ete-2026-2027
+   Hero (image + textes), ambiance (image + titre + texte), palette (5 couleurs),
+   matières (jusqu'à 6 cartes). Toutes les photos sont réuploadables.
+   ============================================================================ */
+function CollectionPEEditor({ value = {}, onChange }) {
+  const palette = Array.isArray(value.palette) ? value.palette : []
+  const materials = Array.isArray(value.materials) ? value.materials : []
+  const set = (k, v) => onChange({ [k]: v })
+  const updPalette = (i, k, v) => {
+    const next = palette.slice()
+    next[i] = { ...next[i], [k]: v }
+    set('palette', next)
+  }
+  const updMat = (i, k, v) => {
+    const next = materials.slice()
+    next[i] = { ...next[i], [k]: v }
+    set('materials', next)
+  }
+  const addPalette = () => set('palette', [...palette, { name: '', hex: '#CFCFCF' }])
+  const addMaterial = () => set('materials', [...materials, { name: '', image: '' }])
+  const rmPalette = (i) => set('palette', palette.filter((_, j) => j !== i))
+  const rmMaterial = (i) => set('materials', materials.filter((_, j) => j !== i))
+
+  return (
+    <section id="admin-collection-pe" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+        <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Collection « Printemps / Été 2026-2027 »</h3>
+        <a href="/collection/printemps-ete-2026-2027" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
+      </div>
+      <p className="text-sm text-ink/60 mb-6 leading-relaxed">
+        Toute la page de la nouvelle collection se gère ici : la grande bannière du haut, l'ambiance, les 5 couleurs de la palette, et les 4 matières. Les photos par défaut peuvent être remplacées par vos propres photos à tout moment — glissez un fichier dans la zone « Importer ».
+      </p>
+
+      {/* HERO */}
+      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-6">① Grande bannière du haut</h4>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Petit texte (sur-titre)">
+          <input value={value.heroEyebrow || ''} onChange={(e) => set('heroEyebrow', e.target.value)} placeholder="Nouvelle saison" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+        </Field>
+        <Field label="Grand titre">
+          <input value={value.heroTitle || ''} onChange={(e) => set('heroTitle', e.target.value)} placeholder="Printemps / Été 2026-2027" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+        </Field>
+      </div>
+      <Field label="Phrase sous le titre (facultatif)">
+        <input value={value.heroSubtitle || ''} onChange={(e) => set('heroSubtitle', e.target.value)} placeholder="Doux · Chaleureux · Bien chez soi." className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+      </Field>
+      <Field label="Image de la bannière">
+        <ImageUploader
+          images={value.heroImage ? [value.heroImage] : []}
+          onChange={(arr) => set('heroImage', arr[arr.length - 1] || '')}
+        />
+      </Field>
+
+      {/* AMBIANCE */}
+      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-10">② Bloc Ambiance</h4>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Petit texte"><input value={value.moodEyebrow || ''} onChange={(e) => set('moodEyebrow', e.target.value)} placeholder="Ambiance" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+        <Field label="Titre (saut de ligne : touche Entrée)">
+          <textarea value={value.moodTitle || ''} onChange={(e) => set('moodTitle', e.target.value)} rows={2} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink resize-none" />
+        </Field>
+      </div>
+      <Field label="Texte de description">
+        <textarea value={value.moodText || ''} onChange={(e) => set('moodText', e.target.value)} rows={4} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+      </Field>
+      <Field label="Image d'ambiance (vertical idéal)">
+        <ImageUploader images={value.moodImage ? [value.moodImage] : []} onChange={(arr) => set('moodImage', arr[arr.length - 1] || '')} />
+      </Field>
+
+      {/* PALETTE */}
+      <div className="flex items-center justify-between mt-10 mb-3">
+        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">③ Palette de couleurs</h4>
+        <button type="button" onClick={addPalette} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
+      </div>
+      <div className="space-y-3">
+        {palette.map((c, i) => (
+          <div key={i} className="flex items-center gap-3 bg-cream/40 border border-linen p-3">
+            <input type="color" value={c.hex || '#cccccc'} onChange={(e) => updPalette(i, 'hex', e.target.value)} className="h-11 w-14 cursor-pointer rounded-sm border border-ink/15" />
+            <input value={c.name || ''} onChange={(e) => updPalette(i, 'name', e.target.value)} placeholder="Nom (ex. Rose poudré)" className="flex-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+            <input value={c.hex || ''} onChange={(e) => updPalette(i, 'hex', e.target.value)} placeholder="#C98498" className="w-28 bg-transparent border-b border-ink/20 py-2 font-mono text-sm focus:outline-none focus:border-ink" />
+            <button type="button" onClick={() => rmPalette(i)} className="text-terracotta hover:opacity-70 h-11 w-11 flex items-center justify-center" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+          </div>
+        ))}
+      </div>
+
+      {/* MATIÈRES */}
+      <div className="flex items-center justify-between mt-10 mb-3">
+        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">④ Matières</h4>
+        <button type="button" onClick={addMaterial} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        {materials.map((m, i) => (
+          <div key={i} className="border border-linen bg-cream/30 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Matière {i + 1}</span>
+              <button type="button" onClick={() => rmMaterial(i)} className="text-terracotta hover:opacity-70" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+            </div>
+            <Field label="Nom"><input value={m.name || ''} onChange={(e) => updMat(i, 'name', e.target.value)} placeholder="Ex. Cordons tresse" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Photo">
+              <ImageUploader images={m.image ? [m.image] : []} onChange={(arr) => updMat(i, 'image', arr[arr.length - 1] || '')} />
+            </Field>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

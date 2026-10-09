@@ -34,6 +34,8 @@ export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint 
         if (filter === 'new') list = list.filter((p) => p.isNew)
         else if (filter === 'limited') list = list.filter((p) => p.isLimited)
         else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
+        else if (filter === 'intemporels') list = list.filter((p) => p.category === 'intemporels')
+        else if (filter === 'pe-2026-2027') list = list.filter((p) => p.category === 'pe-2026-2027')
         setProducts(list.slice(0, limit))
       })
       .catch(() => {})
