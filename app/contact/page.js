@@ -95,6 +95,7 @@ export default function ContactPage() {
     <div className="min-h-screen bg-ivory">
       <PageEditShell
         pageKey="contact"
+        label="Contact"
         initialContent={content}
         fields={EDIT_FIELDS}
         onChange={setContent}

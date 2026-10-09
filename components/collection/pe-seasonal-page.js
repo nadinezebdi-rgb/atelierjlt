@@ -40,6 +40,7 @@ export default function PESeasonalPage({ content: initialContent, products }) {
     <>
       <PageEditShell
         pageKey="collectionPE2027"
+        label="Collection Printemps / Été"
         initialContent={content}
         fields={EDIT_FIELDS}
         onChange={setContent}

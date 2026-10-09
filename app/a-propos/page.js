@@ -82,6 +82,7 @@ export default function AProposPage() {
     <div className="min-h-screen bg-ivory">
       <PageEditShell
         pageKey="about"
+        label="À propos"
         initialContent={content}
         fields={EDIT_FIELDS}
         onChange={setContent}

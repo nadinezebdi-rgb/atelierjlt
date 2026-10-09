@@ -51,6 +51,9 @@ import {
   Heart,
   Star,
   Flower,
+  Compass,
+  ChevronDown,
+  Home,
 } from 'lucide-react'
 import SectionEditorPanel from './section-editor-panel'
 
@@ -337,6 +340,7 @@ export default function EditModeProvider({
 
 function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, setReorderMode, onOpenHelp, onAddSection }) {
   const [addOpen, setAddOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   return (
     <div
       className="fixed top-0 inset-x-0 z-[200] bg-ink text-ivory shadow-lg"
@@ -345,9 +349,27 @@ function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, s
       <div className="flex items-center gap-2 md:gap-3 px-3 md:px-6 h-14 md:h-16">
         <div className="flex items-center gap-2 min-w-0">
           <Sparkles className="h-4 w-4 text-emerald flex-none" strokeWidth={1.8} />
-          <span className="text-[11px] md:text-xs uppercase tracking-[0.28em] text-ivory/90 truncate">Mode édition</span>
+          <span className="text-[11px] md:text-xs uppercase tracking-[0.28em] text-ivory/90 truncate">Mode édition — Accueil</span>
         </div>
         <div className="flex-1" />
+        <div className="relative">
+          <button
+            onClick={() => setNavOpen((v) => !v)}
+            data-nav-toggle
+            className="h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 bg-ink text-ivory border border-ivory/30 hover:border-ivory"
+            aria-label="Changer de page"
+          >
+            <Compass className="h-4 w-4" strokeWidth={1.5} />
+            <span className="hidden sm:inline">Pages</span>
+            <ChevronDown className="h-3 w-3" strokeWidth={2} />
+          </button>
+          {navOpen && (
+            <HomePageNavMenu
+              dirty={dirty}
+              onClose={() => setNavOpen(false)}
+            />
+          )}
+        </div>
         <button
           onClick={() => setAddOpen(true)}
           className="h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 bg-ivory text-ink hover:bg-emerald hover:text-ivory"
@@ -805,5 +827,80 @@ function HelpOverlay({ onClose }) {
       </div>
     </div>,
     document.body
+  )
+}
+
+/* ---- Menu de navigation entre les pages éditables ---- */
+
+const EDITABLE_PAGES = [
+  { href: '/',       label: "Page d'accueil",             current: true },
+  { href: '/a-propos', label: 'À propos' },
+  { href: '/collection/printemps-ete-2026-2027', label: 'Collection Printemps / Été' },
+  { href: '/contact', label: 'Contact' },
+]
+
+function HomePageNavMenu({ dirty, onClose }) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('[data-nav-menu]') && !e.target.closest('[data-nav-toggle]')) {
+        onClose()
+      }
+    }
+    const t = setTimeout(() => window.addEventListener('click', handler), 50)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('click', handler)
+    }
+  }, [onClose])
+
+  const navigateTo = (href) => {
+    if (dirty && !confirm('Modifications non enregistrées. Changer de page sans sauvegarder ?')) return
+    const url = new URL(href, window.location.origin)
+    url.searchParams.set('edit', '1')
+    window.location.href = url.toString()
+  }
+
+  return (
+    <div
+      data-nav-menu
+      className="absolute right-0 top-[calc(100%+6px)] w-72 bg-ivory text-ink shadow-2xl rounded-sm border border-linen z-[280] overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-linen bg-cream/50">
+        <div className="text-[9px] uppercase tracking-[0.28em] text-emerald">Pages éditables</div>
+        <div className="text-sm font-medium mt-0.5">Changer de page</div>
+      </div>
+      <ul className="py-2">
+        {EDITABLE_PAGES.map((p) => {
+          const isCurrent = p.current
+          return (
+            <li key={p.href}>
+              <button
+                onClick={() => !isCurrent && navigateTo(p.href)}
+                disabled={isCurrent}
+                className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
+                  isCurrent
+                    ? 'bg-emerald/5 text-emerald cursor-default'
+                    : 'hover:bg-cream/50 text-ink'
+                }`}
+              >
+                <Home className={`h-4 w-4 flex-none ${isCurrent ? 'text-emerald' : 'text-ink/40'}`} strokeWidth={1.5} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm leading-tight truncate">{p.label}</div>
+                  <div className={`text-[10px] uppercase tracking-[0.22em] mt-0.5 ${isCurrent ? 'text-emerald/70' : 'text-ink/40'}`}>
+                    {p.href}
+                  </div>
+                </div>
+                {isCurrent && (
+                  <Check className="h-4 w-4 text-emerald flex-none" strokeWidth={2} />
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <div className="px-4 py-3 border-t border-linen text-[10px] uppercase tracking-[0.22em] text-ink/50 text-center">
+        {dirty ? '⚠️ Vous avez des modifs non sauvegardées' : 'Ouvre la page en mode édition'}
+      </div>
+    </div>
   )
 }

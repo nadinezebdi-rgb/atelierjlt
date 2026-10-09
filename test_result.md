@@ -3392,3 +3392,223 @@ agent_communication:
         boutons Ajouter au panier"
       - Nettoyage après test : section custom retirée pour laisser la page propre
 
+
+
+# =====================================================================
+# JOB 2026-06-26 (bugfix) : Discoverability du mode édition sur pages secondaires
+# =====================================================================
+
+  - agent: "main"
+    date: "2026-06-26"
+    message: |
+      🐛 BUGFIX & UX : Navigation entre pages éditables
+      
+      **Problème signalé par Juliette** :
+      "Le lien /collection/printemps-ete-2026-2027?edit=1 ne mène nulle part, 
+       comment modifier la section collection ?"
+      
+      **Diagnostic** : La page `?edit=1` FONCTIONNE côté serveur (200 OK, panneau 
+      s'ouvre). Mais la découvrabilité était faible : aucun moyen depuis le mode
+      édition d'une page de naviguer vers une autre.
+      
+      **Corrections** :
+      1. ✅ Label lisible dans la barre d'outils : "COLLECTIONPE2027" → 
+         "Collection Printemps / Été" (nouveau prop `label` sur PageEditShell)
+      2. ✅ Nouveau bouton **"PAGES"** (avec icône compass) dans la toolbar
+         de toutes les pages éditables (accueil, à-propos, collection, contact)
+      3. ✅ Menu déroulant avec les 4 pages éditables :
+         - Page d'accueil
+         - À propos
+         - Collection Printemps / Été
+         - Contact
+         Tap sur une page → navigue en mode édition (`?edit=1` ajouté automatiquement)
+      4. ✅ Confirmation si modifs non sauvegardées avant navigation
+      5. ✅ Page courante indiquée (check vert + désactivée)
+      6. ✅ Fix du bug de fermeture instantanée du menu (click handler trop agressif)
+      
+      **URLs testées (toutes 200)** :
+      - /?edit=1
+      - /a-propos?edit=1  
+      - /collection/printemps-ete-2026-2027?edit=1
+      - /contact?edit=1
+      
+      ## À vérifier par l'agent de test
+      
+      Tester que le menu "PAGES" (bouton avec icône compass dans la barre
+      noire du haut) s'ouvre correctement sur :
+      - l'accueil en mode édition
+      - /a-propos?edit=1
+      - /collection/printemps-ete-2026-2027?edit=1 (**la page spécifiquement
+        mentionnée dans le bug**)
+      - /contact?edit=1
+      
+      Vérifier que le menu affiche les 4 pages, que la page courante est
+      marquée (check vert), et qu'un clic sur une autre page navigue
+      correctement en préservant `?edit=1`.
+      
+      Credentials admin : password = `Juliette99*`
+
+  - agent: "testing"
+    date: "2026-10-09"
+    message: |
+      ✅ VISUAL EDIT MODE - PAGES NAVIGATION TEST COMPLETE - ALL 6 TESTS PASSED (100%)
+      
+      Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+      
+      CONTEXT:
+      User (Juliette) reported that `/collection/printemps-ete-2026-2027?edit=1` "ne mène nulle part"
+      and she didn't know how to modify the collection section. Main agent implemented a fix by
+      adding a "PAGES" navigation menu in the edit mode toolbar.
+      
+      TEST RESULTS SUMMARY (6/6 PASSED):
+      
+      ✅ TEST 1: Admin Authentication
+         - POST /api/auth/admin-login with password "Juliette99*" successful
+         - Admin session established correctly
+         - Redirected to /admin dashboard
+      
+      ✅ TEST 2: Homepage Edit Mode - PAGES Menu (iPad 1024x1366)
+         - Edit mode toolbar visible with label "Mode édition — Accueil"
+         - PAGES button found with compass icon and "Pages" text
+         - Dropdown menu opens correctly
+         - All 4 pages listed:
+           1. Page d'accueil (marked as current with emerald color/disabled state)
+           2. À propos
+           3. Collection Printemps / Été
+           4. Contact
+         - Current page correctly marked with visual indicator
+      
+      ✅ TEST 3: Collection PE 2026-2027 Page (THE BUG FIX)
+         - Navigation from homepage PAGES menu successful
+         - URL: /collection/printemps-ete-2026-2027?edit=1 (preserves ?edit=1)
+         - Toolbar label: "Mode édition — Collection Printemps / Été"
+         - PAGES button present on this page
+         - MODIFIER button opens edit panel correctly
+         - Panel contains expected fields:
+           * Image du hero
+           * Hero — grand titre
+           * Palette de couleurs
+           * Matières
+         - Panel closes correctly
+         - Screenshot captured: collection-edit-mode-ipad.png
+      
+      ✅ TEST 4: À propos Page Navigation
+         - Navigation from Collection page PAGES menu successful
+         - URL: /a-propos?edit=1 (preserves ?edit=1)
+         - Toolbar label: "Mode édition — À propos"
+         - PAGES button present
+         - Edit mode fully functional
+      
+      ✅ TEST 5: Contact Page Navigation
+         - Navigation from À propos page PAGES menu successful
+         - URL: /contact?edit=1 (preserves ?edit=1)
+         - Toolbar label: "Mode édition — Contact"
+         - PAGES button present
+         - Edit mode fully functional
+      
+      ✅ TEST 6: Mobile Viewport (390x844)
+         - Edit mode toolbar visible on mobile
+         - PAGES button present (may show only icon on small screens)
+         - Dropdown menu opens correctly on mobile
+         - All 4 pages listed
+         - Navigation works correctly (tested Collection page)
+         - URL preserves ?edit=1 parameter
+         - Screenshot captured: mobile-collection-edit-mode.png
+      
+      CRITICAL FINDINGS - BUG FIX VERIFIED:
+      
+      ✅ DISCOVERABILITY ISSUE RESOLVED
+         - The page /collection/printemps-ete-2026-2027?edit=1 is now fully accessible
+         - PAGES menu provides clear navigation between all editable pages
+         - No more "ne mène nulle part" - users can now easily find and edit the collection page
+      
+      ✅ NAVIGATION FEATURES WORKING
+         - PAGES button (compass icon) present on all 4 editable pages
+         - Dropdown menu shows all pages with readable labels (not technical IDs)
+         - Current page marked with emerald color and disabled state
+         - Navigation preserves ?edit=1 parameter across all pages
+         - Confirmation prompt if unsaved changes (not tested to avoid data loss)
+      
+      ✅ EDIT MODE FUNCTIONALITY
+         - Toolbar visible on all pages with correct labels
+         - MODIFIER button opens side panel with page-specific fields
+         - ENREGISTRER button present for saving changes
+         - Exit button (X) present to leave edit mode
+      
+      ✅ RESPONSIVE DESIGN
+         - Works on iPad viewport (1024x1366)
+         - Works on mobile viewport (390x844)
+         - PAGES button adapts to screen size (may hide text on mobile, keeps icon)
+         - Menu dropdown works correctly on both viewports
+      
+      REGRESSION CHECKS:
+      - ✅ Admin authentication working correctly
+      - ✅ Edit mode activation via ?edit=1 working
+      - ✅ All 4 pages render correctly in edit mode
+      - ✅ Edit panels open and close correctly
+      - ✅ No JavaScript errors in console
+      
+      CONCLUSION:
+      The bug fix is FULLY FUNCTIONAL and production-ready. The new PAGES navigation menu
+      successfully resolves the discoverability issue reported by Juliette. Users can now
+      easily navigate between all editable pages (home, about, collection PE, contact) from
+      any page in edit mode. The /collection/printemps-ete-2026-2027?edit=1 page is now
+      accessible and discoverable via the PAGES menu.
+      
+      ZERO CRITICAL ISSUES FOUND. The feature works correctly on both iPad and mobile viewports.
+
+frontend:
+  - task: "Visual Edit Mode - PAGES navigation menu"
+    implemented: true
+    working: true
+    file: "components/edit/page-edit-shell.js, app/page.js, app/a-propos/page.js, app/collection/printemps-ete-2026-2027/page.js, app/contact/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-09"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            BUG FIX CONTEXT:
+            User reported: "/collection/printemps-ete-2026-2027?edit=1 ne mène nulle part"
+            Fix: Added PAGES navigation menu in edit mode toolbar
+            
+            COMPREHENSIVE TEST RESULTS (6/6 PASSED):
+            
+            1. ✅ Admin login successful (password: Juliette99*)
+            2. ✅ Homepage edit mode: PAGES button visible, menu opens with 4 pages
+            3. ✅ Collection PE page: Accessible via PAGES menu, edit panel works
+            4. ✅ À propos page: Navigation and edit mode working
+            5. ✅ Contact page: Navigation and edit mode working
+            6. ✅ Mobile viewport (390x844): All features working correctly
+            
+            KEY FEATURES VERIFIED:
+            • PAGES button (compass icon) present on all 4 editable pages
+            • Dropdown menu lists all pages with readable labels
+            • Current page marked with emerald color/disabled state
+            • Navigation preserves ?edit=1 parameter
+            • MODIFIER button opens edit panel with correct fields
+            • Works on iPad (1024x1366) and mobile (390x844) viewports
+            
+            BUG FIX CONFIRMED:
+            The page /collection/printemps-ete-2026-2027?edit=1 is now fully accessible
+            and discoverable via the PAGES menu. Users can easily navigate between all
+            editable pages from any page in edit mode.
+            
+            ZERO CRITICAL ISSUES. Feature is production-ready.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.3"
+  test_sequence: 6
+  run_ui: true
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
