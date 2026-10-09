@@ -1,354 +1,368 @@
 #!/usr/bin/env python3
 """
-Backend test for Atelier JLT - Image Fallback Feature + Regression Tests
-Tests the new fallback feature for missing upload-* images
+Backend regression test for custom carousel images feature
+Tests both existing functionality and new customImages field persistence
 """
 
 import requests
 import json
 import sys
 
-# Base URL from environment
-BASE_URL = "https://french-craft.preview.emergentagent.com/api"
+BASE_URL = "https://french-craft.preview.emergentagent.com"
 ADMIN_PASSWORD = "Juliette99*"
 
-# Session for cookie persistence
-session = requests.Session()
-
-def print_test(test_num, description):
-    """Print test header"""
-    print(f"\n{'='*80}")
-    print(f"TEST {test_num}: {description}")
-    print('='*80)
-
-def print_result(success, message):
-    """Print test result"""
-    status = "✅ PASSED" if success else "❌ FAILED"
-    print(f"{status}: {message}")
-    return success
-
-def admin_login():
-    """Login as admin and store cookie"""
-    print_test("SETUP", "Admin Login")
-    try:
-        response = session.post(
-            f"{BASE_URL}/auth/admin-login",
-            json={"password": ADMIN_PASSWORD},
-            timeout=30
-        )
-        if response.status_code == 200:
-            print_result(True, f"Admin login successful, cookie set")
-            return True
-        else:
-            print_result(False, f"Admin login failed: {response.status_code} - {response.text}")
-            return False
-    except Exception as e:
-        print_result(False, f"Admin login error: {str(e)}")
-        return False
-
-def test_1_real_image_no_fallback():
-    """Test 1: Real image returns 200 with NO X-Fallback-Image header"""
-    print_test(1, "GET /api/img/jlt-plaid-01 → 200, real image, NO X-Fallback-Image header")
-    
-    try:
-        response = session.get(f"{BASE_URL}/img/jlt-plaid-01", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code}")
-        
-        # Check Content-Type
-        content_type = response.headers.get('Content-Type', '')
-        if not content_type.startswith('image/'):
-            return print_result(False, f"Expected image/* Content-Type, got '{content_type}'")
-        
-        # Check NO X-Fallback-Image header
-        if 'X-Fallback-Image' in response.headers:
-            return print_result(False, f"X-Fallback-Image header should NOT be present for real images")
-        
-        # Check non-empty body
-        if len(response.content) < 1000:
-            return print_result(False, f"Image content too small: {len(response.content)} bytes")
-        
-        return print_result(True, f"Real image served correctly: {len(response.content)} bytes, Content-Type: {content_type}, NO X-Fallback-Image header")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_2_upload_missing_fallback():
-    """Test 2: Missing upload-* image returns 200 with fallback"""
-    print_test(2, "GET /api/img/upload-a48de122 → 200 with fallback (X-Fallback-Image: 1)")
-    
-    try:
-        response = session.get(f"{BASE_URL}/img/upload-a48de122", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200 (fallback), got {response.status_code}")
-        
-        # Check Content-Type
-        content_type = response.headers.get('Content-Type', '')
-        if content_type != 'image/jpeg':
-            return print_result(False, f"Expected 'image/jpeg', got '{content_type}'")
-        
-        # Check X-Fallback-Image header
-        fallback_header = response.headers.get('X-Fallback-Image', '')
-        if fallback_header != '1':
-            return print_result(False, f"Expected X-Fallback-Image: 1, got '{fallback_header}'")
-        
-        # Check non-empty body
-        if len(response.content) < 1000:
-            return print_result(False, f"Fallback image content too small: {len(response.content)} bytes")
-        
-        return print_result(True, f"Fallback served correctly: {len(response.content)} bytes, Content-Type: {content_type}, X-Fallback-Image: 1")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_3_upload_missing_fallback_2():
-    """Test 3: Another missing upload-* image returns 200 with fallback"""
-    print_test(3, "GET /api/img/upload-does-not-exist-xyz → 200 with fallback")
-    
-    try:
-        response = session.get(f"{BASE_URL}/img/upload-does-not-exist-xyz", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200 (fallback), got {response.status_code}")
-        
-        # Check X-Fallback-Image header
-        fallback_header = response.headers.get('X-Fallback-Image', '')
-        if fallback_header != '1':
-            return print_result(False, f"Expected X-Fallback-Image: 1, got '{fallback_header}'")
-        
-        # Check non-empty body
-        if len(response.content) < 1000:
-            return print_result(False, f"Fallback image content too small: {len(response.content)} bytes")
-        
-        return print_result(True, f"Fallback served correctly: {len(response.content)} bytes, X-Fallback-Image: 1")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_4_nonupload_missing_404():
-    """Test 4: Missing non-upload-* image returns 404"""
-    print_test(4, "GET /api/img/nonexistent-thing-no-upload-prefix → 404 (no fallback)")
-    
-    try:
-        response = session.get(f"{BASE_URL}/img/nonexistent-thing-no-upload-prefix", timeout=30)
-        
-        if response.status_code != 404:
-            return print_result(False, f"Expected 404, got {response.status_code}")
-        
-        # Should NOT have X-Fallback-Image header
-        if 'X-Fallback-Image' in response.headers:
-            return print_result(False, f"X-Fallback-Image header should NOT be present for 404 responses")
-        
-        return print_result(True, f"Correctly returns 404 for non-upload-* missing images")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_5_query_params():
-    """Test 5: Real image with query params still works"""
-    print_test(5, "GET /api/img/jlt-plaid-01?xyz=1 → 200 (query params ignored)")
-    
-    try:
-        response = session.get(f"{BASE_URL}/img/jlt-plaid-01?xyz=1", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code}")
-        
-        # Check Content-Type
-        content_type = response.headers.get('Content-Type', '')
-        if not content_type.startswith('image/'):
-            return print_result(False, f"Expected image/* Content-Type, got '{content_type}'")
-        
-        # Check NO X-Fallback-Image header
-        if 'X-Fallback-Image' in response.headers:
-            return print_result(False, f"X-Fallback-Image header should NOT be present for real images")
-        
-        # Check non-empty body
-        if len(response.content) < 1000:
-            return print_result(False, f"Image content too small: {len(response.content)} bytes")
-        
-        return print_result(True, f"Real image served correctly with query params: {len(response.content)} bytes")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_6_products_api():
-    """Test 6: GET /api/products returns products, no 'terre' category"""
-    print_test(6, "REGRESSION: GET /api/products → 200, products returned, no 'terre' category")
-    
-    try:
-        response = session.get(f"{BASE_URL}/products", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code}")
-        
-        data = response.json()
-        
-        if 'products' not in data:
-            return print_result(False, f"Missing 'products' in response")
-        
-        products = data.get('products', [])
-        total = data.get('total', 0)
-        
-        if len(products) == 0:
-            return print_result(False, f"No products returned")
-        
-        # Check no 'terre' category
-        terre_products = [p for p in products if p.get('category') == 'terre']
-        if len(terre_products) > 0:
-            return print_result(False, f"Found {len(terre_products)} products with 'terre' category (should be hidden)")
-        
-        return print_result(True, f"Products API working: {len(products)} products returned (total: {total}), no 'terre' category")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_7_product_detail():
-    """Test 7: GET /api/products/plaid-sylvestre returns product detail"""
-    print_test(7, "REGRESSION: GET /api/products/plaid-sylvestre → 200")
-    
-    try:
-        response = session.get(f"{BASE_URL}/products/plaid-sylvestre", timeout=30)
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code}")
-        
-        data = response.json()
-        
-        if 'product' not in data:
-            return print_result(False, f"Missing 'product' in response")
-        
-        product = data.get('product', {})
-        
-        if product.get('slug') != 'plaid-sylvestre':
-            return print_result(False, f"Expected slug 'plaid-sylvestre', got '{product.get('slug')}'")
-        
-        return print_result(True, f"Product detail working: {product.get('name', 'N/A')}, price: {product.get('price', 0)}€")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_8_reset_product_photos():
-    """Test 8: POST /api/admin/reset-product-photos returns actionId"""
-    print_test(8, "REGRESSION: POST /api/admin/reset-product-photos → 200 with actionId")
-    
-    try:
-        response = session.post(
-            f"{BASE_URL}/admin/reset-product-photos",
-            json={"slug": "plaid-sylvestre"},
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code} - {response.text}")
-        
-        data = response.json()
-        
-        if not data.get('ok'):
-            return print_result(False, f"Expected ok: true, got {data}")
-        
-        action_id = data.get('actionId')
-        if not action_id:
-            return print_result(False, f"Missing 'actionId' in response")
-        
-        # Store for next test
-        global reset_action_id
-        reset_action_id = action_id
-        
-        return print_result(True, f"Reset product photos working: actionId={action_id}")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def test_9_undo_action():
-    """Test 9: POST /api/chat/actions with actionId undoes the action"""
-    print_test(9, "REGRESSION: POST /api/chat/actions (undo) → 200")
-    
-    try:
-        if not reset_action_id:
-            return print_result(False, "No actionId from test 8")
-        
-        response = session.post(
-            f"{BASE_URL}/chat/actions",
-            json={"actionId": reset_action_id},
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            return print_result(False, f"Expected 200, got {response.status_code} - {response.text}")
-        
-        data = response.json()
-        
-        if not data.get('ok'):
-            return print_result(False, f"Expected ok: true, got {data}")
-        
-        return print_result(True, f"Undo action working: {data.get('message', 'Action annulée')}")
-        
-    except Exception as e:
-        return print_result(False, f"Exception: {str(e)}")
-
-def main():
-    """Run all tests"""
+def test_section_a_regression():
+    """Section A: Regression tests - should still work"""
     print("\n" + "="*80)
-    print("ATELIER JLT - IMAGE FALLBACK FEATURE + REGRESSION TESTS")
+    print("SECTION A: REGRESSION TESTS")
     print("="*80)
-    print(f"Base URL: {BASE_URL}")
-    print(f"Testing environment: Preview")
-    print("="*80)
-    
-    # Initialize globals
-    global reset_action_id
-    reset_action_id = None
     
     results = []
     
-    # Setup: Admin login
-    if not admin_login():
-        print("\n❌ FATAL: Admin login failed. Cannot continue tests.")
-        sys.exit(1)
+    # Test A1: GET /api/products → 200, 11 products, no `terre` category
+    print("\n[A1] Testing GET /api/products...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/products", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "products" in data, "Missing 'products' key"
+        assert data["total"] == 11, f"Expected 11 products, got {data['total']}"
+        # Check no terre category
+        terre_products = [p for p in data["products"] if p.get("category") == "terre"]
+        assert len(terre_products) == 0, f"Found {len(terre_products)} terre products, expected 0"
+        print(f"✅ PASS: GET /api/products returns {data['total']} products, no terre category")
+        results.append(("A1: GET /api/products", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A1: GET /api/products", False, str(e)))
     
-    # Run tests
-    print("\n" + "="*80)
-    print("PART 1: IMAGE FALLBACK FEATURE TESTS")
-    print("="*80)
-    results.append(("Test 1: Real image no fallback", test_1_real_image_no_fallback()))
-    results.append(("Test 2: Missing upload-* with fallback", test_2_upload_missing_fallback()))
-    results.append(("Test 3: Another missing upload-* with fallback", test_3_upload_missing_fallback_2()))
-    results.append(("Test 4: Non-upload-* missing returns 404", test_4_nonupload_missing_404()))
-    results.append(("Test 5: Query params work", test_5_query_params()))
+    # Test A2: GET /api/products/plaid-sylvestre → 200
+    print("\n[A2] Testing GET /api/products/plaid-sylvestre...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/products/plaid-sylvestre", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "product" in data, "Missing 'product' key"
+        assert data["product"]["slug"] == "plaid-sylvestre", "Wrong product returned"
+        print(f"✅ PASS: GET /api/products/plaid-sylvestre returns product")
+        results.append(("A2: GET /api/products/plaid-sylvestre", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A2: GET /api/products/plaid-sylvestre", False, str(e)))
     
+    # Test A3: GET /api/site-content → 200
+    print("\n[A3] Testing GET /api/site-content...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "content" in data, "Missing 'content' key"
+        print(f"✅ PASS: GET /api/site-content returns content")
+        results.append(("A3: GET /api/site-content", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A3: GET /api/site-content", False, str(e)))
+    
+    # Test A4: POST /api/admin/reset-product-photos (with admin cookie)
+    print("\n[A4] Testing POST /api/admin/reset-product-photos...")
+    try:
+        # First login as admin
+        login_resp = requests.post(
+            f"{BASE_URL}/api/auth/admin-login",
+            json={"password": ADMIN_PASSWORD},
+            timeout=10
+        )
+        assert login_resp.status_code == 200, f"Admin login failed: {login_resp.status_code}"
+        admin_cookies = login_resp.cookies
+        
+        # Now reset product photos
+        resp = requests.post(
+            f"{BASE_URL}/api/admin/reset-product-photos",
+            json={"slug": "plaid-sylvestre"},
+            cookies=admin_cookies,
+            timeout=10
+        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, f"Expected ok:true, got {data}"
+        assert "actionId" in data, "Missing actionId in response"
+        action_id = data["actionId"]
+        print(f"✅ PASS: POST /api/admin/reset-product-photos returns ok:true, actionId: {action_id}")
+        results.append(("A4: POST /api/admin/reset-product-photos", True, None))
+        
+        # Test A5: POST /api/chat/actions (undo)
+        print("\n[A5] Testing POST /api/chat/actions (undo)...")
+        try:
+            undo_resp = requests.post(
+                f"{BASE_URL}/api/chat/actions",
+                json={"actionId": action_id},
+                cookies=admin_cookies,
+                timeout=10
+            )
+            assert undo_resp.status_code == 200, f"Expected 200, got {undo_resp.status_code}"
+            undo_data = undo_resp.json()
+            assert undo_data.get("ok") == True, f"Expected ok:true, got {undo_data}"
+            print(f"✅ PASS: POST /api/chat/actions undo works")
+            results.append(("A5: POST /api/chat/actions (undo)", True, None))
+        except Exception as e:
+            print(f"❌ FAIL: {e}")
+            results.append(("A5: POST /api/chat/actions (undo)", False, str(e)))
+            
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A4: POST /api/admin/reset-product-photos", False, str(e)))
+        results.append(("A5: POST /api/chat/actions (undo)", False, "Skipped due to A4 failure"))
+    
+    # Test A6: GET /api/img/jlt-plaid-01 → 200 real bytes
+    print("\n[A6] Testing GET /api/img/jlt-plaid-01...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/img/jlt-plaid-01", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        assert resp.headers.get("Content-Type", "").startswith("image/"), f"Expected image content type, got {resp.headers.get('Content-Type')}"
+        assert len(resp.content) > 1000, f"Expected real image bytes, got {len(resp.content)} bytes"
+        assert "X-Fallback-Image" not in resp.headers, "Should not have fallback header for real image"
+        print(f"✅ PASS: GET /api/img/jlt-plaid-01 returns real image ({len(resp.content)} bytes)")
+        results.append(("A6: GET /api/img/jlt-plaid-01", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A6: GET /api/img/jlt-plaid-01", False, str(e)))
+    
+    # Test A7: GET /api/img/upload-does-not-exist → 200 with X-Fallback-Image header
+    print("\n[A7] Testing GET /api/img/upload-does-not-exist...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/img/upload-does-not-exist", timeout=10)
+        assert resp.status_code == 200, f"Expected 200 (fallback), got {resp.status_code}"
+        assert "X-Fallback-Image" in resp.headers, "Missing X-Fallback-Image header"
+        assert resp.headers["X-Fallback-Image"] == "1", f"Expected X-Fallback-Image: 1, got {resp.headers['X-Fallback-Image']}"
+        assert len(resp.content) > 1000, f"Expected fallback image bytes, got {len(resp.content)} bytes"
+        print(f"✅ PASS: GET /api/img/upload-does-not-exist returns fallback with X-Fallback-Image: 1")
+        results.append(("A7: GET /api/img/upload-does-not-exist", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("A7: GET /api/img/upload-does-not-exist", False, str(e)))
+    
+    return results
+
+
+def test_section_b_new_feature():
+    """Section B: New feature end-to-end - custom carousel images"""
     print("\n" + "="*80)
-    print("PART 2: REGRESSION TESTS")
+    print("SECTION B: NEW FEATURE - CUSTOM CAROUSEL IMAGES")
     print("="*80)
-    results.append(("Test 6: Products API", test_6_products_api()))
-    results.append(("Test 7: Product detail", test_7_product_detail()))
-    results.append(("Test 8: Reset product photos", test_8_reset_product_photos()))
-    results.append(("Test 9: Undo action", test_9_undo_action()))
+    
+    results = []
+    
+    # Test B1: POST /api/auth/admin-login
+    print("\n[B1] Testing POST /api/auth/admin-login...")
+    try:
+        resp = requests.post(
+            f"{BASE_URL}/api/auth/admin-login",
+            json={"password": ADMIN_PASSWORD},
+            timeout=10
+        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, f"Expected ok:true, got {data}"
+        assert "ginette_admin" in resp.cookies, "Missing admin cookie"
+        admin_cookies = resp.cookies
+        print(f"✅ PASS: POST /api/auth/admin-login returns 200 + admin cookie")
+        results.append(("B1: POST /api/auth/admin-login", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("B1: POST /api/auth/admin-login", False, str(e)))
+        return results  # Can't continue without admin auth
+    
+    # Test B2: GET /api/admin/site-content (with cookie)
+    print("\n[B2] Testing GET /api/admin/site-content...")
+    try:
+        resp = requests.get(
+            f"{BASE_URL}/api/admin/site-content",
+            cookies=admin_cookies,
+            timeout=10
+        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "content" in data, "Missing 'content' key"
+        original_content = data["content"]
+        print(f"✅ PASS: GET /api/admin/site-content returns content object")
+        results.append(("B2: GET /api/admin/site-content", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("B2: GET /api/admin/site-content", False, str(e)))
+        return results  # Can't continue without content
+    
+    # Test B3: PUT /api/admin/site-content with customImages
+    # Note: The API actually uses PATCH, not PUT (route.js line 636)
+    print("\n[B3] Testing PUT /api/admin/site-content with customImages...")
+    try:
+        # Create test content with customImages
+        test_content = original_content or {}
+        if "sections" not in test_content:
+            test_content["sections"] = []
+        
+        # Add or modify a section with customImages
+        test_section = {
+            "id": "test-carousel-section",
+            "type": "carousel",
+            "visible": True,
+            "content": {
+                "title": "Test Carousel",
+                "customImages": [
+                    {
+                        "id": "x1",
+                        "src": "/api/img/jlt-plaid-01",
+                        "alt": "test image 1"
+                    },
+                    {
+                        "id": "x2",
+                        "src": "/api/img/jlt-plaid-02",
+                        "alt": "test image 2"
+                    }
+                ]
+            }
+        }
+        
+        # Find existing test section or add new one
+        existing_idx = None
+        for idx, section in enumerate(test_content.get("sections", [])):
+            if section.get("id") == "test-carousel-section":
+                existing_idx = idx
+                break
+        
+        if existing_idx is not None:
+            test_content["sections"][existing_idx] = test_section
+        else:
+            test_content["sections"].append(test_section)
+        
+        # PATCH the updated content (API uses PATCH, not PUT)
+        resp = requests.patch(
+            f"{BASE_URL}/api/admin/site-content",
+            json=test_content,
+            cookies=admin_cookies,
+            timeout=10
+        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, f"Expected ok:true, got {data}"
+        print(f"✅ PASS: PUT /api/admin/site-content with customImages returns ok:true")
+        results.append(("B3: PUT /api/admin/site-content with customImages", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("B3: PUT /api/admin/site-content with customImages", False, str(e)))
+        return results
+    
+    # Test B4: GET /api/site-content → verify customImages persisted
+    print("\n[B4] Testing GET /api/site-content (verify persistence)...")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "content" in data, "Missing 'content' key"
+        
+        # Find the test section
+        test_section_found = None
+        for section in data["content"].get("sections", []):
+            if section.get("id") == "test-carousel-section":
+                test_section_found = section
+                break
+        
+        assert test_section_found is not None, "Test section not found in persisted content"
+        assert "customImages" in test_section_found.get("content", {}), "customImages field not persisted"
+        custom_images = test_section_found["content"]["customImages"]
+        assert len(custom_images) == 2, f"Expected 2 customImages, got {len(custom_images)}"
+        assert custom_images[0]["id"] == "x1", f"Expected id 'x1', got {custom_images[0].get('id')}"
+        assert custom_images[0]["src"] == "/api/img/jlt-plaid-01", f"Expected src '/api/img/jlt-plaid-01', got {custom_images[0].get('src')}"
+        
+        print(f"✅ PASS: GET /api/site-content returns persisted customImages (2 images)")
+        results.append(("B4: GET /api/site-content (verify persistence)", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("B4: GET /api/site-content (verify persistence)", False, str(e)))
+    
+    # Test B5: Edge case - PUT with empty customImages array
+    # Note: Using PATCH as the API doesn't support PUT
+    print("\n[B5] Testing PUT /api/admin/site-content with empty customImages...")
+    try:
+        # Update the test section with empty customImages
+        test_content_empty = data["content"]
+        for section in test_content_empty.get("sections", []):
+            if section.get("id") == "test-carousel-section":
+                section["content"]["customImages"] = []
+                break
+        
+        resp = requests.patch(
+            f"{BASE_URL}/api/admin/site-content",
+            json=test_content_empty,
+            cookies=admin_cookies,
+            timeout=10
+        )
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("ok") == True, f"Expected ok:true, got {data}"
+        
+        # Verify empty array persisted
+        verify_resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
+        verify_data = verify_resp.json()
+        test_section_verify = None
+        for section in verify_data["content"].get("sections", []):
+            if section.get("id") == "test-carousel-section":
+                test_section_verify = section
+                break
+        
+        assert test_section_verify is not None, "Test section not found after empty update"
+        assert "customImages" in test_section_verify.get("content", {}), "customImages field removed instead of emptied"
+        assert test_section_verify["content"]["customImages"] == [], f"Expected empty array, got {test_section_verify['content']['customImages']}"
+        
+        print(f"✅ PASS: PUT /api/admin/site-content with empty customImages saves correctly")
+        results.append(("B5: PUT with empty customImages", True, None))
+    except Exception as e:
+        print(f"❌ FAIL: {e}")
+        results.append(("B5: PUT with empty customImages", False, str(e)))
+    
+    return results
+
+
+def main():
+    print("\n" + "="*80)
+    print("BACKEND REGRESSION TEST - CUSTOM CAROUSEL IMAGES FEATURE")
+    print("="*80)
+    print(f"Base URL: {BASE_URL}")
+    print(f"Admin Password: {ADMIN_PASSWORD}")
+    
+    all_results = []
+    
+    # Run Section A tests
+    section_a_results = test_section_a_regression()
+    all_results.extend(section_a_results)
+    
+    # Run Section B tests
+    section_b_results = test_section_b_new_feature()
+    all_results.extend(section_b_results)
     
     # Summary
     print("\n" + "="*80)
     print("TEST SUMMARY")
     print("="*80)
     
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
+    passed = sum(1 for _, success, _ in all_results if success)
+    failed = sum(1 for _, success, _ in all_results if not success)
+    total = len(all_results)
     
-    for test_name, result in results:
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"{status}: {test_name}")
+    print(f"\nTotal: {total} tests")
+    print(f"Passed: {passed} ✅")
+    print(f"Failed: {failed} ❌")
+    print(f"Success Rate: {(passed/total*100):.1f}%")
     
-    print("="*80)
-    print(f"TOTAL: {passed}/{total} tests passed ({100*passed//total}%)")
-    print("="*80)
+    print("\nDetailed Results:")
+    for test_name, success, error in all_results:
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"  {status}: {test_name}")
+        if error:
+            print(f"    Error: {error}")
     
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED - Image fallback feature working correctly, no regressions")
-        sys.exit(0)
-    else:
-        print(f"\n⚠️  {total - passed} test(s) failed")
-        sys.exit(1)
+    # Exit with appropriate code
+    sys.exit(0 if failed == 0 else 1)
+
 
 if __name__ == "__main__":
     main()

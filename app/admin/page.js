@@ -7,6 +7,7 @@ import { formatPrice } from '@/lib/utils'
 import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown } from 'lucide-react'
 import { HOMEPAGE_SECTION_DEFAULTS, mergeHomepageSections, BANNER_TEMPLATES } from '@/lib/homepage-sections'
 import HeroComposer from '@/components/admin/hero-composer'
+import CarouselImageEditor from '@/components/admin/carousel-image-editor'
 import MissingMediaRecovery from '@/components/admin/missing-media-recovery'
 import VariantsEditor from '@/components/admin/variants-editor'
 import { cn } from '@/lib/utils'
@@ -2917,6 +2918,13 @@ function SectionContentEditor({ type, content, onChange }) {
             className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink"
           />
         </Field>
+        {/* ---- Images personnalisées (mode "carrousel d'images") ---- */}
+        <div className="md:col-span-2 mt-2 pt-6 border-t border-linen">
+          <CarouselImageEditor
+            images={Array.isArray(content.customImages) ? content.customImages : []}
+            onChange={(next) => onChange('customImages', next)}
+          />
+        </div>
       </div>
     )
   }
