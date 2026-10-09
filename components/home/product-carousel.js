@@ -19,7 +19,7 @@ import { toast } from 'sonner'
  *  - fallback : liste PRODUCTS pré-importée (optionnelle)
  *  - filter   : (p) => bool  filtre client (nouveautés / featured)
  */
-export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false }) {
+export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false, pickedSlugs = [] }) {
   const [products, setProducts] = useState([])
   const scrollRef = useRef(null)
   const { add } = useCart()
@@ -31,6 +31,13 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
       .then((d) => {
         if (cancelled) return
         let list = d.products || []
+        // Mode vitrine manuelle : garde seulement les slugs sélectionnés, dans l'ordre
+        if (Array.isArray(pickedSlugs) && pickedSlugs.length > 0) {
+          const map = new Map(list.map((p) => [p.slug, p]))
+          list = pickedSlugs.map((s) => map.get(s)).filter(Boolean)
+          setProducts(list.slice(0, limit))
+          return
+        }
         if (filter === 'new') list = list.filter((p) => p.isNew)
         else if (filter === 'limited') list = list.filter((p) => p.isLimited)
         else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
@@ -50,7 +57,7 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [endpoint, filter, limit])
+  }, [endpoint, filter, limit, pickedSlugs?.join(',')])
 
   const scroll = (dir) => {
     if (!scrollRef.current) return

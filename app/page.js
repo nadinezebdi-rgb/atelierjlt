@@ -109,7 +109,22 @@ function renderSection(s) {
         />
       )
     case 'product-carousel':
-      // Mode "images personnalisées" si customImages non vide, sinon carrousel produits
+      // Priorité 1 : vitrine manuelle (produits sélectionnés par l'admin)
+      if (Array.isArray(c.pickedProducts) && c.pickedProducts.length > 0) {
+        return (
+          <ProductCarousel
+            key={s.id}
+            eyebrow={c.eyebrow}
+            title={c.title}
+            description={c.description}
+            viewAllHref={c.viewAllHref}
+            limit={Number(c.limit) || 8}
+            hideBadges={c.hideBadges === true}
+            pickedSlugs={c.pickedProducts}
+          />
+        )
+      }
+      // Priorité 2 : galerie d'images personnalisées (ancien mode, conservé)
       if (Array.isArray(c.customImages) && c.customImages.length > 0) {
         return (
           <CarouselImageGallery

@@ -15,7 +15,7 @@
  */
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Eye, EyeOff, ExternalLink, Trash2 } from 'lucide-react'
+import { X, Eye, EyeOff, ExternalLink, Trash2, Search, Plus, Check, ShoppingBag } from 'lucide-react'
 
 const INPUT_CLS =
   'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald transition rounded-sm'
@@ -288,9 +288,9 @@ export default function SectionEditorPanel({ section, onClose, onChange, onToggl
                 />
                 <span className="text-sm text-ink/70">Masquer les badges Nouveau / Édition sur les photos</span>
               </label>
-              <CustomImagesManager
-                images={Array.isArray(c.customImages) ? c.customImages : []}
-                onChange={(next) => updateContent({ customImages: next })}
+              <PickedProductsManager
+                picked={Array.isArray(c.pickedProducts) ? c.pickedProducts : []}
+                onChange={(next) => updateContent({ pickedProducts: next })}
               />
             </>
           )}
@@ -502,5 +502,332 @@ function CustomImagesManager({ images, onChange }) {
       </label>
       {err && <p className="text-xs text-terracotta mt-2">{err}</p>}
     </div>
+  )
+}
+
+/* ---------------------------------------------------------------------- */
+/*  PickedProductsManager — remplace "ajouter des photos" par de vrais     */
+/*  produits (prix + couleurs + lien fiche produit). Vitrine de vente.    */
+/* ---------------------------------------------------------------------- */
+
+function PickedProductsManager({ picked, onChange }) {
+  const [openModal, setOpenModal] = useState(false)
+  const [pickedDetails, setPickedDetails] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  // Charge les détails des produits sélectionnés
+  useEffect(() => {
+    if (!picked.length) {
+      setPickedDetails([])
+      return
+    }
+    setLoading(true)
+    fetch('/api/products', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        const all = d.products || []
+        const map = new Map(all.map((p) => [p.slug, p]))
+        setPickedDetails(picked.map((slug) => map.get(slug)).filter(Boolean))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [picked])
+
+  const removeAt = (i) => onChange(picked.filter((_, j) => j !== i))
+  const moveUp = (i) => {
+    if (i === 0) return
+    const next = picked.slice()
+    ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+    onChange(next)
+  }
+  const moveDown = (i) => {
+    if (i === picked.length - 1) return
+    const next = picked.slice()
+    ;[next[i + 1], next[i]] = [next[i], next[i + 1]]
+    onChange(next)
+  }
+
+  return (
+    <div className="pt-5 border-t border-linen">
+      <div className="flex items-center justify-between mb-3">
+        <span className={LABEL_CLS + ' mb-0'}>
+          Produits sélectionnés ({picked.length})
+        </span>
+        {picked.length > 0 && (
+          <span className="text-[10px] uppercase tracking-[0.2em] text-emerald">
+            Vitrine manuelle
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-ink/55 leading-relaxed mb-3">
+        Choisissez vous-même les produits à afficher dans le carrousel. Chaque
+        produit garde son prix, ses couleurs et renvoie vers sa fiche quand on
+        clique dessus. Laissez vide pour utiliser le filtre automatique.
+      </p>
+
+      {loading && <div className="text-xs text-ink/50 mb-2">Chargement…</div>}
+
+      {pickedDetails.length > 0 && (
+        <ul className="space-y-2 mb-3">
+          {pickedDetails.map((p, i) => (
+            <li
+              key={p.slug}
+              className="flex items-center gap-3 border border-linen bg-ivory p-2 rounded-sm"
+            >
+              <div className="h-14 w-14 flex-none bg-cream overflow-hidden rounded-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{p.name}</div>
+                <div className="text-xs text-ink/60 tabular-nums">
+                  {Number(p.price).toFixed(2).replace('.', ',')} €
+                  {p.variants?.length ? ` · ${p.variants.length} coul.` : ''}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => moveUp(i)}
+                  disabled={i === 0}
+                  className="h-6 w-6 flex items-center justify-center border border-ink/10 hover:border-ink text-[10px] rounded-sm disabled:opacity-30"
+                  aria-label="Monter"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveDown(i)}
+                  disabled={i === pickedDetails.length - 1}
+                  className="h-6 w-6 flex items-center justify-center border border-ink/10 hover:border-ink text-[10px] rounded-sm disabled:opacity-30"
+                  aria-label="Descendre"
+                >
+                  ↓
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeAt(i)}
+                className="h-9 w-9 flex items-center justify-center bg-ink/5 hover:bg-brique hover:text-ivory rounded-sm"
+                aria-label="Retirer"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setOpenModal(true)}
+        className="w-full h-11 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.22em] bg-ink text-ivory hover:bg-emerald transition rounded-sm"
+      >
+        <Plus className="h-4 w-4" strokeWidth={1.8} />
+        Ajouter des produits
+      </button>
+
+      {openModal && (
+        <ProductPickerModal
+          picked={picked}
+          onClose={() => setOpenModal(false)}
+          onConfirm={(next) => { onChange(next); setOpenModal(false) }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Modal de sélection de produits — recherche + liste scrollable         */
+/* ---------------------------------------------------------------------- */
+
+function ProductPickerModal({ picked, onClose, onConfirm }) {
+  const [all, setAll] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [cat, setCat] = useState('all')
+  const [selected, setSelected] = useState(new Set(picked))
+
+  useEffect(() => {
+    fetch('/api/products', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setAll(d.products || []))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const categories = Array.from(new Set(all.map((p) => p.category))).filter(Boolean)
+
+  const q = query.toLowerCase().trim()
+  const filtered = all.filter((p) => {
+    if (cat !== 'all' && p.category !== cat) return false
+    if (!q) return true
+    return ((p.name || '') + ' ' + (p.material || '') + ' ' + (p.color || ''))
+      .toLowerCase()
+      .includes(q)
+  })
+
+  const toggle = (slug) => {
+    const next = new Set(selected)
+    if (next.has(slug)) next.delete(slug)
+    else next.add(slug)
+    setSelected(next)
+  }
+
+  const confirm = () => {
+    // Garde l'ordre existant pour les anciens sélectionnés, ajoute les nouveaux à la fin
+    const existing = picked.filter((s) => selected.has(s))
+    const additions = Array.from(selected).filter((s) => !picked.includes(s))
+    onConfirm([...existing, ...additions])
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[260] flex items-stretch md:items-center justify-center bg-ink/60 p-0 md:p-6">
+      <div
+        className="bg-ivory w-full md:max-w-2xl md:h-[80vh] md:rounded-sm flex flex-col shadow-2xl"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          height: '100dvh',
+          maxHeight: '100dvh',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-linen">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-emerald mb-1">Vitrine</div>
+            <div className="font-display text-xl">
+              Choisissez les produits
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-11 w-11 flex items-center justify-center border border-ink/15 hover:border-ink rounded-sm"
+            aria-label="Fermer"
+          >
+            <X className="h-4 w-4" strokeWidth={1.8} />
+          </button>
+        </div>
+
+        {/* Search + filters */}
+        <div className="px-5 py-3 border-b border-linen space-y-3">
+          <div className="flex items-center gap-2 border border-ink/15 bg-ivory px-3">
+            <Search className="h-4 w-4 text-ink/40" strokeWidth={1.5} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Rechercher un produit…"
+              className="flex-1 bg-transparent text-sm outline-none py-2.5"
+            />
+          </div>
+          {categories.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1">
+              <PickChip label="Tous" active={cat === 'all'} onClick={() => setCat('all')} />
+              {categories.map((c) => (
+                <PickChip key={c} label={c} active={cat === c} onClick={() => setCat(c)} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {loading ? (
+            <div className="text-sm text-ink/50 text-center py-10">Chargement…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-sm text-ink/50 text-center py-10">Aucun produit ne correspond.</div>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {filtered.map((p) => {
+                const isSelected = selected.has(p.slug)
+                return (
+                  <li key={p.slug}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(p.slug)}
+                      className={`w-full text-left flex items-center gap-3 p-2 border transition rounded-sm ${
+                        isSelected
+                          ? 'border-emerald bg-emerald/5'
+                          : 'border-linen hover:border-ink/30'
+                      }`}
+                    >
+                      <div className="h-16 w-16 flex-none bg-cream overflow-hidden rounded-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.images?.[0]}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.name}</div>
+                        <div className="text-xs text-ink/60 tabular-nums">
+                          {Number(p.price).toFixed(2).replace('.', ',')} €
+                        </div>
+                        {p.variants?.length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {p.variants.slice(0, 5).map((v, i) => (
+                              <span
+                                key={i}
+                                className="h-3 w-3 rounded-full border border-ink/15"
+                                style={{ background: v.hex || '#eee' }}
+                                title={v.name}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span
+                        className={`h-6 w-6 flex-none rounded-full border-2 flex items-center justify-center transition ${
+                          isSelected ? 'bg-emerald border-emerald text-ivory' : 'border-ink/20'
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-linen flex items-center gap-3 bg-ivory">
+          <div className="flex-1 text-sm">
+            <strong className="tabular-nums">{selected.size}</strong>{' '}
+            <span className="text-ink/60">produit{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-11 px-4 text-[11px] uppercase tracking-[0.22em] border border-ink/20 hover:border-ink rounded-sm"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={confirm}
+            className="h-11 px-5 bg-ink text-ivory text-[11px] uppercase tracking-[0.22em] hover:bg-emerald rounded-sm flex items-center gap-2"
+          >
+            <ShoppingBag className="h-4 w-4" strokeWidth={1.5} />
+            Valider
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function PickChip({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-none px-3 h-9 text-[10px] uppercase tracking-[0.22em] border rounded-sm transition ${
+        active ? 'bg-ink text-ivory border-ink' : 'border-ink/15 text-ink/70 hover:border-ink'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
