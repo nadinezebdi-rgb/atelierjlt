@@ -54,7 +54,37 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
     else toast.error(r.error || 'Erreur')
   }
 
-  if (!products.length) return null
+  if (!products.length) {
+    // Si l'admin a configuré un titre ou une description, on affiche quand même
+    // l'en-tête — ça évite que la section disparaisse totalement en cas de
+    // rechargement partiel ou de filtre temporairement vide.
+    if (!title && !eyebrow && !description) return null
+    return (
+      <section className="py-16 md:py-24 bg-ivory">
+        <div className="container">
+          <div className="max-w-2xl">
+            {eyebrow && (
+              <span className="block text-[10px] uppercase tracking-[0.42em] text-emerald mb-3">{eyebrow}</span>
+            )}
+            {title && (
+              <h2
+                className="font-display text-3xl md:text-5xl leading-[1.05] text-balance"
+                style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
+              >
+                {title}
+              </h2>
+            )}
+            {description && (
+              <p className="mt-5 md:mt-6 text-ink/75 text-[15px] md:text-base leading-[1.75] max-w-xl">
+                {description}
+              </p>
+            )}
+            <p className="mt-8 text-sm text-ink/50 italic">Les pièces arrivent bientôt.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-16 md:py-24 bg-ivory">
