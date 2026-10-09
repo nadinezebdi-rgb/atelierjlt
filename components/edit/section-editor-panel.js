@@ -143,6 +143,7 @@ export default function SectionEditorPanel({ section, onClose, onChange, onToggl
                   value={c.filter || 'all'}
                   onChange={(v) => updateContent({ filter: v })}
                   options={[
+                    { v: 'classiques', label: 'Classiques' },
                     { v: 'intemporels', label: 'Intemporels' },
                     { v: 'pe-2026-2027', label: 'PE 26-27' },
                     { v: 'all', label: 'Tous' },

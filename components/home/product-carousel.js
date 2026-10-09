@@ -36,6 +36,16 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
         else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
         else if (filter === 'intemporels') list = list.filter((p) => p.category === 'intemporels')
         else if (filter === 'pe-2026-2027') list = list.filter((p) => p.category === 'pe-2026-2027')
+        else if (filter === 'classiques') {
+          // Les classiques : plaids, coussins, paniers, tapis, chemins & sets de table.
+          // Exclut macramés muraux et suspensions (qui restent dans les Intemporels mais pas dans ce carrousel).
+          const prefixes = ['plaid-', 'coussin-', 'panier-', 'chemin-de-table-', 'tapis-', 'set-de-table-']
+          list = list.filter(
+            (p) =>
+              p.category === 'intemporels' &&
+              prefixes.some((pref) => (p.slug || '').startsWith(pref))
+          )
+        }
         setProducts(list.slice(0, limit))
       })
       .catch(() => {})

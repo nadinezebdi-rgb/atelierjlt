@@ -3004,7 +3004,8 @@ function SectionContentEditor({ type, content, onChange }) {
             <option value="new">Nouveautés</option>
             <option value="bestsellers">Meilleures ventes</option>
             <option value="limited">Éditions limitées</option>
-            <option value="intemporels">Les Intemporels</option>
+            <option value="intemporels">Les Intemporels (tous)</option>
+            <option value="classiques">Les Classiques (plaids · coussins · paniers · tapis · sets de table)</option>
             <option value="pe-2026-2027">Printemps/Été 2026-2027</option>
             <option value="all">Tous les produits</option>
           </select>
