@@ -7,6 +7,7 @@ export default function sitemap() {
   const staticPages = [
     '',
     '/collections',
+    '/collection/printemps-ete-2026-2027',
     '/a-propos',
     '/journal',
     '/contact',
@@ -24,10 +25,11 @@ export default function sitemap() {
     priority: 0.6,
   }))
 
-  // La collection Terre a été retirée du site public : on filtre ses produits
-  // pour ne pas renvoyer de 404 depuis le sitemap aux moteurs de recherche.
+  // Toute la collection Terre a été retirée + les anciennes catégories
+  // racine/empreinte ont été fusionnées dans « intemporels ». On n'exporte
+  // dans le sitemap que les slugs toujours actifs.
   const productPages = PRODUCTS
-    .filter((p) => p.category !== 'terre')
+    .filter((p) => ['intemporels', 'pe-2026-2027'].includes(p.category))
     .map((p) => ({
       url: `${BASE}/produit/${p.slug}`,
       lastModified: now,

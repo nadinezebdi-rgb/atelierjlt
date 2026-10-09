@@ -1360,7 +1360,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-collections', 'Collections'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-collection-pe', 'Collection Printemps/Été 2026-2027'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1376,37 +1376,6 @@ function TabContent({ onDirtyChange }) {
           }}
           ImageUploader={ImageUploader}
         />
-
-        {/* COLLECTIONS */}
-        <section id="admin-collections" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Collections</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Surtitre section"><input value={c.sectionEyebrow} onChange={(e) => upd('sectionEyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Titre section"><input value={c.sectionTitle} onChange={(e) => upd('sectionTitle', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-          </div>
-          <div className="mt-6 space-y-6">
-            {c.collections.map((coll, i) => (
-              <div key={coll.key} className="border border-linen p-4 bg-cream/30">
-                <div className="grid md:grid-cols-3 gap-4 items-start">
-                  <div className="md:col-span-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={coll.image} alt={coll.name} className="w-full aspect-[4/5] object-cover bg-cream" />
-                  </div>
-                  <div className="md:col-span-2 space-y-3">
-                    <Field label={`Nom collection ${i + 1}`}><input value={coll.name} onChange={(e) => updColl(i, 'name', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink font-display text-lg" /></Field>
-                    <Field label="Accroche (sous-titre)"><input value={coll.tagline} onChange={(e) => updColl(i, 'tagline', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-                    <Field label="Photo de la collection (glisser-déposer)">
-                      <ImageUploader
-                        images={coll.image ? [coll.image] : []}
-                        onChange={(imgs) => updColl(i, 'image', imgs[0] || '')}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
 
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
@@ -1435,6 +1404,12 @@ function TabContent({ onDirtyChange }) {
             />
           </Field>
         </section>
+
+        {/* ===== PAGE COLLECTION "PRINTEMPS / ÉTÉ 2026-2027" — hero, ambiance, palette, matières ===== */}
+        <CollectionPEEditor
+          value={c.collectionPE2027 || {}}
+          onChange={(patch) => upd('collectionPE2027', { ...(c.collectionPE2027 || {}), ...patch })}
+        />
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
 
@@ -3157,5 +3132,113 @@ function TabSettings() {
         </section>
       </div>
     </div>
+  )
+}
+
+/* ============================================================================
+   CollectionPEEditor — Admin editor for /collection/printemps-ete-2026-2027
+   Hero (image + textes), ambiance (image + titre + texte), palette (5 couleurs),
+   matières (jusqu'à 6 cartes). Toutes les photos sont réuploadables.
+   ============================================================================ */
+function CollectionPEEditor({ value = {}, onChange }) {
+  const palette = Array.isArray(value.palette) ? value.palette : []
+  const materials = Array.isArray(value.materials) ? value.materials : []
+  const set = (k, v) => onChange({ [k]: v })
+  const updPalette = (i, k, v) => {
+    const next = palette.slice()
+    next[i] = { ...next[i], [k]: v }
+    set('palette', next)
+  }
+  const updMat = (i, k, v) => {
+    const next = materials.slice()
+    next[i] = { ...next[i], [k]: v }
+    set('materials', next)
+  }
+  const addPalette = () => set('palette', [...palette, { name: '', hex: '#CFCFCF' }])
+  const addMaterial = () => set('materials', [...materials, { name: '', image: '' }])
+  const rmPalette = (i) => set('palette', palette.filter((_, j) => j !== i))
+  const rmMaterial = (i) => set('materials', materials.filter((_, j) => j !== i))
+
+  return (
+    <section id="admin-collection-pe" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+        <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Collection « Printemps / Été 2026-2027 »</h3>
+        <a href="/collection/printemps-ete-2026-2027" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
+      </div>
+      <p className="text-sm text-ink/60 mb-6 leading-relaxed">
+        Toute la page de la nouvelle collection se gère ici : la grande bannière du haut, l'ambiance, les 5 couleurs de la palette, et les 4 matières. Les photos par défaut peuvent être remplacées par vos propres photos à tout moment — glissez un fichier dans la zone « Importer ».
+      </p>
+
+      {/* HERO */}
+      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-6">① Grande bannière du haut</h4>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Petit texte (sur-titre)">
+          <input value={value.heroEyebrow || ''} onChange={(e) => set('heroEyebrow', e.target.value)} placeholder="Nouvelle saison" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+        </Field>
+        <Field label="Grand titre">
+          <input value={value.heroTitle || ''} onChange={(e) => set('heroTitle', e.target.value)} placeholder="Printemps / Été 2026-2027" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+        </Field>
+      </div>
+      <Field label="Phrase sous le titre (facultatif)">
+        <input value={value.heroSubtitle || ''} onChange={(e) => set('heroSubtitle', e.target.value)} placeholder="Doux · Chaleureux · Bien chez soi." className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+      </Field>
+      <Field label="Image de la bannière">
+        <ImageUploader
+          images={value.heroImage ? [value.heroImage] : []}
+          onChange={(arr) => set('heroImage', arr[arr.length - 1] || '')}
+        />
+      </Field>
+
+      {/* AMBIANCE */}
+      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-10">② Bloc Ambiance</h4>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Field label="Petit texte"><input value={value.moodEyebrow || ''} onChange={(e) => set('moodEyebrow', e.target.value)} placeholder="Ambiance" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+        <Field label="Titre (saut de ligne : touche Entrée)">
+          <textarea value={value.moodTitle || ''} onChange={(e) => set('moodTitle', e.target.value)} rows={2} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink resize-none" />
+        </Field>
+      </div>
+      <Field label="Texte de description">
+        <textarea value={value.moodText || ''} onChange={(e) => set('moodText', e.target.value)} rows={4} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+      </Field>
+      <Field label="Image d'ambiance (vertical idéal)">
+        <ImageUploader images={value.moodImage ? [value.moodImage] : []} onChange={(arr) => set('moodImage', arr[arr.length - 1] || '')} />
+      </Field>
+
+      {/* PALETTE */}
+      <div className="flex items-center justify-between mt-10 mb-3">
+        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">③ Palette de couleurs</h4>
+        <button type="button" onClick={addPalette} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
+      </div>
+      <div className="space-y-3">
+        {palette.map((c, i) => (
+          <div key={i} className="flex items-center gap-3 bg-cream/40 border border-linen p-3">
+            <input type="color" value={c.hex || '#cccccc'} onChange={(e) => updPalette(i, 'hex', e.target.value)} className="h-11 w-14 cursor-pointer rounded-sm border border-ink/15" />
+            <input value={c.name || ''} onChange={(e) => updPalette(i, 'name', e.target.value)} placeholder="Nom (ex. Rose poudré)" className="flex-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+            <input value={c.hex || ''} onChange={(e) => updPalette(i, 'hex', e.target.value)} placeholder="#C98498" className="w-28 bg-transparent border-b border-ink/20 py-2 font-mono text-sm focus:outline-none focus:border-ink" />
+            <button type="button" onClick={() => rmPalette(i)} className="text-terracotta hover:opacity-70 h-11 w-11 flex items-center justify-center" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+          </div>
+        ))}
+      </div>
+
+      {/* MATIÈRES */}
+      <div className="flex items-center justify-between mt-10 mb-3">
+        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">④ Matières</h4>
+        <button type="button" onClick={addMaterial} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        {materials.map((m, i) => (
+          <div key={i} className="border border-linen bg-cream/30 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Matière {i + 1}</span>
+              <button type="button" onClick={() => rmMaterial(i)} className="text-terracotta hover:opacity-70" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+            </div>
+            <Field label="Nom"><input value={m.name || ''} onChange={(e) => updMat(i, 'name', e.target.value)} placeholder="Ex. Cordons tresse" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+            <Field label="Photo">
+              <ImageUploader images={m.image ? [m.image] : []} onChange={(arr) => updMat(i, 'image', arr[arr.length - 1] || '')} />
+            </Field>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

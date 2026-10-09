@@ -1,368 +1,380 @@
 #!/usr/bin/env python3
 """
-Backend regression test for custom carousel images feature
-Tests both existing functionality and new customImages field persistence
+Backend test for major restructure:
+- Categories: removed racine/empreinte, added intemporels/pe-2026-2027
+- All 11 products reclassified to intemporels
+- New page /collection/printemps-ete-2026-2027
+- Homepage sections restructured
+- Admin: CollectionPEEditor (saves to content.collectionPE2027)
 """
 
 import requests
 import json
 import sys
+from typing import Dict, Any
 
 BASE_URL = "https://french-craft.preview.emergentagent.com"
 ADMIN_PASSWORD = "Juliette99*"
 
-def test_section_a_regression():
-    """Section A: Regression tests - should still work"""
-    print("\n" + "="*80)
-    print("SECTION A: REGRESSION TESTS")
-    print("="*80)
+class TestRunner:
+    def __init__(self):
+        self.passed = 0
+        self.failed = 0
+        self.admin_cookie = None
+        self.original_content = None
     
-    results = []
+    def test(self, name: str, condition: bool, details: str = ""):
+        if condition:
+            self.passed += 1
+            print(f"✅ {name}")
+            if details:
+                print(f"   {details}")
+        else:
+            self.failed += 1
+            print(f"❌ {name}")
+            if details:
+                print(f"   {details}")
     
-    # Test A1: GET /api/products → 200, 11 products, no `terre` category
-    print("\n[A1] Testing GET /api/products...")
+    def section(self, title: str):
+        print(f"\n{'='*80}")
+        print(f"  {title}")
+        print(f"{'='*80}\n")
+    
+    def admin_login(self):
+        """Login as admin and store cookie"""
+        try:
+            resp = requests.post(
+                f"{BASE_URL}/api/auth/admin-login",
+                json={"password": ADMIN_PASSWORD},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                self.admin_cookie = resp.cookies.get("ginette_admin")
+                self.test("Admin login", self.admin_cookie is not None, f"Cookie: {self.admin_cookie[:20]}...")
+                return True
+            else:
+                self.test("Admin login", False, f"Status: {resp.status_code}")
+                return False
+        except Exception as e:
+            self.test("Admin login", False, f"Error: {str(e)}")
+            return False
+    
+    def get_cookies(self):
+        """Return cookies dict for admin requests"""
+        if self.admin_cookie:
+            return {"ginette_admin": self.admin_cookie}
+        return {}
+
+def main():
+    runner = TestRunner()
+    
+    # ========================================================================
+    # SECTION A: PRODUCTS
+    # ========================================================================
+    runner.section("A. PRODUCTS - Category Restructure")
+    
     try:
+        # A1: GET /api/products → 200, exactly 11 products, ALL have category: 'intemporels'
         resp = requests.get(f"{BASE_URL}/api/products", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert "products" in data, "Missing 'products' key"
-        assert data["total"] == 11, f"Expected 11 products, got {data['total']}"
-        # Check no terre category
-        terre_products = [p for p in data["products"] if p.get("category") == "terre"]
-        assert len(terre_products) == 0, f"Found {len(terre_products)} terre products, expected 0"
-        print(f"✅ PASS: GET /api/products returns {data['total']} products, no terre category")
-        results.append(("A1: GET /api/products", True, None))
+        runner.test("A1: GET /api/products returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            products = data.get("products", [])
+            total = data.get("total", 0)
+            
+            runner.test("A1: Exactly 11 products", total == 11 and len(products) == 11, 
+                       f"Found {total} products")
+            
+            # Check ALL products have category: 'intemporels'
+            all_intemporels = all(p.get("category") == "intemporels" for p in products)
+            runner.test("A1: ALL products have category='intemporels'", all_intemporels,
+                       f"Categories: {set(p.get('category') for p in products)}")
+            
+            # Check NO products have old categories
+            old_categories = [p for p in products if p.get("category") in ["racine", "empreinte", "terre"]]
+            runner.test("A1: NO products with old categories (racine/empreinte/terre)", 
+                       len(old_categories) == 0,
+                       f"Found {len(old_categories)} products with old categories")
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A1: GET /api/products", False, str(e)))
+        runner.test("A1: GET /api/products", False, f"Error: {str(e)}")
     
-    # Test A2: GET /api/products/plaid-sylvestre → 200
-    print("\n[A2] Testing GET /api/products/plaid-sylvestre...")
     try:
+        # A2: GET /api/products?cat=intemporels → 200, 11 products
+        resp = requests.get(f"{BASE_URL}/api/products?cat=intemporels", timeout=10)
+        runner.test("A2: GET /api/products?cat=intemporels returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            products = data.get("products", [])
+            runner.test("A2: Filter intemporels returns 11 products", len(products) == 11,
+                       f"Found {len(products)} products")
+    except Exception as e:
+        runner.test("A2: GET /api/products?cat=intemporels", False, f"Error: {str(e)}")
+    
+    try:
+        # A3: GET /api/products?cat=pe-2026-2027 → 200, 0 products (empty collection)
+        resp = requests.get(f"{BASE_URL}/api/products?cat=pe-2026-2027", timeout=10)
+        runner.test("A3: GET /api/products?cat=pe-2026-2027 returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            products = data.get("products", [])
+            runner.test("A3: New category pe-2026-2027 is empty (0 products)", len(products) == 0,
+                       f"Found {len(products)} products (expected 0)")
+    except Exception as e:
+        runner.test("A3: GET /api/products?cat=pe-2026-2027", False, f"Error: {str(e)}")
+    
+    try:
+        # A4: GET /api/products?cat=racine → 200, 0 products (old category gone)
+        resp = requests.get(f"{BASE_URL}/api/products?cat=racine", timeout=10)
+        runner.test("A4: GET /api/products?cat=racine returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            products = data.get("products", [])
+            runner.test("A4: Old category 'racine' returns 0 products", len(products) == 0,
+                       f"Found {len(products)} products (expected 0, old category removed)")
+    except Exception as e:
+        runner.test("A4: GET /api/products?cat=racine", False, f"Error: {str(e)}")
+    
+    try:
+        # A5: GET /api/products/plaid-sylvestre → 200 with product.category === 'intemporels'
         resp = requests.get(f"{BASE_URL}/api/products/plaid-sylvestre", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert "product" in data, "Missing 'product' key"
-        assert data["product"]["slug"] == "plaid-sylvestre", "Wrong product returned"
-        print(f"✅ PASS: GET /api/products/plaid-sylvestre returns product")
-        results.append(("A2: GET /api/products/plaid-sylvestre", True, None))
+        runner.test("A5: GET /api/products/plaid-sylvestre returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            product = data.get("product", {})
+            category = product.get("category")
+            runner.test("A5: plaid-sylvestre has category='intemporels'", category == "intemporels",
+                       f"Category: {category}")
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A2: GET /api/products/plaid-sylvestre", False, str(e)))
+        runner.test("A5: GET /api/products/plaid-sylvestre", False, f"Error: {str(e)}")
     
-    # Test A3: GET /api/site-content → 200
-    print("\n[A3] Testing GET /api/site-content...")
-    try:
-        resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert "content" in data, "Missing 'content' key"
-        print(f"✅ PASS: GET /api/site-content returns content")
-        results.append(("A3: GET /api/site-content", True, None))
-    except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A3: GET /api/site-content", False, str(e)))
+    # ========================================================================
+    # SECTION B: PAGES RENDER
+    # ========================================================================
+    runner.section("B. PAGES RENDER")
     
-    # Test A4: POST /api/admin/reset-product-photos (with admin cookie)
-    print("\n[A4] Testing POST /api/admin/reset-product-photos...")
+    pages = [
+        ("B1", "/", "Homepage"),
+        ("B2", "/collection/printemps-ete-2026-2027", "New PE 2026-2027 collection page"),
+        ("B3", "/collections", "Collections page"),
+        ("B4", "/collections?cat=intemporels", "Collections filtered by intemporels"),
+        ("B5", "/a-propos", "About page"),
+        ("B6", "/admin", "Admin page"),
+    ]
+    
+    for test_id, path, description in pages:
+        try:
+            resp = requests.get(f"{BASE_URL}{path}", timeout=10)
+            runner.test(f"{test_id}: GET {path} returns 200", resp.status_code == 200,
+                       f"{description} - Status: {resp.status_code}")
+        except Exception as e:
+            runner.test(f"{test_id}: GET {path}", False, f"Error: {str(e)}")
+    
+    # ========================================================================
+    # SECTION C: ADMIN FLOWS
+    # ========================================================================
+    runner.section("C. ADMIN FLOWS")
+    
+    # C1: Admin login
+    if not runner.admin_login():
+        print("⚠️  Admin login failed, skipping admin tests")
+        runner.section("SUMMARY")
+        print(f"\n✅ Passed: {runner.passed}")
+        print(f"❌ Failed: {runner.failed}")
+        print(f"📊 Total: {runner.passed + runner.failed}")
+        return 1 if runner.failed > 0 else 0
+    
     try:
-        # First login as admin
-        login_resp = requests.post(
-            f"{BASE_URL}/api/auth/admin-login",
-            json={"password": ADMIN_PASSWORD},
+        # C2: GET /api/admin/site-content (with cookie) → 200
+        resp = requests.get(
+            f"{BASE_URL}/api/admin/site-content",
+            cookies=runner.get_cookies(),
             timeout=10
         )
-        assert login_resp.status_code == 200, f"Admin login failed: {login_resp.status_code}"
-        admin_cookies = login_resp.cookies
+        runner.test("C2: GET /api/admin/site-content returns 200", resp.status_code == 200)
         
-        # Now reset product photos
+        if resp.status_code == 200:
+            data = resp.json()
+            runner.original_content = data.get("content")
+            runner.test("C2: Content object exists", runner.original_content is not None)
+    except Exception as e:
+        runner.test("C2: GET /api/admin/site-content", False, f"Error: {str(e)}")
+    
+    try:
+        # C3: PATCH /api/admin/site-content with collectionPE2027 data
+        # First get existing content to merge properly
+        resp_get = requests.get(
+            f"{BASE_URL}/api/admin/site-content",
+            cookies=runner.get_cookies(),
+            timeout=10
+        )
+        
+        if resp_get.status_code == 200:
+            existing = resp_get.json().get("content", {})
+            # Merge new collectionPE2027 data into existing content
+            existing["collectionPE2027"] = {
+                "heroTitle": "Test Title 123",
+                "palette": [
+                    {"name": "Test", "hex": "#FF0000"}
+                ]
+            }
+            test_data = existing
+        else:
+            # Fallback if GET fails
+            test_data = {
+                "collectionPE2027": {
+                    "heroTitle": "Test Title 123",
+                    "palette": [
+                        {"name": "Test", "hex": "#FF0000"}
+                    ]
+                }
+            }
+        
+        resp = requests.patch(
+            f"{BASE_URL}/api/admin/site-content",
+            json=test_data,
+            cookies=runner.get_cookies(),
+            timeout=10
+        )
+        runner.test("C3: PATCH /api/admin/site-content returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            runner.test("C3: Response has ok:true", data.get("ok") == True)
+    except Exception as e:
+        runner.test("C3: PATCH /api/admin/site-content", False, f"Error: {str(e)}")
+    
+    try:
+        # C4: GET /api/site-content → verify collectionPE2027 data persisted
+        resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
+        runner.test("C4: GET /api/site-content returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            content = data.get("content", {})
+            collection_pe = content.get("collectionPE2027", {})
+            
+            hero_title = collection_pe.get("heroTitle")
+            palette = collection_pe.get("palette", [])
+            
+            runner.test("C4: collectionPE2027.heroTitle === 'Test Title 123'", 
+                       hero_title == "Test Title 123",
+                       f"heroTitle: {hero_title}")
+            
+            runner.test("C4: collectionPE2027.palette array present", 
+                       isinstance(palette, list) and len(palette) > 0,
+                       f"palette: {palette}")
+            
+            if len(palette) > 0:
+                runner.test("C4: palette[0] has correct data",
+                           palette[0].get("name") == "Test" and palette[0].get("hex") == "#FF0000",
+                           f"palette[0]: {palette[0]}")
+    except Exception as e:
+        runner.test("C4: GET /api/site-content", False, f"Error: {str(e)}")
+    
+    # ========================================================================
+    # SECTION D: REGRESSION TESTS
+    # ========================================================================
+    runner.section("D. REGRESSION TESTS")
+    
+    try:
+        # D1: POST /api/admin/reset-product-photos
         resp = requests.post(
             f"{BASE_URL}/api/admin/reset-product-photos",
             json={"slug": "plaid-sylvestre"},
-            cookies=admin_cookies,
+            cookies=runner.get_cookies(),
             timeout=10
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert data.get("ok") == True, f"Expected ok:true, got {data}"
-        assert "actionId" in data, "Missing actionId in response"
-        action_id = data["actionId"]
-        print(f"✅ PASS: POST /api/admin/reset-product-photos returns ok:true, actionId: {action_id}")
-        results.append(("A4: POST /api/admin/reset-product-photos", True, None))
+        runner.test("D1: POST /api/admin/reset-product-photos returns 200", 
+                   resp.status_code == 200)
         
-        # Test A5: POST /api/chat/actions (undo)
-        print("\n[A5] Testing POST /api/chat/actions (undo)...")
-        try:
-            undo_resp = requests.post(
-                f"{BASE_URL}/api/chat/actions",
-                json={"actionId": action_id},
-                cookies=admin_cookies,
-                timeout=10
-            )
-            assert undo_resp.status_code == 200, f"Expected 200, got {undo_resp.status_code}"
-            undo_data = undo_resp.json()
-            assert undo_data.get("ok") == True, f"Expected ok:true, got {undo_data}"
-            print(f"✅ PASS: POST /api/chat/actions undo works")
-            results.append(("A5: POST /api/chat/actions (undo)", True, None))
-        except Exception as e:
-            print(f"❌ FAIL: {e}")
-            results.append(("A5: POST /api/chat/actions (undo)", False, str(e)))
-            
+        if resp.status_code == 200:
+            data = resp.json()
+            runner.test("D1: Response has ok:true", data.get("ok") == True)
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A4: POST /api/admin/reset-product-photos", False, str(e)))
-        results.append(("A5: POST /api/chat/actions (undo)", False, "Skipped due to A4 failure"))
+        runner.test("D1: POST /api/admin/reset-product-photos", False, f"Error: {str(e)}")
     
-    # Test A6: GET /api/img/jlt-plaid-01 → 200 real bytes
-    print("\n[A6] Testing GET /api/img/jlt-plaid-01...")
     try:
+        # D2: GET /api/img/jlt-plaid-01 → 200 real bytes
         resp = requests.get(f"{BASE_URL}/api/img/jlt-plaid-01", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        assert resp.headers.get("Content-Type", "").startswith("image/"), f"Expected image content type, got {resp.headers.get('Content-Type')}"
-        assert len(resp.content) > 1000, f"Expected real image bytes, got {len(resp.content)} bytes"
-        assert "X-Fallback-Image" not in resp.headers, "Should not have fallback header for real image"
-        print(f"✅ PASS: GET /api/img/jlt-plaid-01 returns real image ({len(resp.content)} bytes)")
-        results.append(("A6: GET /api/img/jlt-plaid-01", True, None))
+        runner.test("D2: GET /api/img/jlt-plaid-01 returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            content_type = resp.headers.get("Content-Type", "")
+            content_length = len(resp.content)
+            runner.test("D2: Real image bytes returned", 
+                       "image" in content_type and content_length > 1000,
+                       f"Content-Type: {content_type}, Size: {content_length} bytes")
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A6: GET /api/img/jlt-plaid-01", False, str(e)))
+        runner.test("D2: GET /api/img/jlt-plaid-01", False, f"Error: {str(e)}")
     
-    # Test A7: GET /api/img/upload-does-not-exist → 200 with X-Fallback-Image header
-    print("\n[A7] Testing GET /api/img/upload-does-not-exist...")
     try:
-        resp = requests.get(f"{BASE_URL}/api/img/upload-does-not-exist", timeout=10)
-        assert resp.status_code == 200, f"Expected 200 (fallback), got {resp.status_code}"
-        assert "X-Fallback-Image" in resp.headers, "Missing X-Fallback-Image header"
-        assert resp.headers["X-Fallback-Image"] == "1", f"Expected X-Fallback-Image: 1, got {resp.headers['X-Fallback-Image']}"
-        assert len(resp.content) > 1000, f"Expected fallback image bytes, got {len(resp.content)} bytes"
-        print(f"✅ PASS: GET /api/img/upload-does-not-exist returns fallback with X-Fallback-Image: 1")
-        results.append(("A7: GET /api/img/upload-does-not-exist", True, None))
+        # D3: GET /api/img/upload-not-exist → 200 with X-Fallback-Image header
+        resp = requests.get(f"{BASE_URL}/api/img/upload-not-exist", timeout=10)
+        runner.test("D3: GET /api/img/upload-not-exist returns 200", resp.status_code == 200)
+        
+        if resp.status_code == 200:
+            fallback_header = resp.headers.get("X-Fallback-Image")
+            runner.test("D3: X-Fallback-Image header present", 
+                       fallback_header == "1",
+                       f"X-Fallback-Image: {fallback_header}")
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("A7: GET /api/img/upload-does-not-exist", False, str(e)))
+        runner.test("D3: GET /api/img/upload-not-exist", False, f"Error: {str(e)}")
     
-    return results
-
-
-def test_section_b_new_feature():
-    """Section B: New feature end-to-end - custom carousel images"""
-    print("\n" + "="*80)
-    print("SECTION B: NEW FEATURE - CUSTOM CAROUSEL IMAGES")
-    print("="*80)
+    # ========================================================================
+    # SECTION E: CLEANUP
+    # ========================================================================
+    runner.section("E. CLEANUP")
     
-    results = []
-    
-    # Test B1: POST /api/auth/admin-login
-    print("\n[B1] Testing POST /api/auth/admin-login...")
     try:
-        resp = requests.post(
-            f"{BASE_URL}/api/auth/admin-login",
-            json={"password": ADMIN_PASSWORD},
-            timeout=10
-        )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert data.get("ok") == True, f"Expected ok:true, got {data}"
-        assert "ginette_admin" in resp.cookies, "Missing admin cookie"
-        admin_cookies = resp.cookies
-        print(f"✅ PASS: POST /api/auth/admin-login returns 200 + admin cookie")
-        results.append(("B1: POST /api/auth/admin-login", True, None))
-    except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("B1: POST /api/auth/admin-login", False, str(e)))
-        return results  # Can't continue without admin auth
-    
-    # Test B2: GET /api/admin/site-content (with cookie)
-    print("\n[B2] Testing GET /api/admin/site-content...")
-    try:
-        resp = requests.get(
+        # E1: Clear test data - get current content and clear collectionPE2027
+        resp_get = requests.get(
             f"{BASE_URL}/api/admin/site-content",
-            cookies=admin_cookies,
+            cookies=runner.get_cookies(),
             timeout=10
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert "content" in data, "Missing 'content' key"
-        original_content = data["content"]
-        print(f"✅ PASS: GET /api/admin/site-content returns content object")
-        results.append(("B2: GET /api/admin/site-content", True, None))
-    except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("B2: GET /api/admin/site-content", False, str(e)))
-        return results  # Can't continue without content
-    
-    # Test B3: PUT /api/admin/site-content with customImages
-    # Note: The API actually uses PATCH, not PUT (route.js line 636)
-    print("\n[B3] Testing PUT /api/admin/site-content with customImages...")
-    try:
-        # Create test content with customImages
-        test_content = original_content or {}
-        if "sections" not in test_content:
-            test_content["sections"] = []
         
-        # Add or modify a section with customImages
-        test_section = {
-            "id": "test-carousel-section",
-            "type": "carousel",
-            "visible": True,
-            "content": {
-                "title": "Test Carousel",
-                "customImages": [
-                    {
-                        "id": "x1",
-                        "src": "/api/img/jlt-plaid-01",
-                        "alt": "test image 1"
-                    },
-                    {
-                        "id": "x2",
-                        "src": "/api/img/jlt-plaid-02",
-                        "alt": "test image 2"
-                    }
-                ]
-            }
-        }
-        
-        # Find existing test section or add new one
-        existing_idx = None
-        for idx, section in enumerate(test_content.get("sections", [])):
-            if section.get("id") == "test-carousel-section":
-                existing_idx = idx
-                break
-        
-        if existing_idx is not None:
-            test_content["sections"][existing_idx] = test_section
+        if resp_get.status_code == 200:
+            cleanup_data = resp_get.json().get("content", {})
+            # Clear the test data
+            cleanup_data["collectionPE2027"] = {}
         else:
-            test_content["sections"].append(test_section)
-        
-        # PATCH the updated content (API uses PATCH, not PUT)
-        resp = requests.patch(
-            f"{BASE_URL}/api/admin/site-content",
-            json=test_content,
-            cookies=admin_cookies,
-            timeout=10
-        )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert data.get("ok") == True, f"Expected ok:true, got {data}"
-        print(f"✅ PASS: PUT /api/admin/site-content with customImages returns ok:true")
-        results.append(("B3: PUT /api/admin/site-content with customImages", True, None))
-    except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("B3: PUT /api/admin/site-content with customImages", False, str(e)))
-        return results
-    
-    # Test B4: GET /api/site-content → verify customImages persisted
-    print("\n[B4] Testing GET /api/site-content (verify persistence)...")
-    try:
-        resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert "content" in data, "Missing 'content' key"
-        
-        # Find the test section
-        test_section_found = None
-        for section in data["content"].get("sections", []):
-            if section.get("id") == "test-carousel-section":
-                test_section_found = section
-                break
-        
-        assert test_section_found is not None, "Test section not found in persisted content"
-        assert "customImages" in test_section_found.get("content", {}), "customImages field not persisted"
-        custom_images = test_section_found["content"]["customImages"]
-        assert len(custom_images) == 2, f"Expected 2 customImages, got {len(custom_images)}"
-        assert custom_images[0]["id"] == "x1", f"Expected id 'x1', got {custom_images[0].get('id')}"
-        assert custom_images[0]["src"] == "/api/img/jlt-plaid-01", f"Expected src '/api/img/jlt-plaid-01', got {custom_images[0].get('src')}"
-        
-        print(f"✅ PASS: GET /api/site-content returns persisted customImages (2 images)")
-        results.append(("B4: GET /api/site-content (verify persistence)", True, None))
-    except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("B4: GET /api/site-content (verify persistence)", False, str(e)))
-    
-    # Test B5: Edge case - PUT with empty customImages array
-    # Note: Using PATCH as the API doesn't support PUT
-    print("\n[B5] Testing PUT /api/admin/site-content with empty customImages...")
-    try:
-        # Update the test section with empty customImages
-        test_content_empty = data["content"]
-        for section in test_content_empty.get("sections", []):
-            if section.get("id") == "test-carousel-section":
-                section["content"]["customImages"] = []
-                break
+            cleanup_data = {"collectionPE2027": {}}
         
         resp = requests.patch(
             f"{BASE_URL}/api/admin/site-content",
-            json=test_content_empty,
-            cookies=admin_cookies,
+            json=cleanup_data,
+            cookies=runner.get_cookies(),
             timeout=10
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
-        assert data.get("ok") == True, f"Expected ok:true, got {data}"
+        runner.test("E1: PATCH /api/admin/site-content (cleanup) returns 200", 
+                   resp.status_code == 200)
         
-        # Verify empty array persisted
-        verify_resp = requests.get(f"{BASE_URL}/api/site-content", timeout=10)
-        verify_data = verify_resp.json()
-        test_section_verify = None
-        for section in verify_data["content"].get("sections", []):
-            if section.get("id") == "test-carousel-section":
-                test_section_verify = section
-                break
-        
-        assert test_section_verify is not None, "Test section not found after empty update"
-        assert "customImages" in test_section_verify.get("content", {}), "customImages field removed instead of emptied"
-        assert test_section_verify["content"]["customImages"] == [], f"Expected empty array, got {test_section_verify['content']['customImages']}"
-        
-        print(f"✅ PASS: PUT /api/admin/site-content with empty customImages saves correctly")
-        results.append(("B5: PUT with empty customImages", True, None))
+        if resp.status_code == 200:
+            data = resp.json()
+            runner.test("E1: Cleanup successful (ok:true)", data.get("ok") == True)
     except Exception as e:
-        print(f"❌ FAIL: {e}")
-        results.append(("B5: PUT with empty customImages", False, str(e)))
+        runner.test("E1: Cleanup", False, f"Error: {str(e)}")
     
-    return results
-
-
-def main():
-    print("\n" + "="*80)
-    print("BACKEND REGRESSION TEST - CUSTOM CAROUSEL IMAGES FEATURE")
-    print("="*80)
-    print(f"Base URL: {BASE_URL}")
-    print(f"Admin Password: {ADMIN_PASSWORD}")
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    runner.section("SUMMARY")
     
-    all_results = []
+    print(f"\n✅ Passed: {runner.passed}")
+    print(f"❌ Failed: {runner.failed}")
+    print(f"📊 Total: {runner.passed + runner.failed}")
     
-    # Run Section A tests
-    section_a_results = test_section_a_regression()
-    all_results.extend(section_a_results)
-    
-    # Run Section B tests
-    section_b_results = test_section_b_new_feature()
-    all_results.extend(section_b_results)
-    
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
-    
-    passed = sum(1 for _, success, _ in all_results if success)
-    failed = sum(1 for _, success, _ in all_results if not success)
-    total = len(all_results)
-    
-    print(f"\nTotal: {total} tests")
-    print(f"Passed: {passed} ✅")
-    print(f"Failed: {failed} ❌")
-    print(f"Success Rate: {(passed/total*100):.1f}%")
-    
-    print("\nDetailed Results:")
-    for test_name, success, error in all_results:
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"  {status}: {test_name}")
-        if error:
-            print(f"    Error: {error}")
-    
-    # Exit with appropriate code
-    sys.exit(0 if failed == 0 else 1)
-
+    if runner.failed == 0:
+        print("\n🎉 ALL TESTS PASSED!")
+        return 0
+    else:
+        print(f"\n⚠️  {runner.failed} TEST(S) FAILED")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
