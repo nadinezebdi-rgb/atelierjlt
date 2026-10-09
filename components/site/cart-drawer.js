@@ -155,9 +155,13 @@ export default function CartDrawer() {
                       <div className="border-t border-linen/60 pt-2 mt-2 flex justify-between font-display text-lg"><span>Total</span><span className="tabular-nums">{formatPrice(total)}</span></div>
                     </div>
 
-                    <button onClick={() => setStep('checkout')} className="w-full bg-ink text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition flex items-center justify-center gap-2">
+                    <Link
+                      href="/checkout"
+                      onClick={() => setOpen(false)}
+                      className="w-full bg-ink text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition flex items-center justify-center gap-2"
+                    >
                       Passer commande <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
-                    </button>
+                    </Link>
                     <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 text-center">Livraison offerte dès 150 € · Paiement sécurisé</div>
                   </footer>
                 )}
