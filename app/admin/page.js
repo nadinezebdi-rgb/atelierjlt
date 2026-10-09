@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatPrice } from '@/lib/utils'
-import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown, Sparkles } from 'lucide-react'
 import { HOMEPAGE_SECTION_DEFAULTS, mergeHomepageSections, BANNER_TEMPLATES } from '@/lib/homepage-sections'
 import HeroComposer from '@/components/admin/hero-composer'
 import CarouselImageEditor from '@/components/admin/carousel-image-editor'
@@ -1264,6 +1264,15 @@ function TabContent({ onDirtyChange }) {
           <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
         </div>
         <div className="flex gap-2 items-center">
+          <a
+            href="/?edit=1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-ink text-ivory px-4 py-3 text-xs flex gap-2 items-center hover:bg-emerald transition"
+            title="Édition visuelle directement sur la page (idéal iPad)"
+          >
+            <Sparkles className="h-4 w-4" strokeWidth={1.5} /> Édition visuelle
+          </a>
           <a href="/" target="_blank" rel="noopener noreferrer" className="border border-ink/20 px-4 py-3 text-xs flex gap-2 items-center hover:border-ink"><Eye className="h-4 w-4" /> Voir la page publiée</a>
           <button onClick={save} disabled={saving || !dirty} className="bg-emerald text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.18em] hover:bg-emeraldDark transition flex items-center gap-2 disabled:opacity-50">
             <Save className="h-4 w-4" strokeWidth={1.5} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
