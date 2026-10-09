@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatPrice } from '@/lib/utils'
@@ -171,9 +171,30 @@ function TabDashboard() {
 function TabProducts() {
   const [products, setProducts] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [search, setSearch] = useState('')
+  const [catFilter, setCatFilter] = useState('all')
 
   const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
   useEffect(() => { load() }, [])
+
+  // Produits filtrés par recherche + catégorie — permet à la fille de trouver
+  // instantanément « Plaid Sylvestre » sans faire défiler toute la liste.
+  const filtered = useMemo(() => {
+    if (!products) return []
+    const q = search.trim().toLowerCase()
+    return products.filter((p) => {
+      if (catFilter !== 'all' && p.category !== catFilter) return false
+      if (!q) return true
+      const hay = `${p.name} ${p.slug} ${p.category}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [products, search, catFilter])
+
+  const cats = useMemo(() => {
+    if (!products) return []
+    const set = new Set(products.map((p) => p.category).filter(Boolean))
+    return Array.from(set).sort()
+  }, [products])
 
   const save = async (p) => {
     const r = await fetch('/api/admin/products?slug=' + p.slug, {
@@ -227,18 +248,76 @@ function TabProducts() {
 
   if (!products) return <div className="text-ink/50">Chargement…</div>
 
+  const CAT_LABELS = { racine: 'Racine', empreinte: 'Empreinte', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+
   return (
     <div>
       {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
       <MissingMediaRecovery />
-      <div className="flex items-center justify-between mb-6 mt-8">
-        <h2 className="font-display text-3xl">Produits ({products.length})</h2>
+
+      {/* En-tête + action principale */}
+      <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">
+        <div>
+          <h2 className="font-display text-3xl">Produits <span className="text-ink/40 font-normal text-xl">({filtered.length} / {products.length})</span></h2>
+          <p className="text-xs text-ink/60 mt-1">Toute la boutique est ici. Cherchez un produit par son nom pour le trouver vite.</p>
+        </div>
         <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
           <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
         </button>
       </div>
+
+      {/* Barre de recherche + filtres de catégorie */}
+      <div className="bg-cream/50 border border-linen p-3 md:p-4 mb-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1">
+          <Search className="h-4 w-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un produit (ex. plaid sylvestre, coussin, panier…)"
+            className="w-full bg-ivory border border-ink/15 pl-10 pr-10 py-2.5 text-sm rounded-sm focus:outline-none focus:border-emerald"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center text-ink/50 hover:text-ink"
+              aria-label="Effacer la recherche"
+              type="button"
+            >
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1 p-1 bg-ivory border border-ink/15 rounded-sm overflow-x-auto">
+          {['all', ...cats].map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCatFilter(c)}
+              className={`px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] rounded-sm whitespace-nowrap transition ${
+                catFilter === c ? 'bg-ink text-ivory' : 'text-ink/60 hover:text-ink'
+              }`}
+            >
+              {c === 'all' ? 'Toutes' : CAT_LABELS[c] || c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Résultat vide */}
+      {filtered.length === 0 && (
+        <div className="border border-dashed border-ink/20 bg-cream/40 p-8 text-center">
+          <p className="text-sm text-ink/60">Aucun produit ne correspond à votre recherche.</p>
+          {search && (
+            <button onClick={() => { setSearch(''); setCatFilter('all') }} className="mt-3 text-[10px] uppercase tracking-[0.22em] text-emerald hover:underline">
+              Effacer les filtres
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {products.map((p) => (
+        {filtered.map((p) => (
           <div key={p.slug} className="border border-linen bg-ivory">
             <div className="flex items-center gap-4 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2348,6 +2427,46 @@ function HomeSectionsEditor({ sections, onChange }) {
   const [expandedId, setExpandedId] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
+  // Vocabulaire humain par type de section — pour que la nouvelle administratrice
+  // comprenne immédiatement ce que fait chaque bannière, sans jargon technique.
+  const SECTION_INFO = {
+    'editorial-banner': {
+      niceName: 'Bannière éditoriale',
+      icon: '🖼️',
+      explain: 'Grande image plein-écran avec un titre et un bouton. Idéal pour mettre en avant un produit, une collection ou une actualité.',
+    },
+    'product-carousel': {
+      niceName: 'Carrousel de produits',
+      icon: '🛍️',
+      explain: 'Rangée de produits qui défile — nouveautés, meilleures ventes, favoris… ou vos propres photos si vous préférez.',
+    },
+    'category-tiles': {
+      niceName: 'Grille des collections',
+      icon: '🗂️',
+      explain: 'Les deux grandes vignettes « Racine » et « Empreinte » cliquables.',
+    },
+    'collections-themes': {
+      niceName: 'Détail des collections',
+      icon: '✨',
+      explain: 'Présentation plus détaillée de chaque collection avec sous-liens (plaids, coussins…).',
+    },
+    'lifestyle': {
+      niceName: 'Scène de vie',
+      icon: '🏡',
+      explain: 'Bloc d\'inspiration : une grande photo d\'ambiance avec un texte.',
+    },
+    'iconic-plaid': {
+      niceName: 'Pièce iconique',
+      icon: '⭐',
+      explain: 'Mise en avant d\'une pièce phare (actuellement : le Plaid Sylvestre).',
+    },
+    'newsletter': {
+      niceName: 'Inscription newsletter',
+      icon: '✉️',
+      explain: 'Le bloc en bas de page pour que les visiteuses laissent leur email.',
+    },
+  }
+
   if (!Array.isArray(sections)) return null
 
   const toggleEnabled = (i) => {
@@ -2428,12 +2547,14 @@ function HomeSectionsEditor({ sections, onChange }) {
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald flex items-center gap-2">
-            <Layers className="h-3.5 w-3.5" strokeWidth={1.5} /> Sections page d’accueil
+            <Layers className="h-3.5 w-3.5" strokeWidth={1.5} /> Sections de la page d'accueil
           </h3>
-          <p className="text-xs text-ink/60 mt-2 max-w-2xl">
-            Réordonnez les bannières comme vous voulez : <strong>glissez-déposez la poignée</strong> à gauche,
-            ou utilisez les <strong>flèches ↑ ↓</strong>. Cliquez sur une section pour modifier son contenu.
-            Le Hero reste toujours visible (édité plus haut).
+          <p className="text-xs text-ink/70 mt-2 max-w-2xl leading-relaxed">
+            Chaque ligne ci-dessous est <strong>un bloc visible sur la page d'accueil</strong>.
+            L'icône à gauche aide à reconnaître ce que c'est : 🖼️ grande image, 🛍️ carrousel de produits, 🗂️ grille de collections, ✉️ newsletter…
+            <br/><br/>
+            <strong>Pour la nouvelle administratrice :</strong> glissez la poignée ou utilisez ↑↓ pour réordonner,
+            cliquez sur une ligne pour modifier son contenu, décochez « Visible » pour la masquer temporairement sans la supprimer.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -2524,16 +2645,17 @@ function HomeSectionsEditor({ sections, onChange }) {
                   onClick={() => setExpandedId(isExpanded ? null : s.id)}
                   className="flex-1 min-w-0 text-left group"
                 >
-                  <div className="font-display text-base leading-tight truncate group-hover:text-emerald transition">
-                    {s.label}
+                  <div className="font-display text-base leading-tight truncate group-hover:text-emerald transition flex items-center gap-2">
+                    <span className="text-base leading-none">{SECTION_INFO[s.type]?.icon || '📄'}</span>
+                    <span className="truncate">{s.label}</span>
                     {s.custom && (
-                      <span className="ml-2 text-[9px] uppercase tracking-[0.24em] bg-terracotta/15 text-terracotta px-2 py-0.5 align-middle">
+                      <span className="ml-1 text-[9px] uppercase tracking-[0.24em] bg-terracotta/15 text-terracotta px-2 py-0.5 align-middle">
                         Perso
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-ink/45 mt-0.5">
-                    {s.type} {s.type === 'editorial-banner' || s.type === 'product-carousel' ? '· clic pour modifier' : ''}
+                  <div className="text-xs text-ink/55 mt-1 leading-snug line-clamp-1">
+                    {SECTION_INFO[s.type]?.explain || s.type}
                   </div>
                 </button>
 
