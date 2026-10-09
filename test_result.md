@@ -3298,3 +3298,58 @@ agent_communication:
         
         Ready for deployment with full confidence.
 
+
+
+# =====================================================================
+# JOB 2026-06-26 (suite) : Visual Edit Mode — Phase A complète
+# =====================================================================
+
+  - agent: "main"
+    date: "2026-06-26"
+    message: |
+      🎨 EXTENSION DU MODE ÉDITION VISUELLE iPad
+
+      ## Nouveaux éléments éditables depuis `?edit=1` :
+      
+      ### Page d'accueil (/?edit=1)
+      - ✅ **Hero** (grande image d'accueil) — tap sur le hero pour éditer :
+        - Image/vidéo d'arrière-plan (avec upload iPad)
+        - Petit texte (sur-titre)
+        - Grand titre (saut de ligne autorisé)
+        - Sous-titre, Signature
+        - Bouton principal (texte + lien)
+        - Bouton secondaire (texte + lien)
+        - Position du texte (5 positions)
+        - Intensité du voile sombre (slider 0-100%)
+        - Toggles afficher/masquer pour chaque élément
+      - ✅ **Newsletter** (bloc du bas) — tap pour éditer :
+        - Petit texte, Grand titre, Description
+        - Placeholder email, Label du bouton
+      
+      ### Nouvelles pages avec mode édition
+      - ✅ `/a-propos?edit=1` — édite tous les textes :
+        - Hero image + alt
+        - 4 paragraphes + citation
+        - Signature finale
+        - CTA complet (titre, description, 2 boutons)
+      - ✅ `/collection/printemps-ete-2026-2027?edit=1` — édite :
+        - Hero + ambiance (image + textes)
+        - Palette de couleurs (ajout/suppression/renommage/hex)
+        - Matières (ajout/suppression)
+      
+      ## Nouveaux composants
+      - `/app/components/edit/hero-shell.js` : wrapper interactif pour le hero
+      - `/app/components/edit/page-edit-shell.js` : édition visuelle réutilisable
+        pour n'importe quelle page secondaire (toolbar + panel + save)
+      
+      ## Fix critique
+      - 🐛 **Save bug corrigé** : Le EditModeProvider envoyait le body wrappé
+        dans `{content: ...}` ce qui causait un double-nesting dans MongoDB
+        (`content.content.hero`). Maintenant envoyé à plat → marche.
+      
+      ## Testing pending
+      Backend n'a pas changé. Pas de besoin de re-tester.
+      Frontend : testé manuellement via screenshots (admin login + edit mode
+      ouvrent correctement sur les 3 pages, panels affichent les champs,
+      sauvegarde API vérifiée via curl).
+

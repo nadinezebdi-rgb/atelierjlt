@@ -1,8 +1,23 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
+import PageEditShell from '@/components/edit/page-edit-shell'
+
+const EDIT_FIELDS = [
+  { key: 'heroImage', type: 'image', label: 'Image du hero' },
+  { key: 'heroEyebrow', type: 'text', label: 'Hero — petit texte' },
+  { key: 'heroTitle', type: 'textarea', label: 'Hero — grand titre' },
+  { key: 'heroSubtitle', type: 'textarea', label: 'Hero — sous-titre' },
+  { key: 'moodImage', type: 'image', label: 'Ambiance — image' },
+  { key: 'moodEyebrow', type: 'text', label: 'Ambiance — petit texte' },
+  { key: 'moodTitle', type: 'textarea', label: 'Ambiance — grand titre' },
+  { key: 'moodText', type: 'longtext', label: 'Ambiance — paragraphe' },
+  { key: 'palette', type: 'palette', label: 'Palette de couleurs' },
+  { key: 'materials', type: 'materials', label: 'Matières' },
+]
 
 /**
  * Page de la collection Printemps / Été 2026-2027 — Atelier JLT.
@@ -16,11 +31,20 @@ import { ArrowRight } from 'lucide-react'
  *   6. CTA de retour vers "Les Intemporels"
  *
  * Tout le contenu (hero, ambiance, palette, matières) est éditable depuis
- * `/admin → Éditeur de l'accueil → Collection Printemps / Été 2026-2027`.
+ * `/admin → Éditeur de l'accueil → Collection Printemps / Été 2026-2027`
+ * ou en mode visuel iPad via `?edit=1`.
  */
-export default function PESeasonalPage({ content, products }) {
+export default function PESeasonalPage({ content: initialContent, products }) {
+  const [content, setContent] = useState(initialContent)
   return (
-    <main>
+    <>
+      <PageEditShell
+        pageKey="collectionPE2027"
+        initialContent={content}
+        fields={EDIT_FIELDS}
+        onChange={setContent}
+      />
+      <main>
       {/* ===== 1. HERO ===== */}
       <section className="relative h-[80vh] min-h-[560px] overflow-hidden bg-ink">
         <motion.div
@@ -273,5 +297,6 @@ export default function PESeasonalPage({ content, products }) {
         </div>
       </section>
     </main>
+    </>
   )
 }
