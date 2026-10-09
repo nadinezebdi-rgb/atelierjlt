@@ -40,6 +40,11 @@ import {
   Check,
   Sparkles,
   Loader2,
+  Plus,
+  Images,
+  Film,
+  LayoutGrid,
+  ShoppingBag,
 } from 'lucide-react'
 import SectionEditorPanel from './section-editor-panel'
 
@@ -73,6 +78,7 @@ export default function EditModeProvider({
   const [sections, setSections] = useState(() => normalizeSections(initialSections))
   const [hero, setHero] = useState(() => initialHero || {})
   const [dirty, setDirty] = useState(false)
+  const [structuralChange, setStructuralChange] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState(null) // 'ok' | 'error' | null
   const [selectedId, setSelectedId] = useState(null)
@@ -136,6 +142,63 @@ export default function EditModeProvider({
     setDirty(true)
   }, [])
 
+  /* ---- Ajout de section personnalisée (vitrine multi-carrousels) ---- */
+
+  const addSection = useCallback((type, overrides = {}) => {
+    const unique = Math.random().toString(36).slice(2, 8)
+    const id = overrides.id || `custom-${type}-${unique}`
+    const presets = {
+      'product-carousel': {
+        label: 'Nouveau carrousel',
+        content: {
+          eyebrow: 'La sélection',
+          title: 'Vitrine personnalisée',
+          description: '',
+          viewAllHref: '/collections',
+          filter: 'all',
+          limit: 8,
+          hideBadges: false,
+          pickedProducts: [],
+        },
+      },
+      'editorial-banner': {
+        label: 'Nouvelle bannière',
+        content: {
+          eyebrow: '',
+          title: 'Nouveau titre',
+          image: '',
+          ctaLabel: '',
+          ctaHref: '',
+          align: 'left',
+          overlay: 'dark',
+          height: 'md',
+        },
+      },
+    }
+    const preset = presets[type] || presets['editorial-banner']
+    const newSection = {
+      id,
+      type,
+      custom: true,
+      enabled: true,
+      label: preset.label,
+      ...overrides,
+      content: { ...preset.content, ...(overrides.content || {}) },
+    }
+    setSections((prev) => [...prev, newSection])
+    setSelectedId(id)
+    setDirty(true)
+    setStructuralChange(true)
+    return id
+  }, [])
+
+  const removeSection = useCallback((id) => {
+    setSections((prev) => prev.filter((s) => s.id !== id))
+    setSelectedId((cur) => (cur === id ? null : cur))
+    setDirty(true)
+    setStructuralChange(true)
+  }, [])
+
   /* ---- Sauvegarde ---- */
 
   const save = useCallback(async () => {
@@ -162,14 +225,21 @@ export default function EditModeProvider({
       if (!r.ok) throw new Error('save failed')
       setDirty(false)
       setSaveStatus('ok')
-      setTimeout(() => setSaveStatus(null), 2500)
+      // Recharge seulement si la structure a changé (ajout/suppression de section)
+      // pour que la nouvelle section apparaisse à l'écran. Les éditions "normales"
+      // préservent le scroll.
+      if (structuralChange) {
+        setTimeout(() => window.location.reload(), 1000)
+      } else {
+        setTimeout(() => setSaveStatus(null), 2500)
+      }
     } catch (e) {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus(null), 4000)
     } finally {
       setSaving(false)
     }
-  }, [sections, hero])
+  }, [sections, hero, structuralChange])
 
   /* ---- Quitter l'édition : prévenir si non enregistré ---- */
 
@@ -211,10 +281,12 @@ export default function EditModeProvider({
       updateSection,
       toggleSection,
       reorderSections,
+      addSection,
+      removeSection,
       reorderMode,
       dirty,
     }),
-    [sections, hero, selectedId, updateSection, toggleSection, reorderSections, reorderMode, dirty]
+    [sections, hero, selectedId, updateSection, toggleSection, reorderSections, addSection, removeSection, reorderMode, dirty]
   )
 
   return (
@@ -230,6 +302,7 @@ export default function EditModeProvider({
         reorderMode={reorderMode}
         setReorderMode={setReorderMode}
         onOpenHelp={() => setHelpOpen(true)}
+        onAddSection={addSection}
       />
       {reorderMode && (
         <ReorderOverlay
@@ -246,6 +319,7 @@ export default function EditModeProvider({
           onClose={() => setSelectedId(null)}
           onChange={(patch) => updateSection(selected.id, patch)}
           onToggle={() => toggleSection(selected.id)}
+          onRemove={selected.custom ? () => removeSection(selected.id) : null}
         />
       )}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
@@ -255,7 +329,8 @@ export default function EditModeProvider({
 
 /* --------------------------- Barre d'outils sticky ------------------------ */
 
-function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, setReorderMode, onOpenHelp }) {
+function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, setReorderMode, onOpenHelp, onAddSection }) {
+  const [addOpen, setAddOpen] = useState(false)
   return (
     <div
       className="fixed top-0 inset-x-0 z-[200] bg-ink text-ivory shadow-lg"
@@ -267,6 +342,14 @@ function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, s
           <span className="text-[11px] md:text-xs uppercase tracking-[0.28em] text-ivory/90 truncate">Mode édition</span>
         </div>
         <div className="flex-1" />
+        <button
+          onClick={() => setAddOpen(true)}
+          className="h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 bg-ivory text-ink hover:bg-emerald hover:text-ivory"
+          aria-label="Ajouter une section"
+        >
+          <Plus className="h-4 w-4" strokeWidth={1.8} />
+          <span className="hidden sm:inline">Ajouter</span>
+        </button>
         <button
           onClick={() => setReorderMode((v) => !v)}
           className={`h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 ${
@@ -319,7 +402,92 @@ function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, s
           <div className="h-full bg-emerald w-1/3 animate-pulse" />
         </div>
       )}
+      {addOpen && (
+        <AddSectionModal
+          onClose={() => setAddOpen(false)}
+          onPick={(type) => { onAddSection(type); setAddOpen(false) }}
+        />
+      )}
     </div>
+  )
+}
+
+/* ---- Modal "Ajouter une section" — choix du type (carrousel, bannière…) ---- */
+
+function AddSectionModal({ onClose, onPick }) {
+  if (typeof document === 'undefined') return null
+  const options = [
+    {
+      type: 'product-carousel',
+      icon: ShoppingBag,
+      title: 'Carrousel produits',
+      description: 'Vitrine de vente avec prix et clic vers la fiche. Idéal pour mettre en avant une sélection.',
+      badge: 'Vente',
+    },
+    {
+      type: 'editorial-banner',
+      icon: Images,
+      title: 'Bannière éditoriale',
+      description: 'Grande image avec titre, texte et un bouton. Pour les ambiances, le storytelling.',
+      badge: 'Image',
+    },
+  ]
+  return createPortal(
+    <div className="fixed inset-0 z-[260] flex items-stretch md:items-center justify-center bg-ink/60 p-0 md:p-6">
+      <div
+        className="bg-ivory w-full md:max-w-xl md:rounded-sm shadow-2xl flex flex-col"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          maxHeight: '100dvh',
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-linen">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.28em] text-emerald mb-1">Nouvelle section</div>
+            <div className="font-display text-xl">Que voulez-vous ajouter ?</div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-11 w-11 flex items-center justify-center border border-ink/15 hover:border-ink rounded-sm"
+            aria-label="Fermer"
+          >
+            <X className="h-4 w-4" strokeWidth={1.8} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3 overflow-y-auto">
+          {options.map((o) => (
+            <button
+              key={o.type}
+              onClick={() => onPick(o.type)}
+              className="w-full text-left flex items-center gap-4 p-4 border border-linen hover:border-emerald hover:bg-cream/30 transition rounded-sm"
+            >
+              <div className="h-12 w-12 flex-none flex items-center justify-center bg-ink text-ivory rounded-sm">
+                <o.icon className="h-5 w-5" strokeWidth={1.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-display text-lg">{o.title}</span>
+                  {o.badge && (
+                    <span className="text-[9px] uppercase tracking-[0.22em] bg-emerald/15 text-emerald px-2 py-0.5 rounded-full">
+                      {o.badge}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-ink/60 mt-1 leading-relaxed">{o.description}</div>
+              </div>
+              <Plus className="h-5 w-5 text-ink/40 flex-none" strokeWidth={1.5} />
+            </button>
+          ))}
+        </div>
+        <div className="px-5 py-4 border-t border-linen bg-ivory">
+          <p className="text-[10px] text-ink/50 uppercase tracking-[0.22em] text-center">
+            La section apparaîtra en bas de la page. Vous pourrez ensuite la réorganiser.
+          </p>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 

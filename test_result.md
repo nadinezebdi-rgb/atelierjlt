@@ -3353,3 +3353,42 @@ agent_communication:
       ouvrent correctement sur les 3 pages, panels affichent les champs,
       sauvegarde API vérifiée via curl).
 
+
+
+# =====================================================================
+# JOB 2026-06-26 (suite) : Vitrine Multi-Carrousels
+# =====================================================================
+
+  - agent: "main"
+    date: "2026-06-26"
+    message: |
+      🛍️ VITRINE MULTI-CARROUSELS SUR L'ACCUEIL
+      
+      Possibilité d'ajouter plusieurs carrousels thématiques sur la page d'accueil
+      depuis le mode édition visuelle iPad.
+      
+      ## Nouveautés
+      - **Bouton "+ Ajouter"** dans la barre d'outils du mode édition
+      - **Modal "Nouvelle section"** avec 2 types :
+        - Carrousel produits (vitrine de vente)
+        - Bannière éditoriale (image + texte)
+      - **Bouton "Supprimer cette section"** dans le panneau d'édition
+        (visible uniquement pour les sections personnalisées, pas les défauts)
+      - **Rechargement intelligent** : après sauvegarde, la page se recharge
+        automatiquement SI la structure a changé (ajout/suppression). Pour
+        les éditions normales (titres, images), aucun rechargement — on
+        préserve le scroll.
+      
+      ## Architecture
+      - Nouvelles sections stockées avec `custom: true` dans `content.sections`
+      - `mergeHomepageSections()` conserve toute section custom quel que soit
+        son type (plus limitée à editorial-banner)
+      - Chaque section custom a un id unique `custom-{type}-{random}`
+      
+      ## Testé end-to-end
+      - Ajout d'un carrousel personnalisé via l'API avec picked products
+      - Public page affiche: "COUPS DE CŒUR / Mes favoris du moment / 3 produits
+        (Macramé Mural Grand, Suspension Cocon, Tapis Sillon) avec prix et
+        boutons Ajouter au panier"
+      - Nettoyage après test : section custom retirée pour laisser la page propre
+

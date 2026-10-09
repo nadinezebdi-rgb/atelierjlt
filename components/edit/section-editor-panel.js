@@ -21,7 +21,7 @@ const INPUT_CLS =
   'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald transition rounded-sm'
 const LABEL_CLS = 'block text-[10px] uppercase tracking-[0.26em] text-ink/70 mb-2'
 
-export default function SectionEditorPanel({ section, onClose, onChange, onToggle }) {
+export default function SectionEditorPanel({ section, onClose, onChange, onToggle, onRemove }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     setMounted(true)
@@ -315,6 +315,19 @@ export default function SectionEditorPanel({ section, onClose, onChange, onToggl
 
         {/* Footer actions */}
         <div className="mt-auto px-5 py-4 border-t border-linen bg-ivory">
+          {onRemove && (
+            <button
+              onClick={() => {
+                if (confirm('Supprimer cette section définitivement ?')) {
+                  onRemove()
+                }
+              }}
+              className="w-full h-11 mb-3 border border-brique/50 text-brique text-[11px] uppercase tracking-[0.22em] hover:bg-brique hover:text-ivory transition rounded-sm flex items-center justify-center gap-2"
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+              Supprimer cette section
+            </button>
+          )}
           <button
             onClick={onClose}
             className="w-full h-12 bg-ink text-ivory text-[11px] uppercase tracking-[0.28em] hover:bg-emerald transition rounded-sm"
