@@ -19,7 +19,7 @@ import { toast } from 'sonner'
  *  - fallback : liste PRODUCTS pré-importée (optionnelle)
  *  - filter   : (p) => bool  filtre client (nouveautés / featured)
  */
-export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint = '/api/products', filter, limit = 8 }) {
+export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false }) {
   const [products, setProducts] = useState([])
   const scrollRef = useRef(null)
   const { add } = useCart()
@@ -36,6 +36,16 @@ export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint 
         else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
         else if (filter === 'intemporels') list = list.filter((p) => p.category === 'intemporels')
         else if (filter === 'pe-2026-2027') list = list.filter((p) => p.category === 'pe-2026-2027')
+        else if (filter === 'classiques') {
+          // Les classiques : plaids, coussins, paniers, tapis, chemins & sets de table.
+          // Exclut macramés muraux et suspensions (qui restent dans les Intemporels mais pas dans ce carrousel).
+          const prefixes = ['plaid-', 'coussin-', 'panier-', 'chemin-de-table-', 'tapis-', 'set-de-table-']
+          list = list.filter(
+            (p) =>
+              p.category === 'intemporels' &&
+              prefixes.some((pref) => (p.slug || '').startsWith(pref))
+          )
+        }
         setProducts(list.slice(0, limit))
       })
       .catch(() => {})
@@ -54,13 +64,43 @@ export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint 
     else toast.error(r.error || 'Erreur')
   }
 
-  if (!products.length) return null
+  if (!products.length) {
+    // Si l'admin a configuré un titre ou une description, on affiche quand même
+    // l'en-tête — ça évite que la section disparaisse totalement en cas de
+    // rechargement partiel ou de filtre temporairement vide.
+    if (!title && !eyebrow && !description) return null
+    return (
+      <section className="py-16 md:py-24 bg-ivory">
+        <div className="container">
+          <div className="max-w-2xl">
+            {eyebrow && (
+              <span className="block text-[10px] uppercase tracking-[0.42em] text-emerald mb-3">{eyebrow}</span>
+            )}
+            {title && (
+              <h2
+                className="font-display text-3xl md:text-5xl leading-[1.05] text-balance"
+                style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
+              >
+                {title}
+              </h2>
+            )}
+            {description && (
+              <p className="mt-5 md:mt-6 text-ink/75 text-[15px] md:text-base leading-[1.75] max-w-xl">
+                {description}
+              </p>
+            )}
+            <p className="mt-8 text-sm text-ink/50 italic">Les pièces arrivent bientôt.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-16 md:py-24 bg-ivory">
       <div className="container">
         <div className="flex items-end justify-between mb-10 md:mb-14 gap-4">
-          <div>
+          <div className="max-w-2xl">
             {eyebrow && (
               <span className="block text-[10px] uppercase tracking-[0.42em] text-emerald mb-3">{eyebrow}</span>
             )}
@@ -70,6 +110,11 @@ export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint 
             >
               {title}
             </h2>
+            {description && (
+              <p className="mt-5 md:mt-6 text-ink/75 text-[15px] md:text-base leading-[1.75] max-w-xl">
+                {description}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => scroll('prev')} aria-label="Précédent" className="hidden md:inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition">
@@ -108,10 +153,10 @@ export default function ProductCarousel({ eyebrow, title, viewAllHref, endpoint 
                     alt={p.name}
                     className="w-full h-full object-cover transition-transform duration-[900ms] group-hover:scale-[1.03]"
                   />
-                  {p.isNew && (
+                  {!hideBadges && p.isNew && (
                     <span className="absolute top-3 left-3 bg-ivory text-ink text-[9px] uppercase tracking-[0.3em] px-2 py-1">Nouveau</span>
                   )}
-                  {p.isLimited && (
+                  {!hideBadges && p.isLimited && (
                     <span className="absolute top-3 right-3 bg-brique text-ivory text-[9px] uppercase tracking-[0.3em] px-2 py-1">Édition</span>
                   )}
                 </div>

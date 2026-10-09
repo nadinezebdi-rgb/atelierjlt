@@ -14,6 +14,7 @@ import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import EditModeProvider from '@/components/edit/edit-mode-provider'
 import SectionShell from '@/components/edit/section-shell'
+import HeroShell from '@/components/edit/hero-shell'
 
 // Toujours frais : les changements admin apparaissent immédiatement
 export const dynamic = 'force-dynamic'
@@ -125,15 +126,26 @@ function renderSection(s) {
           key={s.id}
           eyebrow={c.eyebrow}
           title={c.title}
+          description={c.description}
           viewAllHref={c.viewAllHref}
           filter={c.filter}
           limit={Number(c.limit) || 8}
+          hideBadges={c.hideBadges === true}
         />
       )
     case 'collections-themes':
       return <CollectionsThemes key={s.id} />
     case 'newsletter':
-      return <Newsletter key={s.id} />
+      return (
+        <Newsletter
+          key={s.id}
+          eyebrow={c.eyebrow}
+          title={c.title}
+          description={c.description}
+          placeholder={c.placeholder}
+          buttonLabel={c.buttonLabel}
+        />
+      )
     default:
       return null
   }
@@ -166,7 +178,13 @@ async function App({ searchParams }) {
       <Header />
       <main>
         {/* HERO — carrousel si plusieurs compositions, sinon rendu unique */}
-        <HeroCarousel slides={slides} intervalMs={rotationInterval} />
+        {editMode ? (
+          <HeroShell>
+            <HeroCarousel slides={slides} intervalMs={rotationInterval} />
+          </HeroShell>
+        ) : (
+          <HeroCarousel slides={slides} intervalMs={rotationInterval} />
+        )}
 
         {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
         {sections.map((s) => {

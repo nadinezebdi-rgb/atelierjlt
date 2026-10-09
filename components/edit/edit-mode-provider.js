@@ -71,6 +71,7 @@ export default function EditModeProvider({
   children,
 }) {
   const [sections, setSections] = useState(() => normalizeSections(initialSections))
+  const [hero, setHero] = useState(() => initialHero || {})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState(null) // 'ok' | 'error' | null
@@ -78,11 +79,33 @@ export default function EditModeProvider({
   const [reorderMode, setReorderMode] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
 
-  const selected = sections.find((s) => s.id === selectedId) || null
+  // Virtual hero section (special id = __hero__) — permet d'utiliser le même panneau
+  const heroVirtualSection = useMemo(
+    () => ({
+      id: '__hero__',
+      type: 'hero',
+      label: 'Hero — image d\u2019accueil',
+      enabled: true,
+      content: hero || {},
+    }),
+    [hero]
+  )
+
+  const selected = selectedId === '__hero__'
+    ? heroVirtualSection
+    : (sections.find((s) => s.id === selectedId) || null)
 
   /* ---- Update helpers ---- */
 
   const updateSection = useCallback((id, patch) => {
+    if (id === '__hero__') {
+      setHero((prev) => ({
+        ...prev,
+        ...(patch.content ? patch.content : patch),
+      }))
+      setDirty(true)
+      return
+    }
     setSections((prev) =>
       prev.map((s) =>
         s.id === id
@@ -98,6 +121,7 @@ export default function EditModeProvider({
   }, [])
 
   const toggleSection = useCallback((id) => {
+    if (id === '__hero__') return // Hero ne peut pas être masqué
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)))
     setDirty(true)
   }, [])
@@ -125,12 +149,15 @@ export default function EditModeProvider({
       const nextContent = {
         ...(current?.content || {}),
         sections,
+        hero,
       }
+      // IMPORTANT : le handler PATCH enregistre le body COMME content directement,
+      // donc on envoie le contenu à plat (sans wrapper { content: ... }).
       const r = await fetch('/api/admin/site-content', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: nextContent }),
+        body: JSON.stringify(nextContent),
       })
       if (!r.ok) throw new Error('save failed')
       setDirty(false)
@@ -142,7 +169,7 @@ export default function EditModeProvider({
     } finally {
       setSaving(false)
     }
-  }, [sections])
+  }, [sections, hero])
 
   /* ---- Quitter l'édition : prévenir si non enregistré ---- */
 
@@ -178,6 +205,7 @@ export default function EditModeProvider({
     () => ({
       editMode: true,
       sections,
+      hero,
       selectedId,
       setSelectedId,
       updateSection,
@@ -186,7 +214,7 @@ export default function EditModeProvider({
       reorderMode,
       dirty,
     }),
-    [sections, selectedId, updateSection, toggleSection, reorderSections, reorderMode, dirty]
+    [sections, hero, selectedId, updateSection, toggleSection, reorderSections, reorderMode, dirty]
   )
 
   return (
