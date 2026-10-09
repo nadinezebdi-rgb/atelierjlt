@@ -3004,8 +3004,30 @@ function SectionContentEditor({ type, content, onChange }) {
             <option value="new">Nouveautés</option>
             <option value="bestsellers">Meilleures ventes</option>
             <option value="limited">Éditions limitées</option>
+            <option value="intemporels">Les Intemporels</option>
+            <option value="pe-2026-2027">Printemps/Été 2026-2027</option>
             <option value="all">Tous les produits</option>
           </select>
+        </Field>
+        <Field label="Description (facultatif — paragraphe sous le titre)">
+          <textarea
+            value={content.description || ''}
+            onChange={(e) => onChange('description', e.target.value)}
+            rows={3}
+            placeholder="Un paragraphe élégant qui s'affiche sous le titre."
+            className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink text-sm resize-none"
+          />
+        </Field>
+        <Field label="Masquer les badges « Nouveau » / « Édition »">
+          <label className="flex items-center gap-2 py-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={content.hideBadges === true}
+              onChange={(e) => onChange('hideBadges', e.target.checked)}
+              className="h-4 w-4 accent-emerald"
+            />
+            <span className="text-sm text-ink/70">Oui — pièces classiques, pas de badge</span>
+          </label>
         </Field>
         <Field label="Lien &laquo; voir tout &raquo;">
           <input

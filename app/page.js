@@ -125,9 +125,11 @@ function renderSection(s) {
           key={s.id}
           eyebrow={c.eyebrow}
           title={c.title}
+          description={c.description}
           viewAllHref={c.viewAllHref}
           filter={c.filter}
           limit={Number(c.limit) || 8}
+          hideBadges={c.hideBadges === true}
         />
       )
     case 'collections-themes':

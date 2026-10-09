@@ -127,6 +127,14 @@ export default function SectionEditorPanel({ section, onClose, onChange, onToggl
               <Field label="Grand titre">
                 <input className={INPUT_CLS} value={c.title || ''} onChange={(e) => updateContent({ title: e.target.value })} />
               </Field>
+              <Field label="Paragraphe sous le titre (facultatif)">
+                <textarea
+                  className={`${INPUT_CLS} min-h-[90px]`}
+                  value={c.description || ''}
+                  onChange={(e) => updateContent({ description: e.target.value })}
+                  placeholder="Petit texte élégant qui s'affiche entre le titre et les produits."
+                />
+              </Field>
               <Field label="Lien 'Tout voir' (facultatif)">
                 <input className={INPUT_CLS} value={c.viewAllHref || ''} onChange={(e) => updateContent({ viewAllHref: e.target.value })} placeholder="/collections" />
               </Field>
@@ -135,15 +143,24 @@ export default function SectionEditorPanel({ section, onClose, onChange, onToggl
                   value={c.filter || 'all'}
                   onChange={(v) => updateContent({ filter: v })}
                   options={[
+                    { v: 'intemporels', label: 'Intemporels' },
+                    { v: 'pe-2026-2027', label: 'PE 26-27' },
                     { v: 'all', label: 'Tous' },
-                    { v: 'nouveautes', label: 'Nouveautés' },
-                    { v: 'bestsellers', label: 'Favoris' },
                   ]}
                 />
               </Field>
               <Field label="Nombre de produits">
                 <input type="number" min={2} max={20} className={INPUT_CLS} value={c.limit || 8} onChange={(e) => updateContent({ limit: Number(e.target.value) })} />
               </Field>
+              <label className="flex items-center gap-2 py-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={c.hideBadges === true}
+                  onChange={(e) => updateContent({ hideBadges: e.target.checked })}
+                  className="h-4 w-4 accent-emerald"
+                />
+                <span className="text-sm text-ink/70">Masquer les badges Nouveau / Édition sur les photos</span>
+              </label>
               <CustomImagesManager
                 images={Array.isArray(c.customImages) ? c.customImages : []}
                 onChange={(next) => updateContent({ customImages: next })}
