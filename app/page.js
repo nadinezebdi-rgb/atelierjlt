@@ -10,6 +10,10 @@ import CollectionsThemes from '@/components/home/collections-themes'
 import Newsletter from '@/components/home/newsletter'
 import { getDb } from '@/lib/db'
 import { mergeHomepageSections } from '@/lib/homepage-sections'
+import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/auth'
+import EditModeProvider from '@/components/edit/edit-mode-provider'
+import SectionShell from '@/components/edit/section-shell'
 
 // Toujours frais : les changements admin apparaissent immédiatement
 export const dynamic = 'force-dynamic'
@@ -135,10 +139,25 @@ function renderSection(s) {
   }
 }
 
-async function App() {
+async function App({ searchParams }) {
+  const sp = await searchParams
+  const editRequested = sp?.edit === '1'
+
+  // Vérifie l'authentification admin via le cookie session
+  let isAdminAuthed = false
+  if (editRequested) {
+    try {
+      const cookieStore = await cookies()
+      const token = cookieStore.get('ginette_admin')?.value
+      isAdminAuthed = verifyToken(token)?.type === 'admin'
+    } catch { isAdminAuthed = false }
+  }
+  const editMode = editRequested && isAdminAuthed
+
   const { sections, hero, heroSlides, rotationInterval } = await loadHomeContent()
   const slides = [heroToProps(hero), ...(heroSlides || []).map(heroToProps)].filter(Boolean)
-  return (
+
+  const inner = (
     <div className="min-h-screen bg-ivory">
       <script
         type="application/ld+json"
@@ -150,12 +169,59 @@ async function App() {
         <HeroCarousel slides={slides} intervalMs={rotationInterval} />
 
         {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
-        {sections.map(renderSection)}
+        {sections.map((s) => {
+          const rendered = renderSection(s)
+          if (!editMode) return rendered
+          return (
+            <SectionShell key={s.id} section={s}>
+              {rendered}
+            </SectionShell>
+          )
+        })}
       </main>
       <Footer />
       <CartDrawer />
     </div>
   )
+
+  if (editMode) {
+    return (
+      <EditModeProvider
+        initialSections={sections}
+        initialHero={hero}
+        initialHeroSlides={heroSlides}
+      >
+        {inner}
+      </EditModeProvider>
+    )
+  }
+
+  // Redirection douce : si ?edit=1 sans auth admin → page login
+  if (editRequested && !isAdminAuthed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ivory text-ink p-6">
+        <div className="max-w-sm w-full text-center space-y-5">
+          <h1
+            className="text-2xl md:text-3xl text-emerald"
+            style={{ fontFamily: 'var(--font-logo), var(--font-display), serif' }}
+          >
+            Mode édition
+          </h1>
+          <p className="text-sm text-ink/70 leading-relaxed">
+            Connectez-vous à l'administration pour activer l'édition visuelle.
+          </p>
+          <a
+            href="/admin"
+            className="inline-flex items-center justify-center h-12 px-6 bg-ink text-ivory text-[11px] uppercase tracking-[0.28em] hover:bg-emerald transition rounded-sm"
+          >
+            Aller à l'admin
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  return inner
 }
 
 export default App
