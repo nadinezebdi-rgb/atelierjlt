@@ -4,10 +4,32 @@ import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
 
+const DEFAULT_IMAGE = IMAGES.heroBeige || IMAGES.plaidBeige
+const DEFAULT_ALT = 'Atelier JLT — créations faites main'
+
 export default function AProposPage() {
+  // Récupère la photo configurée dans l'admin → site_content.about
+  const [heroImage, setHeroImage] = useState(DEFAULT_IMAGE)
+  const [heroAlt, setHeroAlt] = useState(DEFAULT_ALT)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/site-content')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        const about = d?.content?.about
+        if (about?.heroImage) setHeroImage(about.heroImage)
+        if (about?.heroImageAlt) setHeroAlt(about.heroImageAlt)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   return (
     <div className="min-h-screen bg-ivory">
       <Header />
@@ -15,20 +37,21 @@ export default function AProposPage() {
         {/* Hero — image plein cadre */}
         <section className="relative h-[70vh] min-h-[500px] overflow-hidden bg-ink">
           <motion.div
-            initial={{ scale: 1.08 }}
-            animate={{ scale: 1 }}
+            key={heroImage}
+            initial={{ scale: 1.08, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 2.5, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={IMAGES.heroBeige || IMAGES.plaidBeige}
-              alt="Atelier JLT — créations faites main"
+              src={heroImage}
+              alt={heroAlt}
               className="w-full h-full object-cover"
               onError={(e) => {
                 if (!e.currentTarget.dataset.fallback) {
                   e.currentTarget.dataset.fallback = '1'
-                  e.currentTarget.src = IMAGES.plaidBeige || IMAGES.heroPlaid
+                  e.currentTarget.src = DEFAULT_IMAGE
                 }
               }}
             />

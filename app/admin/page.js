@@ -7,6 +7,7 @@ import { formatPrice } from '@/lib/utils'
 import { LayoutDashboard, Package, ShoppingBag, Tag, Users, Mail, LogOut, Plus, Trash2, Save, Ticket, FileText, Settings as SettingsIcon, Upload, BookOpen, Eye, EyeOff, Edit3, ArrowUp, ArrowDown, Layers, GripVertical, X, FolderOpen, Copy, Check, Film, Image as ImageIcon, Search, ArrowUpDown } from 'lucide-react'
 import { HOMEPAGE_SECTION_DEFAULTS, mergeHomepageSections, BANNER_TEMPLATES } from '@/lib/homepage-sections'
 import HeroComposer from '@/components/admin/hero-composer'
+import CarouselImageEditor from '@/components/admin/carousel-image-editor'
 import MissingMediaRecovery from '@/components/admin/missing-media-recovery'
 import VariantsEditor from '@/components/admin/variants-editor'
 import { cn } from '@/lib/utils'
@@ -1155,7 +1156,7 @@ const DEFAULT_CONTENT = {
     title: 'L\u2019art discret\nde la maison.',
     subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.',
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
-    ctaSecondary: { label: 'Notre atelier', href: '/atelier' },
+    ctaSecondary: { label: 'À propos de nous', href: '/a-propos' },
     signature: 'Plaid Sylvestre · Crochet main',
     image: '/api/img/jlt-hero-beige',
     showEyebrow: true,
@@ -1183,6 +1184,11 @@ const DEFAULT_CONTENT = {
   ],
   sections: HOMEPAGE_SECTION_DEFAULTS.map((s) => ({ ...s, content: { ...s.content } })),
   mediaLibrary: [],
+  // Page "À propos de nous" — image hero éditable depuis le CMS
+  about: {
+    heroImage: '/api/img/jlt-hero-beige',
+    heroImageAlt: 'Atelier JLT — créations faites main',
+  },
 }
 
 function TabContent({ onDirtyChange }) {
@@ -1227,7 +1233,12 @@ function TabContent({ onDirtyChange }) {
       const next = structuredClone(prev)
       const parts = path.split('.')
       let cur = next
-      for (let i = 0; i < parts.length - 1; i++) cur = cur[parts[i]]
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') {
+          cur[parts[i]] = {}
+        }
+        cur = cur[parts[i]]
+      }
       cur[parts[parts.length - 1]] = value
       return next
     })
@@ -1261,7 +1272,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-collections', 'Collections'], ['#admin-sections', 'Sections de la page'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-hero', 'Bannière principale'], ['#admin-collections', 'Collections'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1341,6 +1352,31 @@ function TabContent({ onDirtyChange }) {
 
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
+
+        {/* ===== PAGE "À PROPOS DE NOUS" — image hero éditable ===== */}
+        <section id="admin-about" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+            <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Page « À propos de nous »</h3>
+            <a href="/a-propos" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
+          </div>
+          <p className="text-sm text-ink/60 mb-6 leading-relaxed">
+            Changez l'image affichée en haut de la page <code className="bg-cream/60 px-1.5 py-0.5 text-xs">/a-propos</code> (bannière principale). Idéalement une photo en format paysage de bonne qualité — vos pelotes de laine, votre plan de travail, un détail d'atelier…
+          </p>
+          <Field label="Photo bannière (hero)">
+            <ImageUploader
+              images={c.about?.heroImage ? [c.about.heroImage] : []}
+              onChange={(arr) => upd('about.heroImage', arr[arr.length - 1] || '')}
+            />
+          </Field>
+          <Field label="Texte alternatif (accessibilité & SEO)">
+            <input
+              value={c.about?.heroImageAlt || ''}
+              onChange={(e) => upd('about.heroImageAlt', e.target.value)}
+              placeholder="Ex. Atelier JLT — pelotes de laine naturelles"
+              className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink"
+            />
+          </Field>
+        </section>
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
 
@@ -2912,6 +2948,13 @@ function SectionContentEditor({ type, content, onChange }) {
             className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink"
           />
         </Field>
+        {/* ---- Images personnalisées (mode "carrousel d'images") ---- */}
+        <div className="md:col-span-2 mt-2 pt-6 border-t border-linen">
+          <CarouselImageEditor
+            images={Array.isArray(content.customImages) ? content.customImages : []}
+            onChange={(next) => onChange('customImages', next)}
+          />
+        </div>
       </div>
     )
   }

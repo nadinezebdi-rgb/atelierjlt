@@ -5,6 +5,7 @@ import HeroCarousel from '@/components/home/hero-carousel'
 import CategoryTiles from '@/components/home/category-tiles'
 import EditorialBanner from '@/components/home/editorial-banner'
 import ProductCarousel from '@/components/home/product-carousel'
+import CarouselImageGallery from '@/components/home/carousel-image-gallery'
 import CollectionsThemes from '@/components/home/collections-themes'
 import Newsletter from '@/components/home/newsletter'
 import { getDb } from '@/lib/db'
@@ -103,6 +104,18 @@ function renderSection(s) {
         />
       )
     case 'product-carousel':
+      // Mode "images personnalisées" si customImages non vide, sinon carrousel produits
+      if (Array.isArray(c.customImages) && c.customImages.length > 0) {
+        return (
+          <CarouselImageGallery
+            key={s.id}
+            eyebrow={c.eyebrow}
+            title={c.title}
+            viewAllHref={c.viewAllHref}
+            images={c.customImages}
+          />
+        )
+      }
       return (
         <ProductCarousel
           key={s.id}

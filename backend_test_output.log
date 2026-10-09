@@ -1,0 +1,688 @@
+
+================================================================================
+JULIETTE AI ASSISTANT - BACKEND TEST SUITE V3
+================================================================================
+Base URL: https://french-craft.preview.emergentagent.com
+Timeout: 30s
+================================================================================
+
+================================================================================
+TEST: Test 1: Client Mode - Basic Product Recommendation
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat
+ℹ️  Payload: {"message": "Quels plaids en crochet me recommandez-vous pour un canapé beige ?"}
+ℹ️  Status: 200
+ℹ️  Response keys: ['session_id', 'reply', 'commands', 'mode']
+ℹ️  Reply length: 711 characters
+ℹ️  Reply preview: Bonjour ! Pour un canapé beige, je vous recommande particulièrement le **Plaid Sylvestre** en coloris **Beige lin** — il créera un camaïeu doux et élégant. Si vous préférez apporter du contraste, le *...
+✅ Client mode basic test PASSED
+✅ ✓ Status: 200
+✅ ✓ Mode: client
+✅ ✓ Reply: non-empty French string mentioning products
+✅ ✓ Commands: empty array
+✅ ✓ Session ID: c324779b-264b-4c2f-93f5-f922f676d55c
+
+================================================================================
+TEST: Test 2: Client Mode - Multi-turn Session Persistence
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat
+ℹ️  Payload: {"message": "Quel est son prix ?", "session_id": "c324779b-264b-4c2f-93f5-f922f676d55c"}
+ℹ️  Using session_id: c324779b-264b-4c2f-93f5-f922f676d55c
+ℹ️  Status: 200
+ℹ️  Reply: Le **Plaid Sylvestre** est à **340 €**, et le **Plaid Boréal** à **320 €**.
+
+Les deux sont en laine mérinos filée main, format 140 × 180 cm, avec livraison offerte dès 150 € en France métropolitaine.
+✅ Multi-turn session persistence PASSED
+✅ ✓ AI remembered previous context and mentioned price
+
+================================================================================
+TEST: Test 3: Admin Login
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/auth/admin-login
+ℹ️  Payload: {"password": "Juliette99*"}
+ℹ️  Status: 200
+ℹ️  Cookies received: ['ginette_admin', '__cf_bm']
+✅ Admin login PASSED
+✅ ✓ Status: 200
+✅ ✓ Admin cookie set
+
+================================================================================
+TEST: Test 4: Admin Mode - Light Command (Hero Update)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat (with admin cookie)
+ℹ️  Payload: {"message": "Change le titre du hero en Test IA Backend"}
+ℹ️  Status: 200
+ℹ️  Response keys: ['session_id', 'reply', 'commands', 'mode']
+ℹ️  Command: {
+  "id": "8d393aac-806e-4acb-9d10-ccebed4be537",
+  "type": "update_hero",
+  "label": "Changer le titre du hero en « Test IA Backend »",
+  "severity": "light",
+  "patch": {
+    "title": "Test IA Backend"
+  },
+  "targetId": null
+}
+✅ Admin mode light command test PASSED
+✅ ✓ Mode: admin
+✅ ✓ Command type: update_hero
+✅ ✓ Severity: light
+✅ ✓ Patch contains title: Test IA Backend
+✅ ✓ Label: Changer le titre du hero en « Test IA Backend »
+✅ ✓ ID: 8d393aac-806e-4acb-9d10-ccebed4be537
+✅ ✓ Reply: Je modifie le titre principal du hero en « Test IA Backend »....
+
+================================================================================
+TEST: Test 5: Admin Mode - Sensitive Command (Price Update)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat (with admin cookie)
+ℹ️  Payload: {"message": "Baisse le prix du Plaid Sylvestre a 259 euros"}
+ℹ️  Status: 200
+ℹ️  Command: {
+  "id": "a6011080-1648-4f6c-9cbe-b53f5b01957f",
+  "type": "update_product",
+  "label": "Baisser le prix du Plaid Sylvestre à 259 €",
+  "severity": "sensitive",
+  "patch": {
+    "price": 259
+  },
+  "targetId": "plaid-sylvestre"
+}
+✅ Admin mode sensitive command test PASSED
+✅ ✓ Command type: update_product
+✅ ✓ Severity: sensitive
+✅ ✓ Target ID: plaid-sylvestre
+✅ ✓ Patch price: 259
+
+================================================================================
+TEST: Test 6: Apply Command Without Auth (Rejection Test)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (NO admin cookie)
+ℹ️  Payload: {"command": {"type": "update_hero", "label": "Test", "severity": "light", "patch": {"title": "Test"}}}
+ℹ️  Status: 401
+✅ Apply without auth rejection test PASSED
+✅ ✓ Status: 401 (Unauthorized)
+
+================================================================================
+TEST: Test 7: Apply Command With Auth
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/admin/site-content (to get current state)
+ℹ️  Current hero title: L’art discret
+de la maison.
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (with admin cookie)
+ℹ️  Payload: {
+  "command": {
+    "id": "8d393aac-806e-4acb-9d10-ccebed4be537",
+    "type": "update_hero",
+    "label": "Changer le titre du hero en « Test IA Backend »",
+    "severity": "light",
+    "patch": {
+      "title": "Test IA Backend"
+    },
+    "targetId": null
+  }
+}
+ℹ️  Status: 200
+ℹ️  Response: {
+  "ok": true,
+  "message": "Bannière mise à jour",
+  "before": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "L’art discret\nde la maison.",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "after": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "Test IA Backend",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "actionId": "70c180f9-277a-4d43-b774-87e8dbec5af6"
+}
+ℹ️  After title: Test IA Backend
+ℹ️  Verified hero title: Test IA Backend
+✅ Apply command with auth test PASSED
+✅ ✓ Status: 200
+✅ ✓ ok: true
+✅ ✓ Message: Bannière mise à jour
+✅ ✓ Before title: L’art discret
+de la maison.
+✅ ✓ After title: Test IA Backend
+✅ ✓ Verified in database: Test IA Backend
+
+================================================================================
+TEST: Test 8: Restore Original Hero Title
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (with admin cookie)
+ℹ️  Restoring title to: L’art discret
+de la maison.
+ℹ️  Status: 200
+✅ Hero restoration PASSED
+✅ ✓ Title restored to: L’art discret
+de la maison.
+
+================================================================================
+TEST: Test 9: Rejection Test - Empty Body
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat
+ℹ️  Payload: {}
+ℹ️  Status: 400
+✅ Empty body rejection test PASSED
+✅ ✓ Status: 400 (Bad Request)
+
+================================================================================
+TEST: Test 10: Rejection Test - Empty Message
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat
+ℹ️  Payload: {"message": ""}
+ℹ️  Status: 400
+✅ Empty message rejection test PASSED
+✅ ✓ Status: 400 (Bad Request)
+
+================================================================================
+TEST: Test 11: Rejection Test - Unknown Command Type
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (with admin cookie)
+ℹ️  Payload: {"command": {"type": "unknown_type", "label": "Test", "severity": "light", "patch": {}}}
+ℹ️  Status: 400
+✅ Unknown command type rejection test PASSED
+✅ ✓ Status: 400 (Bad Request)
+
+================================================================================
+TEST: Test 12: Blog Draft Creation Command
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat (with admin cookie)
+ℹ️  Payload: {"message": "Rédige un court article sur la poterie tournée main (150 mots max) et crée-le comme brouillon"}
+ℹ️  Status: 200
+ℹ️  Command type: create_blog_post
+ℹ️  Command severity: sensitive
+ℹ️  Blog post title: La poterie tournée main : un geste ancestral
+ℹ️  Blog post slug: poterie-tournee-main-geste-ancestral
+ℹ️  Content length: 762 characters
+✅ Blog draft creation command test PASSED
+✅ ✓ Command type: create_blog_post
+✅ ✓ Severity: sensitive
+✅ ✓ Patch contains: title, slug, content
+✅ ✓ Published: false (draft)
+✅ ✓ NOT APPLIED (as requested)
+
+================================================================================
+TEST: Test 13: GET /api/chat/sessions (Client - No Auth)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions (NO admin cookie)
+ℹ️  Status: 200
+ℹ️  Response keys: ['sessions']
+ℹ️  Number of sessions: 4
+ℹ️  First session: {"session_id": "c324779b-264b-4c2f-93f5-f922f676d55c", "mode": "client", "lastAt": "2026-09-25T12:28:32.893Z", "firstAt": "2026-09-25T12:28:30.642Z", "count": 4, "title": "Quels plaids en crochet me recommandez-vous pour un canapé b…"}
+✅ Sessions list without auth test PASSED
+✅ ✓ Status: 200
+✅ ✓ Sessions count: 4
+✅ ✓ All sessions are client mode
+✅ ✓ Session structure correct
+
+================================================================================
+TEST: Test 14: GET /api/chat/sessions (Admin - With Auth)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Number of sessions: 16
+ℹ️  Admin sessions: 12
+ℹ️  Client sessions: 4
+✅ Sessions list with auth test PASSED
+✅ ✓ Status: 200
+✅ ✓ Total sessions: 16
+✅ ✓ Admin sessions: 12
+✅ ✓ Client sessions: 4
+
+================================================================================
+TEST: Test 15: GET /api/chat/sessions?sid=X (Client Session)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions?sid=c324779b-264b-4c2f-93f5-f922f676d55c (NO admin cookie)
+ℹ️  Session ID: c324779b-264b-4c2f-93f5-f922f676d55c
+ℹ️  Status: 200
+ℹ️  Response keys: ['session_id', 'messages']
+ℹ️  Number of messages: 4
+ℹ️  First message role: user
+ℹ️  First message content preview: Quels plaids en crochet me recommandez-vous pour u...
+✅ Get messages for client session test PASSED
+✅ ✓ Status: 200
+✅ ✓ Session ID: c324779b-264b-4c2f-93f5-f922f676d55c
+✅ ✓ Messages count: 4
+✅ ✓ Messages sorted by createdAt ascending
+
+================================================================================
+TEST: Test 16: GET /api/chat/sessions?sid=invalid
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions?sid=invalid-session-id-12345
+ℹ️  Status: 200
+✅ Invalid session ID test PASSED
+✅ ✓ Status: 200
+✅ ✓ Messages: empty array
+
+================================================================================
+TEST: Test 17: Client Access to Admin Session (401)
+================================================================================
+ℹ️  Creating admin session...
+ℹ️  Admin session ID: 2e635829-b3f5-424f-a203-ea86260cc6a3
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions?sid=2e635829-b3f5-424f-a203-ea86260cc6a3 (NO admin cookie)
+ℹ️  Status: 401
+✅ Client access to admin session rejection test PASSED
+✅ ✓ Status: 401 (Unauthorized)
+
+================================================================================
+TEST: Test 18: Admin Access to Admin Session
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/sessions?sid=2e635829-b3f5-424f-a203-ea86260cc6a3 (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Number of messages: 2
+✅ Admin access to admin session test PASSED
+✅ ✓ Status: 200
+✅ ✓ Messages count: 2
+
+================================================================================
+TEST: Test 19: POST /api/chat/apply with session_id tracking
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (with admin cookie)
+ℹ️  Payload: {
+  "command": {
+    "id": "test-undo",
+    "type": "update_hero",
+    "label": "Test undo tracking",
+    "severity": "light",
+    "patch": {
+      "title": "TEST UNDO STATE"
+    },
+    "targetId": null
+  },
+  "session_id": "test-undo-session"
+}
+ℹ️  Status: 200
+ℹ️  Response: {
+  "ok": true,
+  "message": "Bannière mise à jour",
+  "before": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "L’art discret\nde la maison.",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "after": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "TEST UNDO STATE",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "actionId": "5ede013b-8446-4b70-8bcf-590f6a81c076"
+}
+✅ Apply with session_id tracking test PASSED
+✅ ✓ Status: 200
+✅ ✓ ok: true
+✅ ✓ actionId: 5ede013b-8446-4b70-8bcf-590f6a81c076
+✅ ✓ Hero title updated to: TEST UNDO STATE
+
+================================================================================
+TEST: Test 20: GET /api/chat/actions (No Auth - 401)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/actions?limit=5 (NO admin cookie)
+ℹ️  Status: 401
+✅ Actions list without auth rejection test PASSED
+✅ ✓ Status: 401 (Unauthorized)
+
+================================================================================
+TEST: Test 21: GET /api/chat/actions (Admin - With Auth)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/actions?limit=5 (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Response keys: ['actions']
+ℹ️  Number of actions: 5
+ℹ️  First action: {
+  "_id": "5ede013b-8446-4b70-8bcf-590f6a81c076",
+  "sessionId": "test-undo-session",
+  "type": "update_hero",
+  "targetId": null,
+  "label": "Test undo tracking",
+  "severity": "light",
+  "before": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "L’art discret\nde la maison.",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "after": {
+    "layout": "full-image",
+    "textPosition": "bottom-left",
+    "overlayIntensity": 30,
+    "eyebrow": "Nouvelle Collection · Automne-Hiver 2025",
+    "title": "TEST UNDO STATE",
+    "subtitle": "Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.",
+    "ctaPrimary": {
+      "label": "Découvrir la collection",
+      "href": "/collections?cat=nouveautes"
+    },
+    "ctaSecondary": {
+      "label": "Notre atelier",
+      "href": "/atelier"
+    },
+    "signature": "Plaid Sylvestre · Crochet main",
+    "image": "/api/img/jlt-hero-beige",
+    "showEyebrow": true,
+    "showTitle": true,
+    "showSubtitle": true,
+    "showPrimary": true,
+    "showSecondary": true,
+    "showSignature": true,
+    "useCustomPosition": false,
+    "textCoords": {
+      "x": 8,
+      "y": 65
+    },
+    "textAlign": "left",
+    "textColorMode": "auto",
+    "heroTextColor": "white",
+    "parallaxEnabled": false,
+    "parallaxIntensity": 25
+  },
+  "patch": {
+    "title": "TEST UNDO STATE"
+  },
+  "appliedAt": "2026-09-25T12:28:54.574Z",
+  "undone": false
+}
+✅ Actions list with auth test PASSED
+✅ ✓ Status: 200
+✅ ✓ Actions count: 5
+✅ ✓ Actions sorted by appliedAt descending
+✅ ✓ Action structure correct
+✅ ✓ Test action present with undone=false
+
+================================================================================
+TEST: Test 22: POST /api/chat/actions (Undo - No Auth - 401)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/actions (NO admin cookie)
+ℹ️  Payload: {"actionId": "dummy-id"}
+ℹ️  Status: 401
+✅ Undo without auth rejection test PASSED
+✅ ✓ Status: 401 (Unauthorized)
+
+================================================================================
+TEST: Test 23: POST /api/chat/actions (Undo - With Auth)
+================================================================================
+ℹ️  Hero title before undo: TEST UNDO STATE
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/actions (WITH admin cookie)
+ℹ️  Payload: {"actionId": "5ede013b-8446-4b70-8bcf-590f6a81c076"}
+ℹ️  Status: 200
+ℹ️  Response: {
+  "ok": true,
+  "message": "Action « Test undo tracking » annulée"
+}
+ℹ️  Hero title after undo: L’art discret
+de la maison.
+✅ Undo with auth test PASSED
+✅ ✓ Status: 200
+✅ ✓ ok: true
+✅ ✓ Message: Action « Test undo tracking » annulée
+✅ ✓ Hero title reverted from 'TEST UNDO STATE'
+
+================================================================================
+TEST: Test 24: POST /api/chat/actions (Already Undone - 400)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/actions (WITH admin cookie)
+ℹ️  Payload: {"actionId": "5ede013b-8446-4b70-8bcf-590f6a81c076"}
+ℹ️  Attempting to undo the same action again...
+ℹ️  Status: 400
+✅ Already undone rejection test PASSED
+✅ ✓ Status: 400 (Bad Request)
+✅ ✓ Error: Cette action est déjà annulée
+
+================================================================================
+TEST: Test 25: POST /api/chat/actions (Invalid Action ID - 400)
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/actions (WITH admin cookie)
+ℹ️  Payload: {"actionId": "invalid-action-id-12345"}
+ℹ️  Status: 400
+✅ Invalid action ID rejection test PASSED
+✅ ✓ Status: 400 (Bad Request)
+✅ ✓ Error: Action introuvable
+
+================================================================================
+TEST: Test 26: GET /api/chat/insights (No Auth - 401)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/insights (NO admin cookie)
+ℹ️  Status: 401
+✅ Insights without auth rejection test PASSED
+✅ ✓ Status: 401 (Unauthorized)
+
+================================================================================
+TEST: Test 27: GET /api/chat/insights (Admin - Healthy Data)
+================================================================================
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/insights (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Response keys: ['insights', 'counts']
+ℹ️  Insights count: 0
+ℹ️  Counts: {
+  "total": 0,
+  "critical": 0,
+  "warning": 0,
+  "info": 0
+}
+✅ Insights with auth (healthy data) test PASSED
+✅ ✓ Status: 200
+✅ ✓ Insights count: 0
+✅ ✓ Counts: total=0, critical=0, warning=0, info=0
+
+================================================================================
+TEST: Test 28: Trigger Low Stock Warning
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/apply (with admin cookie)
+ℹ️  Setting Plaid Sylvestre stock to 1...
+ℹ️  Command applied successfully
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/insights (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Insights count: 1
+ℹ️  Counts: {
+  "total": 1,
+  "critical": 0,
+  "warning": 1,
+  "info": 0
+}
+ℹ️  Found stock warning: Plaid Sylvestre : plus que 1 en stock
+✅ Low stock warning trigger test PASSED
+✅ ✓ Status: 200
+✅ ✓ Warning count: 1
+✅ ✓ Found stock warning for Plaid Sylvestre
+
+================================================================================
+TEST: Test 29: Insights After Undo
+================================================================================
+ℹ️  POST https://french-craft.preview.emergentagent.com/api/chat/actions (WITH admin cookie)
+ℹ️  Undoing stock change...
+ℹ️  Stock change undone successfully
+ℹ️  GET https://french-craft.preview.emergentagent.com/api/chat/insights (WITH admin cookie)
+ℹ️  Status: 200
+ℹ️  Counts after undo: {
+  "total": 0,
+  "critical": 0,
+  "warning": 0,
+  "info": 0
+}
+✅ Insights after undo test PASSED
+✅ ✓ Status: 200
+✅ ✓ Plaid Sylvestre stock warning removed
+✅ ✓ Counts: total=0, critical=0, warning=0, info=0
+
+================================================================================
+TEST SUMMARY
+================================================================================
+✅ PASS - Client Mode - Basic
+✅ PASS - Client Mode - Multi-turn
+✅ PASS - Admin Login
+✅ PASS - Admin Mode - Light Command
+✅ PASS - Admin Mode - Sensitive Command
+✅ PASS - Apply Without Auth (401)
+✅ PASS - Apply With Auth
+✅ PASS - Restore Hero
+✅ PASS - Rejection - Empty Body
+✅ PASS - Rejection - Empty Message
+✅ PASS - Rejection - Unknown Command
+✅ PASS - Blog Draft Creation
+✅ PASS - V3: Sessions List (Client)
+✅ PASS - V3: Sessions List (Admin)
+✅ PASS - V3: Get Session Messages (Client)
+✅ PASS - V3: Get Session Messages (Invalid)
+✅ PASS - V3: Client Access Admin Session (401)
+✅ PASS - V3: Admin Access Admin Session
+✅ PASS - V3: Apply with session_id tracking
+✅ PASS - V3: Actions List (No Auth - 401)
+✅ PASS - V3: Actions List (Admin)
+✅ PASS - V3: Undo (No Auth - 401)
+✅ PASS - V3: Undo (Admin)
+✅ PASS - V3: Undo Already Undone (400)
+✅ PASS - V3: Undo Invalid Action ID (400)
+✅ PASS - V3: Insights (No Auth - 401)
+✅ PASS - V3: Insights (Healthy Data)
+✅ PASS - V3: Insights (Low Stock Warning)
+✅ PASS - V3: Insights After Undo
+================================================================================
+TOTAL: 29/29 tests passed (100%)
+================================================================================
