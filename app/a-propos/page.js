@@ -8,55 +8,12 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
+import { ABOUT_DEFAULTS, ABOUT_FIELDS } from '@/lib/page-content-config'
 
 const DEFAULT_IMAGE = IMAGES.heroBeige || IMAGES.plaidBeige
 
-const DEFAULT_CONTENT = {
-  heroImage: DEFAULT_IMAGE,
-  heroImageAlt: 'Atelier JLT — créations faites main',
-  heroEyebrow: 'À propos de nous',
-  heroTitle: "Atelier JLT,\nc'est quoi ?",
-  intro:
-    "Atelier\u00a0JLT, c'est une aventure artisanale née de mon amour pour la création et la décoration d'intérieur. J'imagine et confectionne à la main des pièces pensées pour apporter de la douceur, de la chaleur et du caractère à votre maison. Chaque création prend forme avec soin, amour et patience, au rythme des gestes et du travail de la matière.",
-  paragraph2:
-    "Basé en France, Atelier\u00a0JLT possède aussi une âme nomade. Mes créations m'accompagnent dans les différents endroits où je voyage\u00a0: un ouvrage commencé ici peut ainsi se poursuivre ailleurs, au fil de mes déplacements et de mes découvertes.",
-  quote:
-    "« Les paysages, les couleurs, les matières et les rencontres nourrissent mon imagination. »",
-  paragraph3:
-    "Mes voyages passés comme ceux en cours se retrouvent, par petites touches, dans les associations de teintes, les textures et les formes que je choisis.",
-  paragraph4:
-    "À travers Atelier\u00a0JLT, je souhaite partager le plaisir des objets faits main, ceux auxquels on s'attache et qui trouvent naturellement leur place dans notre quotidien. De légères irrégularités peuvent témoigner du geste artisanal\u00a0: elles font partie de l'histoire et du caractère de chaque pièce.",
-  signature:
-    "Derrière chaque création, il y a mes mains, du temps, une idée qui a mûri… et parfois un petit bout de voyage à accueillir chez vous.",
-  ctaEyebrow: 'Découvrir',
-  ctaTitle: 'Les créations de la maison.',
-  ctaDescription:
-    'Chaque pièce est unique, imaginée et confectionnée à la main — plaids, coussins, paniers, macramés…',
-  ctaButton1Label: 'Voir les collections',
-  ctaButton1Href: '/collections',
-  ctaButton2Label: 'Nous écrire',
-  ctaButton2Href: '/contact',
-}
-
-const EDIT_FIELDS = [
-  { key: 'heroImage', type: 'image', label: 'Image du hero' },
-  { key: 'heroImageAlt', type: 'text', label: 'Texte alternatif (SEO)' },
-  { key: 'heroEyebrow', type: 'text', label: 'Petit texte (sur-titre)' },
-  { key: 'heroTitle', type: 'textarea', label: 'Grand titre (saut de ligne autorisé)' },
-  { key: 'intro', type: 'longtext', label: 'Paragraphe d\u2019introduction' },
-  { key: 'paragraph2', type: 'longtext', label: 'Paragraphe 2' },
-  { key: 'quote', type: 'textarea', label: 'Citation' },
-  { key: 'paragraph3', type: 'longtext', label: 'Paragraphe 3' },
-  { key: 'paragraph4', type: 'longtext', label: 'Paragraphe 4' },
-  { key: 'signature', type: 'longtext', label: 'Signature finale' },
-  { key: 'ctaEyebrow', type: 'text', label: 'CTA — Petit texte' },
-  { key: 'ctaTitle', type: 'textarea', label: 'CTA — Grand titre' },
-  { key: 'ctaDescription', type: 'textarea', label: 'CTA — Description' },
-  { key: 'ctaButton1Label', type: 'text', label: 'Bouton 1 — texte' },
-  { key: 'ctaButton1Href', type: 'text', label: 'Bouton 1 — lien' },
-  { key: 'ctaButton2Label', type: 'text', label: 'Bouton 2 — texte' },
-  { key: 'ctaButton2Href', type: 'text', label: 'Bouton 2 — lien' },
-]
+const DEFAULT_CONTENT = ABOUT_DEFAULTS
+const EDIT_FIELDS = ABOUT_FIELDS
 
 export default function AProposPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT)

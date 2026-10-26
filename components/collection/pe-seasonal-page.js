@@ -6,18 +6,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import PageEditShell from '@/components/edit/page-edit-shell'
 
-const EDIT_FIELDS = [
-  { key: 'heroImage', type: 'image', label: 'Image du hero' },
-  { key: 'heroEyebrow', type: 'text', label: 'Hero — petit texte' },
-  { key: 'heroTitle', type: 'textarea', label: 'Hero — grand titre' },
-  { key: 'heroSubtitle', type: 'textarea', label: 'Hero — sous-titre' },
-  { key: 'moodImage', type: 'image', label: 'Ambiance — image' },
-  { key: 'moodEyebrow', type: 'text', label: 'Ambiance — petit texte' },
-  { key: 'moodTitle', type: 'textarea', label: 'Ambiance — grand titre' },
-  { key: 'moodText', type: 'longtext', label: 'Ambiance — paragraphe' },
-  { key: 'palette', type: 'palette', label: 'Palette de couleurs' },
-  { key: 'materials', type: 'materials', label: 'Matières' },
-]
+import { PE_FIELDS as EDIT_FIELDS } from '@/lib/page-content-config'
 
 /**
  * Page de la collection Printemps / Été 2026-2027 — Atelier JLT.
@@ -138,17 +127,20 @@ export default function PESeasonalPage({ content: initialContent, products }) {
               transition={{ duration: 1 }}
               className="text-center max-w-xl mx-auto mb-12 md:mb-16"
             >
-              <span className="block text-[10px] md:text-[11px] uppercase tracking-[0.42em] text-emerald mb-3">
-                La palette
-              </span>
+              {content.paletteEyebrow !== '' && (
+                <span className="block text-[10px] md:text-[11px] uppercase tracking-[0.42em] text-emerald mb-3">
+                  {content.paletteEyebrow ?? 'La palette'}
+                </span>
+              )}
               <h2
-                className="text-3xl md:text-5xl leading-[1.05] text-ink"
+                className="text-3xl md:text-5xl leading-[1.05] text-ink whitespace-pre-line text-balance"
                 style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
               >
-                Cinq couleurs,<br />une saison.
+                {content.paletteTitle ?? 'Cinq couleurs,\nune saison.'}
               </h2>
             </motion.div>
-            <div className="grid grid-cols-5 gap-3 md:gap-5 max-w-4xl mx-auto">
+            {/* flex + justify-center : centré quel que soit le nombre de couleurs */}
+            <div className="flex flex-wrap justify-center gap-3 md:gap-5 max-w-4xl mx-auto" data-testid="pe-palette">
               {content.palette.map((c, i) => (
                 <motion.div
                   key={c.hex + i}
@@ -156,7 +148,7 @@ export default function PESeasonalPage({ content: initialContent, products }) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.6, delay: i * 0.08 }}
-                  className="text-center"
+                  className="text-center w-[calc(33.333%-0.5rem)] sm:w-[calc(20%-1rem)] max-w-[170px]"
                 >
                   <div
                     className="aspect-square mb-3 md:mb-5 rounded-sm shadow-sm"
@@ -183,17 +175,20 @@ export default function PESeasonalPage({ content: initialContent, products }) {
             transition={{ duration: 1 }}
             className="text-center max-w-xl mx-auto mb-12 md:mb-16"
           >
-            <span className="block text-[10px] md:text-[11px] uppercase tracking-[0.42em] text-emerald mb-3">
-              Les matières
-            </span>
+            {content.materialsEyebrow !== '' && (
+              <span className="block text-[10px] md:text-[11px] uppercase tracking-[0.42em] text-emerald mb-3">
+                {content.materialsEyebrow ?? 'Les matières'}
+              </span>
+            )}
             <h2
-              className="text-3xl md:text-5xl leading-[1.05] text-ink"
+              className="text-3xl md:text-5xl leading-[1.05] text-ink whitespace-pre-line text-balance"
               style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
             >
-              Fils fins et cordons tressés.
+              {content.materialsTitle ?? 'Fils fins et cordons tressés.'}
             </h2>
           </motion.div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          {/* flex + justify-center : centré quel que soit le nombre de matières */}
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6" data-testid="pe-materials">
             {content.materials.map((m, i) => (
               <motion.div
                 key={(m.name || '') + i}
@@ -201,6 +196,7 @@ export default function PESeasonalPage({ content: initialContent, products }) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: i * 0.08 }}
+                className="w-[calc(50%-0.5rem)] md:w-[calc(25%-1.125rem)]"
               >
                 <div className="relative aspect-square overflow-hidden bg-linen mb-4">
                   {m.image ? (

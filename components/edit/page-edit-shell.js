@@ -329,7 +329,7 @@ const INPUT_CLS =
   'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald transition rounded-sm'
 const LABEL_CLS = 'block text-[10px] uppercase tracking-[0.26em] text-ink/70 mb-2'
 
-function FieldRenderer({ field, value, onChange }) {
+export function FieldRenderer({ field, value, onChange }) {
   const { type, label, placeholder, hint } = field
 
   if (type === 'palette') {

@@ -56,6 +56,7 @@ import {
   Home,
 } from 'lucide-react'
 import SectionEditorPanel from './section-editor-panel'
+import AddSectionModal, { createSection } from './add-section-modal'
 
 const Ctx = createContext(null)
 export const useEditMode = () => useContext(Ctx)
@@ -154,50 +155,18 @@ export default function EditModeProvider({
   /* ---- Ajout de section personnalisée (vitrine multi-carrousels) ---- */
 
   const addSection = useCallback((type, overrides = {}) => {
-    const unique = Math.random().toString(36).slice(2, 8)
-    const id = overrides.id || `custom-${type}-${unique}`
-    const presets = {
-      'product-carousel': {
-        label: 'Nouveau carrousel',
-        content: {
-          eyebrow: 'La sélection',
-          title: 'Vitrine personnalisée',
-          description: '',
-          viewAllHref: '/collections',
-          filter: 'all',
-          limit: 8,
-          hideBadges: false,
-          pickedProducts: [],
-        },
-      },
-      'editorial-banner': {
-        label: 'Nouvelle bannière',
-        content: {
-          eyebrow: '',
-          title: 'Nouveau titre',
-          image: '',
-          ctaLabel: '',
-          ctaHref: '',
-          align: 'left',
-          overlay: 'dark',
-          height: 'md',
-        },
-      },
-    }
-    const preset = presets[type] || presets['editorial-banner']
-    const newSection = {
-      id,
-      type,
-      custom: true,
-      enabled: true,
-      label: preset.label,
-      ...overrides,
-      content: { ...preset.content, ...(overrides.content || {}) },
-    }
+    const newSection = createSection(type, overrides)
+    const id = newSection.id
     setSections((prev) => [...prev, newSection])
     setSelectedId(id)
     setDirty(true)
     setStructuralChange(true)
+    // Fait défiler jusqu'à la nouvelle section (aperçu en direct)
+    setTimeout(() => {
+      try {
+        document.querySelector(`[data-section-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } catch {}
+    }, 150)
     return id
   }, [])
 
@@ -233,15 +202,10 @@ export default function EditModeProvider({
       })
       if (!r.ok) throw new Error('save failed')
       setDirty(false)
+      setStructuralChange(false)
       setSaveStatus('ok')
-      // Recharge seulement si la structure a changé (ajout/suppression de section)
-      // pour que la nouvelle section apparaisse à l'écran. Les éditions "normales"
-      // préservent le scroll.
-      if (structuralChange) {
-        setTimeout(() => window.location.reload(), 1000)
-      } else {
-        setTimeout(() => setSaveStatus(null), 2500)
-      }
+      // L'aperçu est en direct : plus besoin de recharger la page.
+      setTimeout(() => setSaveStatus(null), 2500)
     } catch (e) {
       setSaveStatus('error')
       setTimeout(() => setSaveStatus(null), 4000)
@@ -437,248 +401,6 @@ function EditToolbar({ dirty, saving, saveStatus, onSave, onExit, reorderMode, s
         />
       )}
     </div>
-  )
-}
-
-/* ---- Modal "Ajouter une section" — templates prêts à l'emploi ---- */
-
-const SECTION_TEMPLATES = [
-  {
-    key: 'gift',
-    icon: Gift,
-    accent: 'bg-terracotta',
-    title: 'Idées cadeau',
-    tagline: 'À offrir',
-    description: "Une sélection pour offrir — plaids, bougies, petits objets.",
-    type: 'product-carousel',
-    overrides: {
-      label: 'Idées cadeau',
-      content: {
-        eyebrow: 'À offrir',
-        title: 'Idées cadeau.',
-        description: 'Nos pièces les plus douces à glisser sous le sapin ou dans un panier.',
-        viewAllHref: '/collections',
-        filter: 'all',
-        limit: 6,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-  {
-    key: 'new-season',
-    icon: Sparkles,
-    accent: 'bg-emerald',
-    title: 'Nouveau de la saison',
-    tagline: 'Nouveautés',
-    description: "Fraîchement sortis de l'atelier — vos dernières arrivées.",
-    type: 'product-carousel',
-    overrides: {
-      label: 'Nouveau de la saison',
-      content: {
-        eyebrow: 'Nouveautés',
-        title: "Fraîchement sortis de l'atelier.",
-        description: "Les pièces qui viennent d'être terminées — à découvrir en premier.",
-        viewAllHref: '/collections?cat=nouveautes',
-        filter: 'new',
-        limit: 8,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-  {
-    key: 'bedroom',
-    icon: Bed,
-    accent: 'bg-plantes',
-    title: 'Pour la chambre',
-    tagline: 'La chambre',
-    description: 'Plaids crochet, coussins doux, textures apaisantes.',
-    type: 'product-carousel',
-    overrides: {
-      label: 'Pour la chambre',
-      content: {
-        eyebrow: 'La chambre',
-        title: 'Douceur sur le lit.',
-        description: 'Plaids crochet et coussins pour habiller la chambre.',
-        viewAllHref: '/collections',
-        filter: 'classiques',
-        limit: 6,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-  {
-    key: 'living',
-    icon: Sofa,
-    accent: 'bg-brique',
-    title: 'Pour le salon',
-    tagline: 'Le salon',
-    description: 'Tapis, macramés et plaids pour une pièce chaleureuse.',
-    type: 'product-carousel',
-    overrides: {
-      label: 'Pour le salon',
-      content: {
-        eyebrow: 'Le salon',
-        title: "L'atmosphère du salon.",
-        description: 'Tapis, macramés et plaids pour une pièce chaleureuse.',
-        viewAllHref: '/collections?cat=intemporels',
-        filter: 'intemporels',
-        limit: 8,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-  {
-    key: 'favorites',
-    icon: Heart,
-    accent: 'bg-ink',
-    title: 'Coups de cœur',
-    tagline: 'Sélection manuelle',
-    description: 'Vous choisissez vous-même les produits à mettre en avant.',
-    type: 'product-carousel',
-    overrides: {
-      label: 'Coups de cœur',
-      content: {
-        eyebrow: 'Mes favoris',
-        title: 'Les pièces du moment.',
-        description: '',
-        viewAllHref: '/collections',
-        filter: 'all',
-        limit: 6,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-  {
-    key: 'spring',
-    icon: Flower,
-    accent: 'bg-plantes',
-    title: 'Collection saisonnière',
-    tagline: 'Printemps / Été',
-    description: 'Mettez en avant la collection de la saison.',
-    type: 'product-carousel',
-    overrides: {
-      label: 'Collection PE 26-27',
-      content: {
-        eyebrow: 'Printemps / Été 2026-2027',
-        title: 'La collection de la saison.',
-        description: 'Pastels, lin et douceur florale pour la nouvelle saison.',
-        viewAllHref: '/collection/printemps-ete-2026-2027',
-        filter: 'pe-2026-2027',
-        limit: 6,
-        hideBadges: false,
-        pickedProducts: [],
-      },
-    },
-  },
-]
-
-const BLANK_OPTIONS = [
-  {
-    key: 'blank-carousel',
-    icon: ShoppingBag,
-    title: 'Carrousel vierge',
-    description: 'Partez de zéro, filtrez ou sélectionnez les produits à la main.',
-    type: 'product-carousel',
-    overrides: null,
-  },
-  {
-    key: 'blank-banner',
-    icon: Images,
-    title: 'Bannière éditoriale',
-    description: 'Une grande image avec titre, texte et un bouton. Pour les ambiances.',
-    type: 'editorial-banner',
-    overrides: null,
-  },
-]
-
-function AddSectionModal({ onClose, onPick }) {
-  if (typeof document === 'undefined') return null
-  return createPortal(
-    <div className="fixed inset-0 z-[260] flex items-stretch md:items-center justify-center bg-ink/60 p-0 md:p-6">
-      <div
-        className="bg-ivory w-full md:max-w-3xl md:rounded-sm shadow-2xl flex flex-col"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          maxHeight: '100dvh',
-        }}
-      >
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-linen">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-emerald mb-1">Nouvelle section</div>
-            <div className="font-display text-xl md:text-2xl">Choisissez un modèle</div>
-          </div>
-          <button
-            onClick={onClose}
-            className="h-11 w-11 flex items-center justify-center border border-ink/15 hover:border-ink rounded-sm"
-            aria-label="Fermer"
-          >
-            <X className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </div>
-
-        <div className="p-5 overflow-y-auto">
-          <div className="text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-3 flex items-center gap-2">
-            <Sparkles className="h-3 w-3 text-emerald" strokeWidth={1.8} />
-            Modèles prêts à l'emploi
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-            {SECTION_TEMPLATES.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => onPick(t.type, t.overrides)}
-                className="text-left flex items-start gap-3 p-4 border border-linen hover:border-emerald hover:bg-cream/40 transition rounded-sm group"
-              >
-                <div className={`h-11 w-11 flex-none flex items-center justify-center ${t.accent} text-ivory rounded-sm group-hover:scale-105 transition`}>
-                  <t.icon className="h-5 w-5" strokeWidth={1.5} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[9px] uppercase tracking-[0.22em] text-emerald mb-0.5">
-                    {t.tagline}
-                  </div>
-                  <div className="font-display text-base md:text-lg leading-tight">{t.title}</div>
-                  <div className="text-xs text-ink/60 mt-1 leading-relaxed">{t.description}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-3 flex items-center gap-2">
-            <Plus className="h-3 w-3" strokeWidth={1.8} />
-            Partir d'une page blanche
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {BLANK_OPTIONS.map((o) => (
-              <button
-                key={o.key}
-                onClick={() => onPick(o.type, o.overrides)}
-                className="text-left flex items-start gap-3 p-4 border border-dashed border-ink/20 hover:border-ink hover:bg-ink/5 transition rounded-sm group"
-              >
-                <div className="h-11 w-11 flex-none flex items-center justify-center bg-ink/10 text-ink rounded-sm group-hover:bg-ink group-hover:text-ivory transition">
-                  <o.icon className="h-5 w-5" strokeWidth={1.5} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-display text-base md:text-lg leading-tight">{o.title}</div>
-                  <div className="text-xs text-ink/60 mt-1 leading-relaxed">{o.description}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-5 py-4 border-t border-linen bg-cream/30">
-          <p className="text-[10px] text-ink/60 uppercase tracking-[0.22em] text-center">
-            La nouvelle section apparaît en bas de la page. Vous pouvez la personnaliser et la déplacer ensuite.
-          </p>
-        </div>
-      </div>
-    </div>,
-    document.body
   )
 }
 

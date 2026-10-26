@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, ArrowRight, Plus } from 'lucide-react'
 import { useCart } from '@/components/site/cart-provider'
 import { toast } from 'sonner'
+import { filterProductsForCarousel } from '@/lib/homepage-sections'
 
 /**
  * Carrousel produits style Ferm Living — défilement horizontal souple,
@@ -38,21 +39,7 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
           setProducts(list.slice(0, limit))
           return
         }
-        if (filter === 'new') list = list.filter((p) => p.isNew)
-        else if (filter === 'limited') list = list.filter((p) => p.isLimited)
-        else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
-        else if (filter === 'intemporels') list = list.filter((p) => p.category === 'intemporels')
-        else if (filter === 'pe-2026-2027') list = list.filter((p) => p.category === 'pe-2026-2027')
-        else if (filter === 'classiques') {
-          // Les classiques : plaids, coussins, paniers, tapis, chemins & sets de table.
-          // Exclut macramés muraux et suspensions (qui restent dans les Intemporels mais pas dans ce carrousel).
-          const prefixes = ['plaid-', 'coussin-', 'panier-', 'chemin-de-table-', 'tapis-', 'set-de-table-']
-          list = list.filter(
-            (p) =>
-              p.category === 'intemporels' &&
-              prefixes.some((pref) => (p.slug || '').startsWith(pref))
-          )
-        }
+        list = filterProductsForCarousel(list, filter)
         setProducts(list.slice(0, limit))
       })
       .catch(() => {})
@@ -173,7 +160,22 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
                          style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>
                       {p.name}
                     </div>
-                    <div className="text-[13px] text-ink/60 mt-1 tabular-nums">EUR {p.price.toFixed(0)},00</div>
+                    <div className="text-[13px] text-ink/60 mt-1 tabular-nums">EUR {Number(p.price || 0).toFixed(0)},00</div>
+                    {Array.isArray(p.variants) && p.variants.length > 1 && (
+                      <div className="mt-2 flex items-center gap-1.5" aria-label={`${p.variants.length} couleurs disponibles`}>
+                        {p.variants.slice(0, 5).map((v, k) => (
+                          <span
+                            key={k}
+                            title={v.name}
+                            className="h-3 w-3 rounded-full border border-ink/15"
+                            style={{ backgroundColor: v.hex || '#ddd' }}
+                          />
+                        ))}
+                        {p.variants.length > 5 && (
+                          <span className="text-[10px] text-ink/50">+{p.variants.length - 5}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Link>

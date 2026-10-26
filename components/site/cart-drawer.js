@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Minus, Plus, ShoppingBag, Tag, Gift, Check, ArrowRight } from 'lucide-react'
+import { X, Minus, Plus, ShoppingBag, Tag, Gift, Check, ArrowRight, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { useCart } from './cart-provider'
@@ -110,13 +110,27 @@ export default function CartDrawer() {
                                   <div className="text-[10px] text-ink/40 mt-0.5 normal-case tracking-normal">{it.sizeDimensions}</div>
                                 )}
                               </div>
-                              <button onClick={() => remove(it.slug, { variant: it.variant, size: it.size })} className="text-[11px] uppercase tracking-[0.18em] text-ink/50 hover:text-terracotta">Retirer</button>
+                              <button
+                                onClick={() => remove(it.slug, { variant: it.variant, size: it.size })}
+                                className="h-10 w-10 -mr-2 -mt-2 flex items-center justify-center text-ink/50 hover:text-terracotta hover:bg-terracotta/10 rounded-sm transition flex-shrink-0"
+                                aria-label={`Supprimer ${it.name} du panier`}
+                                title="Supprimer du panier"
+                                data-testid={`cart-remove-${it.slug}`}
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                              </button>
                             </div>
                             <div className="flex items-center justify-between mt-4">
                               <div className="flex items-center border border-linen">
-                                <button onClick={() => update(it.slug, Math.max(1, it.qty - 1), { variant: it.variant, size: it.size })} className="p-2 hover:bg-linen/40"><Minus className="h-3 w-3" strokeWidth={1.5} /></button>
+                                <button
+                                  onClick={() => (it.qty <= 1 ? remove(it.slug, { variant: it.variant, size: it.size }) : update(it.slug, it.qty - 1, { variant: it.variant, size: it.size }))}
+                                  className="h-9 w-9 flex items-center justify-center hover:bg-linen/40"
+                                  aria-label={it.qty <= 1 ? 'Supprimer' : 'Diminuer la quantité'}
+                                >
+                                  {it.qty <= 1 ? <Trash2 className="h-3 w-3" strokeWidth={1.5} /> : <Minus className="h-3 w-3" strokeWidth={1.5} />}
+                                </button>
                                 <span className="w-8 text-center text-sm tabular-nums">{it.qty}</span>
-                                <button onClick={() => update(it.slug, it.qty + 1, { variant: it.variant, size: it.size })} className="p-2 hover:bg-linen/40"><Plus className="h-3 w-3" strokeWidth={1.5} /></button>
+                                <button onClick={() => update(it.slug, it.qty + 1, { variant: it.variant, size: it.size })} className="h-9 w-9 flex items-center justify-center hover:bg-linen/40" aria-label="Augmenter la quantité"><Plus className="h-3 w-3" strokeWidth={1.5} /></button>
                               </div>
                               <div className="text-sm font-medium tabular-nums">{formatPrice(it.price * it.qty)}</div>
                             </div>

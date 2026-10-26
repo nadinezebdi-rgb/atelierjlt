@@ -13,7 +13,7 @@ export default function Footer() {
             </div>
             <p className="mt-6 text-sm leading-relaxed text-ivory/70 max-w-sm">
               Maison française de décoration artisanale.
-              Imaginé, fabriqué et assemblé à la main dans notre atelier de la Drôme.
+              Imaginé, fabriqué et assemblé à la main dans notre atelier.
             </p>
             <a href="mailto:contact@atelierjlt.fr" className="inline-block mt-4 text-sm text-ivory/80 hover:text-terracotta transition-colors">
               contact@atelierjlt.fr

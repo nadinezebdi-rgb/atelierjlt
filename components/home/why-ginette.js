@@ -5,7 +5,7 @@ import { Hammer, Flag, Sprout, Diamond, Gift } from 'lucide-react'
 
 const items = [
   { icon: Hammer, title: 'Fabrication artisanale', text: 'Chaque pièce prend forme dans nos mains, pas en série.', color: 'text-terracotta' },
-  { icon: Flag,   title: 'Créations françaises',   text: 'Atelier basé dans la Drôme. Made in France assumé.', color: 'text-brique' },
+  { icon: Flag,   title: 'Créations françaises',   text: 'Imaginées et faites main en France.', color: 'text-brique' },
   { icon: Sprout, title: 'Matières sélectionnées', text: 'Coton recyclé, grès, laines nobles, bois massifs.', color: 'text-plantes' },
   { icon: Diamond,title: 'Pièces uniques',         text: 'Aucune création n\u2019est parfaitement identique.', color: 'text-sable' },
   { icon: Gift,   title: 'Emballage soigné',       text: 'Un rituel de déballage pensé pour être gardé.', color: 'text-terracotta' },

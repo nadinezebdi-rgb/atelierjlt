@@ -14,6 +14,8 @@ import ImageUploader from '@/components/admin/image-uploader'
 import MediaPickerModal from '@/components/admin/media-picker-modal'
 import MediaLibrary from '@/components/admin/media-library'
 import HomeSectionsEditor from '@/components/admin/home-sections-editor'
+import TabOrders from '@/components/admin/orders-tab'
+import PageContentEditor from '@/components/admin/page-content-editor'
 
 /* =========================================================
    ONGLET — CONTENU DU SITE (hero + collections)
@@ -68,7 +70,20 @@ const DEFAULT_SETTINGS = {
     tagline: 'Maison française de décoration artisanale',
     email: 'contact@atelierjlt.fr',
     phone: '',
-    address: 'Drôme, France',
+    address: '',
+  },
+  shipping: {
+    labelProvider: 'simple', // simple | colissimo | aggregator
+    senderName: 'Atelier JLT',
+    senderAddress: '',
+    senderAddress2: '',
+    senderZip: '',
+    senderCity: '',
+    senderCountry: '',
+    senderPhone: '',
+    senderEmail: '',
+    returnDelayDays: 14,
+    returnInstructions: "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci de nous écrire avant tout renvoi.",
   },
   social: {
     instagram: 'https://www.instagram.com/atelier.jlt/',
@@ -1000,41 +1015,6 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
 }
 
 
-function TabOrders() {
-  const [orders, setOrders] = useState(null)
-  const load = () => fetch('/api/admin/orders', { credentials: 'include' }).then((r) => r.json()).then((d) => setOrders(d.orders))
-  useEffect(() => { load() }, [])
-  const updateStatus = async (id, status) => {
-    await fetch('/api/admin/orders?id=' + id, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
-    toast.success('Statut mis à jour')
-    load()
-  }
-  if (!orders) return <div className="text-ink/50">Chargement…</div>
-  return (
-    <div>
-      <h2 className="font-display text-3xl mb-6">Commandes ({orders.length})</h2>
-      {orders.length === 0 ? <p className="text-ink/60">Aucune commande pour l'instant.</p> : (
-        <div className="space-y-2">
-          {orders.map((o) => (
-            <div key={o._id} className="border border-linen p-4 grid md:grid-cols-[1fr_180px_140px_180px] gap-4 items-center">
-              <div>
-                <div className="font-display text-lg">{o.orderNumber}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{new Date(o.createdAt).toLocaleString('fr-FR')}</div>
-                <div className="text-sm text-ink/70 mt-1">{o.items?.length || 0} article{(o.items?.length || 0) > 1 ? 's' : ''} · {o.address?.email || 'invité'}</div>
-              </div>
-              <div className="font-display text-xl tabular-nums">{formatPrice(o.total)}</div>
-              <select value={o.status} onChange={(e) => updateStatus(o._id, e.target.value)} className="bg-transparent border border-ink/20 px-3 py-2 text-[11px] uppercase tracking-[0.22em] focus:outline-none focus:border-ink">
-                {['received', 'preparing', 'shipped', 'delivered', 'cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-ink/50">{o.paymentStatus}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function TabCoupons() {
   const [coupons, setCoupons] = useState(null)
   const [form, setForm] = useState({ code: '', type: 'percent', value: 10, label: '', active: true })
@@ -1195,7 +1175,7 @@ function TabContent({ onDirtyChange }) {
           <p className="text-sm text-ink/60 mt-2">Personnalisez les textes, les images et l’ordre des sections de la page d’accueil.</p>
           <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <a
             href="/?edit=1"
             target="_blank"
@@ -1213,7 +1193,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-collection-pe', 'Collection Printemps/Été 2026-2027'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été'], ['#admin-page-contact', 'Page Contact'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1233,36 +1213,13 @@ function TabContent({ onDirtyChange }) {
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
 
-        {/* ===== PAGE "À PROPOS DE NOUS" — image hero éditable ===== */}
-        <section id="admin-about" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-            <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Page « À propos de nous »</h3>
-            <a href="/a-propos" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
-          </div>
-          <p className="text-sm text-ink/60 mb-6 leading-relaxed">
-            Changez l'image affichée en haut de la page <code className="bg-cream/60 px-1.5 py-0.5 text-xs">/a-propos</code> (bannière principale). Idéalement une photo en format paysage de bonne qualité — vos pelotes de laine, votre plan de travail, un détail d'atelier…
-          </p>
-          <Field label="Photo bannière (hero)">
-            <ImageUploader
-              images={c.about?.heroImage ? [c.about.heroImage] : []}
-              onChange={(arr) => upd('about.heroImage', arr[arr.length - 1] || '')}
-            />
-          </Field>
-          <Field label="Texte alternatif (accessibilité & SEO)">
-            <input
-              value={c.about?.heroImageAlt || ''}
-              onChange={(e) => upd('about.heroImageAlt', e.target.value)}
-              placeholder="Ex. Atelier JLT — pelotes de laine naturelles"
-              className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink"
-            />
-          </Field>
-        </section>
-
-        {/* ===== PAGE COLLECTION "PRINTEMPS / ÉTÉ 2026-2027" — hero, ambiance, palette, matières ===== */}
-        <CollectionPEEditor
-          value={c.collectionPE2027 || {}}
-          onChange={(patch) => upd('collectionPE2027', { ...(c.collectionPE2027 || {}), ...patch })}
-        />
+        {/* ===== PAGES SECONDAIRES — mêmes champs que l'édition visuelle (?edit=1) ===== */}
+        <div className="space-y-4">
+          <h3 className="text-[11px] uppercase tracking-[0.32em] text-ink/60">Pages du site</h3>
+          <PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} />
+          <PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} />
+          <PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} />
+        </div>
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
 
@@ -1285,6 +1242,8 @@ function TabContent({ onDirtyChange }) {
    ========================================================= */
 
 /* =========================================================
+   Réglages de la boutique
+   ========================================================= */
 function TabSettings() {
   const [s, setS] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -1344,6 +1303,59 @@ function TabSettings() {
           </div>
         </section>
 
+        <section className="border border-linen bg-ivory p-6" data-testid="settings-shipping">
+          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-2">Expédition & bordereaux</h3>
+          <p className="text-xs text-ink/60 mb-5 leading-relaxed">
+            Informations imprimées sur les étiquettes 10 × 15 cm (Commandes → Imprimer). Laissez l’adresse vide si vous ne souhaitez afficher que le nom.
+          </p>
+          <Field label="Type d’étiquette">
+            <div className="grid sm:grid-cols-3 gap-2 mt-1">
+              {[
+                ['simple', 'Étiquette à imprimer', 'Fonctionne tout de suite — affranchissement à La Poste'],
+                ['colissimo', 'Colissimo affranchie', 'À connecter : compte Colissimo Entreprise requis'],
+                ['aggregator', 'Boxtal / Sendcloud', 'À connecter : compte transporteur requis'],
+              ].map(([v, label, hint]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => upd('shipping', 'labelProvider', v)}
+                  className={`text-left p-3 border min-h-[72px] transition ${(s.shipping?.labelProvider || 'simple') === v ? 'border-emerald bg-emerald/5 ring-1 ring-emerald' : 'border-ink/15 hover:border-ink/40'}`}
+                >
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="text-[11px] text-ink/55 mt-1 leading-snug">{hint}</div>
+                </button>
+              ))}
+            </div>
+          </Field>
+          {(s.shipping?.labelProvider || 'simple') !== 'simple' && (
+            <p className="text-xs text-terracotta mt-3">
+              Ce transporteur n’est pas encore connecté : l’étiquette simple à imprimer sera utilisée en attendant.
+            </p>
+          )}
+          <div className="grid md:grid-cols-2 gap-4 mt-5">
+            {[
+              ['senderName', 'Nom de l’expéditeur'],
+              ['senderPhone', 'Téléphone (facultatif)'],
+              ['senderAddress', 'Adresse (facultatif)'],
+              ['senderAddress2', 'Complément (facultatif)'],
+              ['senderZip', 'Code postal (facultatif)'],
+              ['senderCity', 'Ville (facultatif)'],
+              ['senderCountry', 'Pays (facultatif)'],
+              ['senderEmail', 'Email pour les retours (facultatif)'],
+            ].map(([k, label]) => (
+              <Field key={k} label={label}>
+                <input value={s.shipping?.[k] || ''} onChange={(e) => upd('shipping', k, e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+              </Field>
+            ))}
+            <Field label="Délai de retour (jours)">
+              <input type="number" min={0} value={s.shipping?.returnDelayDays ?? 14} onChange={(e) => upd('shipping', 'returnDelayDays', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+            </Field>
+          </div>
+          <Field label="Texte du bordereau de retour">
+            <textarea rows={3} value={s.shipping?.returnInstructions || ''} onChange={(e) => upd('shipping', 'returnInstructions', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink text-sm" />
+          </Field>
+        </section>
+
         <section className="border border-linen bg-ivory p-6">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-5">Bandeau haut de site</h3>
           <div className="grid md:grid-cols-3 gap-4">
@@ -1357,110 +1369,3 @@ function TabSettings() {
   )
 }
 
-/* ============================================================================
-   CollectionPEEditor — Admin editor for /collection/printemps-ete-2026-2027
-   Hero (image + textes), ambiance (image + titre + texte), palette (5 couleurs),
-   matières (jusqu'à 6 cartes). Toutes les photos sont réuploadables.
-   ============================================================================ */
-function CollectionPEEditor({ value = {}, onChange }) {
-  const palette = Array.isArray(value.palette) ? value.palette : []
-  const materials = Array.isArray(value.materials) ? value.materials : []
-  const set = (k, v) => onChange({ [k]: v })
-  const updPalette = (i, k, v) => {
-    const next = palette.slice()
-    next[i] = { ...next[i], [k]: v }
-    set('palette', next)
-  }
-  const updMat = (i, k, v) => {
-    const next = materials.slice()
-    next[i] = { ...next[i], [k]: v }
-    set('materials', next)
-  }
-  const addPalette = () => set('palette', [...palette, { name: '', hex: '#CFCFCF' }])
-  const addMaterial = () => set('materials', [...materials, { name: '', image: '' }])
-  const rmPalette = (i) => set('palette', palette.filter((_, j) => j !== i))
-  const rmMaterial = (i) => set('materials', materials.filter((_, j) => j !== i))
-
-  return (
-    <section id="admin-collection-pe" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-        <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Collection « Printemps / Été 2026-2027 »</h3>
-        <a href="/collection/printemps-ete-2026-2027" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
-      </div>
-      <p className="text-sm text-ink/60 mb-6 leading-relaxed">
-        Toute la page de la nouvelle collection se gère ici : la grande bannière du haut, l'ambiance, les 5 couleurs de la palette, et les 4 matières. Les photos par défaut peuvent être remplacées par vos propres photos à tout moment — glissez un fichier dans la zone « Importer ».
-      </p>
-
-      {/* HERO */}
-      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-6">① Grande bannière du haut</h4>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Petit texte (sur-titre)">
-          <input value={value.heroEyebrow || ''} onChange={(e) => set('heroEyebrow', e.target.value)} placeholder="Nouvelle saison" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-        </Field>
-        <Field label="Grand titre">
-          <input value={value.heroTitle || ''} onChange={(e) => set('heroTitle', e.target.value)} placeholder="Printemps / Été 2026-2027" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-        </Field>
-      </div>
-      <Field label="Phrase sous le titre (facultatif)">
-        <input value={value.heroSubtitle || ''} onChange={(e) => set('heroSubtitle', e.target.value)} placeholder="Doux · Chaleureux · Bien chez soi." className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-      </Field>
-      <Field label="Image de la bannière">
-        <ImageUploader
-          images={value.heroImage ? [value.heroImage] : []}
-          onChange={(arr) => set('heroImage', arr[arr.length - 1] || '')}
-        />
-      </Field>
-
-      {/* AMBIANCE */}
-      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-10">② Bloc Ambiance</h4>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Petit texte"><input value={value.moodEyebrow || ''} onChange={(e) => set('moodEyebrow', e.target.value)} placeholder="Ambiance" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-        <Field label="Titre (saut de ligne : touche Entrée)">
-          <textarea value={value.moodTitle || ''} onChange={(e) => set('moodTitle', e.target.value)} rows={2} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink resize-none" />
-        </Field>
-      </div>
-      <Field label="Texte de description">
-        <textarea value={value.moodText || ''} onChange={(e) => set('moodText', e.target.value)} rows={4} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-      </Field>
-      <Field label="Image d'ambiance (vertical idéal)">
-        <ImageUploader images={value.moodImage ? [value.moodImage] : []} onChange={(arr) => set('moodImage', arr[arr.length - 1] || '')} />
-      </Field>
-
-      {/* PALETTE */}
-      <div className="flex items-center justify-between mt-10 mb-3">
-        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">③ Palette de couleurs</h4>
-        <button type="button" onClick={addPalette} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
-      </div>
-      <div className="space-y-3">
-        {palette.map((c, i) => (
-          <div key={i} className="flex items-center gap-3 bg-cream/40 border border-linen p-3">
-            <input type="color" value={c.hex || '#cccccc'} onChange={(e) => updPalette(i, 'hex', e.target.value)} className="h-11 w-14 cursor-pointer rounded-sm border border-ink/15" />
-            <input value={c.name || ''} onChange={(e) => updPalette(i, 'name', e.target.value)} placeholder="Nom (ex. Rose poudré)" className="flex-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-            <input value={c.hex || ''} onChange={(e) => updPalette(i, 'hex', e.target.value)} placeholder="#C98498" className="w-28 bg-transparent border-b border-ink/20 py-2 font-mono text-sm focus:outline-none focus:border-ink" />
-            <button type="button" onClick={() => rmPalette(i)} className="text-terracotta hover:opacity-70 h-11 w-11 flex items-center justify-center" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
-          </div>
-        ))}
-      </div>
-
-      {/* MATIÈRES */}
-      <div className="flex items-center justify-between mt-10 mb-3">
-        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">④ Matières</h4>
-        <button type="button" onClick={addMaterial} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        {materials.map((m, i) => (
-          <div key={i} className="border border-linen bg-cream/30 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Matière {i + 1}</span>
-              <button type="button" onClick={() => rmMaterial(i)} className="text-terracotta hover:opacity-70" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
-            </div>
-            <Field label="Nom"><input value={m.name || ''} onChange={(e) => updMat(i, 'name', e.target.value)} placeholder="Ex. Cordons tresse" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Photo">
-              <ImageUploader images={m.image ? [m.image] : []} onChange={(arr) => updMat(i, 'image', arr[arr.length - 1] || '')} />
-            </Field>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}

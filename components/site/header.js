@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Menu, Search, Heart, User, ShoppingBag, X } from 'lucide-react'
+import { Menu, Search, Heart, User, ShoppingBag, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useCart } from './cart-provider'
 import { useAuth } from './auth-provider'
 import Logo from './logo'
@@ -23,6 +24,12 @@ export default function Header({ transparent = false }) {
   const [mobile, setMobile] = useState(false)
   const { count, setOpen } = useCart()
   const { user } = useAuth()
+  const router = useRouter()
+  // Retour : page précédente si elle existe, sinon l'accueil
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back()
+    else router.push('/')
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -56,9 +63,34 @@ export default function Header({ transparent = false }) {
             >
               <Menu className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <button className="hidden lg:flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] hover:opacity-60 transition">
-              <Search className="h-4 w-4" strokeWidth={1.5} /> Rechercher
-            </button>
+            <div className="flex flex-col items-start gap-2">
+              <button className="hidden lg:flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] hover:opacity-60 transition">
+                <Search className="h-4 w-4" strokeWidth={1.5} /> Rechercher
+              </button>
+              {/* Navigation précédente / suivante */}
+              <div className="flex items-center gap-1.5" data-testid="header-history-nav">
+                <button
+                  type="button"
+                  onClick={goBack}
+                  aria-label="Page précédente"
+                  title="Page précédente"
+                  data-testid="nav-back"
+                  className="h-8 w-8 lg:h-7 lg:w-7 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
+                >
+                  <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.forward()}
+                  aria-label="Page suivante"
+                  title="Page suivante"
+                  data-testid="nav-forward"
+                  className="h-8 w-8 lg:h-7 lg:w-7 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
+                >
+                  <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Center: logo Atelier JLT */}

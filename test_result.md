@@ -3612,3 +3612,31 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+
+
+    - agent: "main"
+      message: |
+        UNIFIED EDITOR (admin == visual edit mode) + Intemporels product picking + PE palette/matières.
+        Frontend-only changes (no backend change; same PATCH /api/admin/site-content):
+        - Shared fields: components/edit/section-fields.js (used by /?edit=1 panel AND /admin → Éditeur de l'accueil).
+        - Product carousels: content.selectionMode 'auto' (filter by category) | 'manual' (content.pickedProducts slugs, ordered).
+          testids: carousel-mode-auto, carousel-mode-manual, open-product-picker, pick-<slug>, confirm-product-picker, picked-item-<slug>.
+        - Shared "Ajouter une section" modal (components/edit/add-section-modal.js) in both places (testid add-section-modal, admin button admin-add-section).
+        - Edit mode renders sections LIVE from context (components/edit/live-sections.js) — no reload after save.
+        - Admin pages editor (components/admin/page-content-editor.js) for about / collectionPE2027 / contact via lib/page-content-config.js.
+        - PE page: editable paletteEyebrow/paletteTitle/materialsEyebrow/materialsTitle; palette & materials centered whatever the count.
+        - Product carousel cards show color swatches. Fixed broken comment that hid TabSettings in admin.
+        Admin password: Juliette99*
+
+    - agent: "main"
+      message: |
+        Shipping labels + misc (frontend only):
+        - /admin/etiquettes?ids=a,b&docs=label,return : printable 10x15cm sheets (.label-sheet), shipping label + return slip.
+        - Admin Commandes tab (components/admin/orders-tab.js): filters, select + "Imprimer la sélection", per-order Bordereaux,
+          details (address, items), tracking number (sets status shipped), French statuses.
+        - Réglages → "Expédition & bordereaux" (settings.shipping: sender name default "Atelier JLT", optional address, return text,
+          labelProvider simple|colissimo|aggregator — carriers NOT connected yet, simple label used).
+        - All "Drôme / La Roche-sur-Grâne / Vieux mas" address mentions removed; contact page address block removed.
+        - Cart drawer: trash icon per item, minus at qty 1 removes; checkout summary: +/- and "Supprimer".
+        - Header: back/forward arrows under "Rechercher" (testids nav-back, nav-forward).
+

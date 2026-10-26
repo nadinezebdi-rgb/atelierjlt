@@ -7,52 +7,12 @@ import CartDrawer from '@/components/site/cart-drawer'
 import PageEditShell from '@/components/edit/page-edit-shell'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Instagram, Facebook, Mail, MapPin } from 'lucide-react'
+import { Instagram, Facebook, Mail } from 'lucide-react'
 
-const DEFAULT_CONTENT = {
-  eyebrow: 'Nous contacter',
-  title: 'Nous écrivons de vraies réponses.',
-  description: "Une question, un projet, une commande spéciale ? Notre atelier est joignable du lundi au vendredi.",
-  formNameLabel: 'Votre nom',
-  formEmailLabel: 'Votre email',
-  formMessageLabel: 'Votre message',
-  formButtonLabel: 'Envoyer le message',
-  formButtonSending: 'Envoi…',
-  successMessage: 'Message envoyé. Nous revenons vers vous rapidement.',
-  errorMessage: 'Champs invalides.',
-  infoEmailTitle: 'Bonjour',
-  infoEmailValue: 'contact@atelierjlt.fr',
-  infoAddressTitle: 'Atelier',
-  infoAddressValue: 'Vieux mas, La Roche-sur-Grâne — Drôme',
-  socialTitle: 'Suivez-nous',
-  instagramUrl: 'https://instagram.com/atelierjlt',
-  facebookUrl: 'https://facebook.com/atelierjlt',
-  showInstagram: true,
-  showFacebook: true,
-}
+import { CONTACT_DEFAULTS, CONTACT_FIELDS } from '@/lib/page-content-config'
 
-const EDIT_FIELDS = [
-  { key: 'eyebrow', type: 'text', label: 'Petit texte (sur-titre)' },
-  { key: 'title', type: 'textarea', label: 'Grand titre' },
-  { key: 'description', type: 'textarea', label: 'Description sous le titre' },
-
-  { key: 'formNameLabel', type: 'text', label: 'Formulaire — label "Nom"' },
-  { key: 'formEmailLabel', type: 'text', label: 'Formulaire — label "Email"' },
-  { key: 'formMessageLabel', type: 'text', label: 'Formulaire — label "Message"' },
-  { key: 'formButtonLabel', type: 'text', label: 'Texte du bouton d\u2019envoi' },
-  { key: 'formButtonSending', type: 'text', label: 'Texte pendant l\u2019envoi' },
-  { key: 'successMessage', type: 'text', label: 'Message de succès' },
-  { key: 'errorMessage', type: 'text', label: 'Message d\u2019erreur' },
-
-  { key: 'infoEmailTitle', type: 'text', label: 'Bloc email — titre' },
-  { key: 'infoEmailValue', type: 'text', label: 'Bloc email — adresse' },
-  { key: 'infoAddressTitle', type: 'text', label: 'Bloc atelier — titre' },
-  { key: 'infoAddressValue', type: 'textarea', label: 'Bloc atelier — adresse' },
-
-  { key: 'socialTitle', type: 'text', label: 'Réseaux — titre' },
-  { key: 'instagramUrl', type: 'text', label: 'Instagram — lien' },
-  { key: 'facebookUrl', type: 'text', label: 'Facebook — lien' },
-]
+const DEFAULT_CONTENT = CONTACT_DEFAULTS
+const EDIT_FIELDS = CONTACT_FIELDS
 
 export default function ContactPage() {
   const [content, setContent] = useState(DEFAULT_CONTENT)
@@ -136,9 +96,6 @@ export default function ContactPage() {
           <div className="space-y-8 md:pl-10 md:border-l border-linen">
             {c.infoEmailValue && (
               <InfoRow icon={Mail} title={c.infoEmailTitle} value={c.infoEmailValue} />
-            )}
-            {c.infoAddressValue && (
-              <InfoRow icon={MapPin} title={c.infoAddressTitle} value={c.infoAddressValue} />
             )}
             {(c.showInstagram !== false || c.showFacebook !== false) && (
               <div>

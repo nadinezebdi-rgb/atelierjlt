@@ -32,7 +32,7 @@ export default function Atelier() {
           </h2>
           <div className="mt-6 space-y-4 text-ink/70 leading-relaxed max-w-lg">
             <p>
-              Nos créations naissent dans un ancien mas drômois, entre l'odeur du bois et le silence du crochet.
+              Nos créations naissent à l'atelier, entre l'odeur du bois et le silence du crochet.
               Nous travaillons lentement, volontairement.
             </p>
             <p>

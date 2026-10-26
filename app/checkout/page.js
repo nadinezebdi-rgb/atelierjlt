@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet } from 'lucide-react'
+import { Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet, Minus, Plus, Trash2 } from 'lucide-react'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import { useCart } from '@/components/site/cart-provider'
@@ -13,7 +13,7 @@ import { useAuth } from '@/components/site/auth-provider'
 import { formatPrice } from '@/lib/utils'
 
 export default function CheckoutPage() {
-  const { items, subtotal, refresh } = useCart()
+  const { items, subtotal, refresh, update, remove } = useCart()
   const { user } = useAuth()
   const router = useRouter()
 
@@ -358,6 +358,34 @@ export default function CheckoutPage() {
                       <div className="text-sm font-medium leading-tight truncate">{it.name}</div>
                       <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 mt-0.5">
                         {[it.variant, it.size].filter(Boolean).join(' · ') || it.category}
+                      </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => (it.qty <= 1 ? remove(it.slug, { variant: it.variant, size: it.size }) : update(it.slug, it.qty - 1, { variant: it.variant, size: it.size }))}
+                          className="h-8 w-8 flex items-center justify-center border border-linen bg-ivory hover:border-ink/40"
+                          aria-label={it.qty <= 1 ? 'Supprimer' : 'Diminuer la quantité'}
+                        >
+                          <Minus className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                        <span className="w-7 text-center text-xs tabular-nums">{it.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => update(it.slug, it.qty + 1, { variant: it.variant, size: it.size })}
+                          className="h-8 w-8 flex items-center justify-center border border-linen bg-ivory hover:border-ink/40"
+                          aria-label="Augmenter la quantité"
+                        >
+                          <Plus className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(it.slug, { variant: it.variant, size: it.size })}
+                          className="ml-2 h-8 px-2 flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-ink/50 hover:text-terracotta"
+                          aria-label={`Supprimer ${it.name}`}
+                          data-testid={`checkout-remove-${it.slug}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} /> Supprimer
+                        </button>
                       </div>
                     </div>
                     <div className="text-sm tabular-nums self-center">{formatPrice(it.price * it.qty)}</div>

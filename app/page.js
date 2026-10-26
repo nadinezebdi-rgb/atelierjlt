@@ -2,18 +2,13 @@ import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import HeroCarousel from '@/components/home/hero-carousel'
-import CategoryTiles from '@/components/home/category-tiles'
-import EditorialBanner from '@/components/home/editorial-banner'
-import ProductCarousel from '@/components/home/product-carousel'
-import CarouselImageGallery from '@/components/home/carousel-image-gallery'
-import CollectionsThemes from '@/components/home/collections-themes'
-import Newsletter from '@/components/home/newsletter'
+import renderSection from '@/components/home/render-section'
 import { getDb } from '@/lib/db'
 import { mergeHomepageSections } from '@/lib/homepage-sections'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import EditModeProvider from '@/components/edit/edit-mode-provider'
-import SectionShell from '@/components/edit/section-shell'
+import LiveSections from '@/components/edit/live-sections'
 import HeroShell from '@/components/edit/hero-shell'
 
 // Toujours frais : les changements admin apparaissent immédiatement
@@ -32,11 +27,6 @@ const jsonLd = {
     'https://www.instagram.com/atelier.jlt/',
     'https://www.facebook.com/atelier.jlt/',
   ],
-  address: {
-    '@type': 'PostalAddress',
-    addressCountry: 'FR',
-    addressRegion: 'Drôme',
-  },
   contactPoint: {
     '@type': 'ContactPoint',
     contactType: 'customer service',
@@ -89,83 +79,6 @@ function heroToProps(h) {
   }
 }
 
-function renderSection(s) {
-  if (!s.enabled) return null
-  const c = s.content || {}
-  switch (s.type) {
-    case 'category-tiles':
-      return <CategoryTiles key={s.id} />
-    case 'editorial-banner':
-      return (
-        <EditorialBanner
-          key={s.id}
-          image={c.image}
-          eyebrow={c.eyebrow}
-          title={c.title}
-          cta={c.ctaLabel && c.ctaHref ? { label: c.ctaLabel, href: c.ctaHref } : undefined}
-          align={c.align || 'left'}
-          overlay={c.overlay || 'dark'}
-          height={c.height || 'md'}
-        />
-      )
-    case 'product-carousel':
-      // Priorité 1 : vitrine manuelle (produits sélectionnés par l'admin)
-      if (Array.isArray(c.pickedProducts) && c.pickedProducts.length > 0) {
-        return (
-          <ProductCarousel
-            key={s.id}
-            eyebrow={c.eyebrow}
-            title={c.title}
-            description={c.description}
-            viewAllHref={c.viewAllHref}
-            limit={Number(c.limit) || 8}
-            hideBadges={c.hideBadges === true}
-            pickedSlugs={c.pickedProducts}
-          />
-        )
-      }
-      // Priorité 2 : galerie d'images personnalisées (ancien mode, conservé)
-      if (Array.isArray(c.customImages) && c.customImages.length > 0) {
-        return (
-          <CarouselImageGallery
-            key={s.id}
-            eyebrow={c.eyebrow}
-            title={c.title}
-            viewAllHref={c.viewAllHref}
-            images={c.customImages}
-          />
-        )
-      }
-      return (
-        <ProductCarousel
-          key={s.id}
-          eyebrow={c.eyebrow}
-          title={c.title}
-          description={c.description}
-          viewAllHref={c.viewAllHref}
-          filter={c.filter}
-          limit={Number(c.limit) || 8}
-          hideBadges={c.hideBadges === true}
-        />
-      )
-    case 'collections-themes':
-      return <CollectionsThemes key={s.id} />
-    case 'newsletter':
-      return (
-        <Newsletter
-          key={s.id}
-          eyebrow={c.eyebrow}
-          title={c.title}
-          description={c.description}
-          placeholder={c.placeholder}
-          buttonLabel={c.buttonLabel}
-        />
-      )
-    default:
-      return null
-  }
-}
-
 async function App({ searchParams }) {
   const sp = await searchParams
   const editRequested = sp?.edit === '1'
@@ -201,16 +114,12 @@ async function App({ searchParams }) {
           <HeroCarousel slides={slides} intervalMs={rotationInterval} />
         )}
 
-        {/* Sections modulaires — pilotées depuis /admin → Contenu du site */}
-        {sections.map((s) => {
-          const rendered = renderSection(s)
-          if (!editMode) return rendered
-          return (
-            <SectionShell key={s.id} section={s}>
-              {rendered}
-            </SectionShell>
-          )
-        })}
+        {/* Sections modulaires — pilotées depuis /admin → Éditeur de l'accueil */}
+        {editMode ? (
+          <LiveSections fallback={sections} />
+        ) : (
+          sections.map((s) => renderSection(s))
+        )}
       </main>
       <Footer />
       <CartDrawer />
