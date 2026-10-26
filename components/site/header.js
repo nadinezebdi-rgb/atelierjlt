@@ -63,10 +63,7 @@ export default function Header({ transparent = false }) {
             >
               <Menu className="h-5 w-5" strokeWidth={1.5} />
             </button>
-            <div className="flex flex-col items-start gap-2">
-              <button className="hidden lg:flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] hover:opacity-60 transition">
-                <Search className="h-4 w-4" strokeWidth={1.5} /> Rechercher
-              </button>
+            <div className="flex items-center">
               {/* Navigation précédente / suivante */}
               <div className="flex items-center gap-1.5" data-testid="header-history-nav">
                 <button
@@ -75,7 +72,7 @@ export default function Header({ transparent = false }) {
                   aria-label="Page précédente"
                   title="Page précédente"
                   data-testid="nav-back"
-                  className="h-8 w-8 lg:h-7 lg:w-7 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
+                  className="h-9 w-9 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
                 >
                   <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                 </button>
@@ -85,7 +82,7 @@ export default function Header({ transparent = false }) {
                   aria-label="Page suivante"
                   title="Page suivante"
                   data-testid="nav-forward"
-                  className="h-8 w-8 lg:h-7 lg:w-7 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
+                  className="h-9 w-9 flex items-center justify-center rounded-full border border-ink/15 hover:border-emerald hover:text-emerald transition"
                 >
                   <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                 </button>

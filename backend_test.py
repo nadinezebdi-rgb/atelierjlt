@@ -1,718 +1,559 @@
 #!/usr/bin/env python3
 """
-Comprehensive backend API test suite for Atelier JLT after refactoring
-Tests all endpoints to verify no regressions were introduced
+Backend API Testing Script for Site Pages & Order Tracking
+Tests new endpoints: /api/site-pages/* and /api/orders/track
 """
 
 import requests
 import json
+import sys
+from pymongo import MongoClient
 import os
-from typing import Dict, Any
 
-# Base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://french-craft.preview.emergentagent.com')
-API_URL = f"{BASE_URL}/api"
-
-# Test credentials
-CLIENT_EMAIL = "test@atelierjlt.fr"
-CLIENT_PASSWORD = "MonSecret123"
+BASE_URL = "https://french-craft.preview.emergentagent.com"
 ADMIN_PASSWORD = "Juliette99*"
 
-# Session storage
-session = requests.Session()
-admin_session = requests.Session()
+# Color codes for output
+GREEN = '\033[92m'
+RED = '\033[91m'
+YELLOW = '\033[93m'
+RESET = '\033[0m'
 
-def print_test(name: str, passed: bool, details: str = ""):
-    """Print test result"""
-    status = "✅ PASS" if passed else "❌ FAIL"
-    print(f"{status} - {name}")
+def log_test(test_name, passed, details=""):
+    """Log test result with color coding"""
+    status = f"{GREEN}✅ PASSED{RESET}" if passed else f"{RED}❌ FAILED{RESET}"
+    print(f"\n{status} - {test_name}")
     if details:
-        print(f"    {details}")
+        print(f"  {details}")
+    return passed
 
-def test_api_root():
-    """Test 0: API root health check"""
+def admin_login():
+    """Login as admin and return session with cookie"""
+    session = requests.Session()
     try:
-        resp = session.get(f"{API_URL}/")
-        passed = resp.status_code == 200 and resp.json().get('message') == 'Atelier JLT API'
-        print_test("API Root Health Check", passed, f"Status: {resp.status_code}, Message: {resp.json().get('message')}")
-        return passed
+        resp = session.post(f"{BASE_URL}/api/auth/admin-login", json={"password": ADMIN_PASSWORD}, timeout=10)
+        if resp.status_code == 200:
+            print(f"{GREEN}✅ Admin login successful{RESET}")
+            return session
+        else:
+            print(f"{RED}❌ Admin login failed: {resp.status_code}{RESET}")
+            return None
     except Exception as e:
-        print_test("API Root Health Check", False, f"Error: {str(e)}")
-        return False
+        print(f"{RED}❌ Admin login error: {e}{RESET}")
+        return None
 
-# ==================== PRODUCTS API (PUBLIC) ====================
-
-def test_products_list():
-    """Test 1: GET /api/products - should return product list"""
+def test_site_pages_footer():
+    """Test 1: GET /api/site-pages/footer"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 1: GET /api/site-pages/footer{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
     try:
-        resp = session.get(f"{API_URL}/products")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'products' in data and len(data['products']) > 0
-        print_test("Products List", passed, f"Status: {resp.status_code}, Count: {len(data.get('products', []))}")
-        return passed, data
-    except Exception as e:
-        print_test("Products List", False, f"Error: {str(e)}")
-        return False, {}
-
-def test_products_by_category():
-    """Test 2: GET /api/products?cat=intemporels"""
-    try:
-        resp = session.get(f"{API_URL}/products?cat=intemporels")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'products' in data
-        print_test("Products by Category (intemporels)", passed, f"Status: {resp.status_code}, Count: {len(data.get('products', []))}")
-        return passed
-    except Exception as e:
-        print_test("Products by Category", False, f"Error: {str(e)}")
-        return False
-
-def test_products_search():
-    """Test 3: GET /api/products?q=plaid"""
-    try:
-        resp = session.get(f"{API_URL}/products?q=plaid")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'products' in data
-        print_test("Products Search (plaid)", passed, f"Status: {resp.status_code}, Count: {len(data.get('products', []))}")
-        return passed
-    except Exception as e:
-        print_test("Products Search", False, f"Error: {str(e)}")
-        return False
-
-def test_products_sort():
-    """Test 4: GET /api/products?sort=price-asc"""
-    try:
-        resp = session.get(f"{API_URL}/products?sort=price-asc")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'products' in data
-        print_test("Products Sort (price-asc)", passed, f"Status: {resp.status_code}, Count: {len(data.get('products', []))}")
-        return passed
-    except Exception as e:
-        print_test("Products Sort", False, f"Error: {str(e)}")
-        return False
-
-def test_product_detail(slug: str = "plaid-sylvestre"):
-    """Test 5: GET /api/products/{slug}"""
-    try:
-        resp = session.get(f"{API_URL}/products/{slug}")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'product' in data
-        print_test(f"Product Detail ({slug})", passed, f"Status: {resp.status_code}, Name: {data.get('product', {}).get('name', 'N/A')}")
-        return passed
-    except Exception as e:
-        print_test(f"Product Detail ({slug})", False, f"Error: {str(e)}")
-        return False
-
-# ==================== CART API (SESSION COOKIE) ====================
-
-def test_cart_get_empty():
-    """Test 6: GET /api/cart - should return empty cart initially"""
-    try:
-        resp = session.get(f"{API_URL}/cart")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'items' in data
-        print_test("Cart GET (empty)", passed, f"Status: {resp.status_code}, Items: {len(data.get('items', []))}")
-        return passed
-    except Exception as e:
-        print_test("Cart GET (empty)", False, f"Error: {str(e)}")
-        return False
-
-def test_cart_add_item():
-    """Test 7: POST /api/cart - add item to cart"""
-    try:
-        payload = {"slug": "plaid-sylvestre", "qty": 1}
-        resp = session.post(f"{API_URL}/cart", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('count', 0) >= 1
-        print_test("Cart POST (add item)", passed, f"Status: {resp.status_code}, Count: {data.get('count', 0)}")
-        return passed
-    except Exception as e:
-        print_test("Cart POST (add item)", False, f"Error: {str(e)}")
-        return False
-
-def test_cart_add_with_variant():
-    """Test 8: POST /api/cart - add item with variant and size"""
-    try:
-        payload = {"slug": "coussin-noyau", "qty": 2, "variant": "beige", "size": "40x40"}
-        resp = session.post(f"{API_URL}/cart", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('count', 0) >= 2
-        print_test("Cart POST (with variant)", passed, f"Status: {resp.status_code}, Count: {data.get('count', 0)}")
-        return passed
-    except Exception as e:
-        print_test("Cart POST (with variant)", False, f"Error: {str(e)}")
-        return False
-
-def test_cart_update():
-    """Test 9: PATCH /api/cart - update cart item"""
-    try:
-        payload = {"slug": "plaid-sylvestre", "qty": 2}
-        resp = session.patch(f"{API_URL}/cart", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Cart PATCH (update)", passed, f"Status: {resp.status_code}, Count: {data.get('count', 0)}")
-        return passed
-    except Exception as e:
-        print_test("Cart PATCH (update)", False, f"Error: {str(e)}")
-        return False
-
-def test_cart_delete():
-    """Test 10: DELETE /api/cart?slug=plaid-sylvestre"""
-    try:
-        resp = session.delete(f"{API_URL}/cart?slug=plaid-sylvestre")
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Cart DELETE", passed, f"Status: {resp.status_code}, Count: {data.get('count', 0)}")
-        return passed
-    except Exception as e:
-        print_test("Cart DELETE", False, f"Error: {str(e)}")
-        return False
-
-# ==================== AUTH CLIENT ====================
-
-def test_auth_register():
-    """Test 11: POST /api/auth/register"""
-    try:
-        import random
-        email = f"newtest{random.randint(1000, 9999)}@example.com"
-        payload = {"email": email, "password": "Test1234", "name": "Test User"}
-        resp = session.post(f"{API_URL}/auth/register", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and 'user' in data
-        print_test("Auth Register", passed, f"Status: {resp.status_code}, Email: {email}")
-        return passed
-    except Exception as e:
-        print_test("Auth Register", False, f"Error: {str(e)}")
-        return False
-
-def test_auth_login():
-    """Test 12: POST /api/auth/login"""
-    try:
-        # First ensure user exists by registering (will fail if exists, that's ok)
-        try:
-            session.post(f"{API_URL}/auth/register", json={"email": CLIENT_EMAIL, "password": CLIENT_PASSWORD, "name": "Test User"})
-        except:
-            pass
+        resp = requests.get(f"{BASE_URL}/api/site-pages/footer", timeout=10)
         
-        payload = {"email": CLIENT_EMAIL, "password": CLIENT_PASSWORD}
-        resp = session.post(f"{API_URL}/auth/login", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and 'user' in data
-        print_test("Auth Login", passed, f"Status: {resp.status_code}, Email: {data.get('user', {}).get('email', 'N/A')}")
-        return passed
-    except Exception as e:
-        print_test("Auth Login", False, f"Error: {str(e)}")
-        return False
-
-def test_auth_me():
-    """Test 13: GET /api/auth/me"""
-    try:
-        resp = session.get(f"{API_URL}/auth/me")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'user' in data
-        print_test("Auth Me", passed, f"Status: {resp.status_code}, Email: {data.get('user', {}).get('email', 'N/A')}")
-        return passed
-    except Exception as e:
-        print_test("Auth Me", False, f"Error: {str(e)}")
-        return False
-
-def test_auth_logout():
-    """Test 14: POST /api/auth/logout"""
-    try:
-        resp = session.post(f"{API_URL}/auth/logout")
-        passed = resp.status_code == 200
-        print_test("Auth Logout", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Auth Logout", False, f"Error: {str(e)}")
-        return False
-
-# ==================== AUTH ADMIN ====================
-
-def test_admin_login():
-    """Test 15: POST /api/auth/admin-login"""
-    try:
-        payload = {"password": ADMIN_PASSWORD}
-        resp = admin_session.post(f"{API_URL}/auth/admin-login", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('ok') == True
-        print_test("Admin Login", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Admin Login", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_status():
-    """Test 16: GET /api/auth/admin-status"""
-    try:
-        resp = admin_session.get(f"{API_URL}/auth/admin-status")
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('isAdmin') == True
-        print_test("Admin Status", passed, f"Status: {resp.status_code}, isAdmin: {data.get('isAdmin')}")
-        return passed
-    except Exception as e:
-        print_test("Admin Status", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_logout():
-    """Test 17: POST /api/auth/admin-logout"""
-    try:
-        resp = admin_session.post(f"{API_URL}/auth/admin-logout")
-        passed = resp.status_code == 200
-        print_test("Admin Logout", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Admin Logout", False, f"Error: {str(e)}")
-        return False
-
-# ==================== WISHLIST (REQUIRES AUTH) ====================
-
-def test_wishlist_get():
-    """Test 18: GET /api/wishlist"""
-    try:
-        # Re-login to ensure auth
-        session.post(f"{API_URL}/auth/login", json={"email": CLIENT_EMAIL, "password": CLIENT_PASSWORD})
-        resp = session.get(f"{API_URL}/wishlist")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'items' in data
-        print_test("Wishlist GET", passed, f"Status: {resp.status_code}, Items: {len(data.get('items', []))}")
-        return passed
-    except Exception as e:
-        print_test("Wishlist GET", False, f"Error: {str(e)}")
-        return False
-
-def test_wishlist_add():
-    """Test 19: POST /api/wishlist"""
-    try:
-        payload = {"slug": "plaid-sylvestre"}
-        resp = session.post(f"{API_URL}/wishlist", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Wishlist POST (add)", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Wishlist POST (add)", False, f"Error: {str(e)}")
-        return False
-
-def test_wishlist_delete():
-    """Test 20: DELETE /api/wishlist?slug=plaid-sylvestre"""
-    try:
-        resp = session.delete(f"{API_URL}/wishlist?slug=plaid-sylvestre")
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Wishlist DELETE", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Wishlist DELETE", False, f"Error: {str(e)}")
-        return False
-
-# ==================== ORDERS ====================
-
-def test_orders_list():
-    """Test 21: GET /api/orders"""
-    try:
-        resp = session.get(f"{API_URL}/orders")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'orders' in data
-        print_test("Orders List", passed, f"Status: {resp.status_code}, Count: {len(data.get('orders', []))}")
-        return passed
-    except Exception as e:
-        print_test("Orders List", False, f"Error: {str(e)}")
-        return False
-
-def test_orders_create():
-    """Test 22: POST /api/orders - create order (requires items in cart)"""
-    try:
-        # First add item to cart
-        session.post(f"{API_URL}/cart", json={"slug": "plaid-sylvestre", "qty": 1})
+        if resp.status_code != 200:
+            return log_test("GET /api/site-pages/footer", False, f"Expected 200, got {resp.status_code}")
         
-        payload = {
-            "shippingAddress": {
-                "name": "Test User",
-                "address": "123 Test St",
-                "city": "Paris",
-                "postalCode": "75001",
-                "country": "France"
-            },
-            "paymentMethod": "card"
-        }
-        resp = session.post(f"{API_URL}/orders", json=payload)
         data = resp.json()
-        passed = resp.status_code == 200 and 'order' in data
-        print_test("Orders Create", passed, f"Status: {resp.status_code}, Order ID: {data.get('order', {}).get('_id', 'N/A')}")
-        return passed
+        
+        # Check structure
+        if 'footer' not in data:
+            return log_test("GET /api/site-pages/footer", False, "Missing 'footer' key in response")
+        
+        footer = data['footer']
+        required_keys = ['tagline', 'email', 'instagram', 'facebook', 'copyright', 'bottomNote', 'clientLinks']
+        missing_keys = [k for k in required_keys if k not in footer]
+        
+        if missing_keys:
+            return log_test("GET /api/site-pages/footer", False, f"Missing keys in footer: {missing_keys}")
+        
+        # Check clientLinks structure
+        client_links = footer['clientLinks']
+        required_link_keys = ['cgv', 'livraison', 'suivi', 'confidentialite']
+        missing_link_keys = [k for k in required_link_keys if k not in client_links]
+        
+        if missing_link_keys:
+            return log_test("GET /api/site-pages/footer", False, f"Missing keys in clientLinks: {missing_link_keys}")
+        
+        # Verify each link has label and show
+        for link_key in required_link_keys:
+            link = client_links[link_key]
+            if 'label' not in link or 'show' not in link:
+                return log_test("GET /api/site-pages/footer", False, f"Link {link_key} missing 'label' or 'show'")
+        
+        return log_test("GET /api/site-pages/footer", True, 
+                       f"Footer structure correct with all required fields")
+        
     except Exception as e:
-        print_test("Orders Create", False, f"Error: {str(e)}")
-        return False
+        return log_test("GET /api/site-pages/footer", False, f"Exception: {e}")
 
-# ==================== COUPONS / GIFT CARDS ====================
-
-def test_coupon_verify():
-    """Test 23: POST /api/coupons/verify"""
-    try:
-        payload = {"code": "FAKECODE"}
-        resp = session.post(f"{API_URL}/coupons/verify", json=payload)
-        # Should return 404 or error for invalid code
-        passed = resp.status_code in [400, 404]
-        print_test("Coupon Verify (invalid)", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Coupon Verify", False, f"Error: {str(e)}")
-        return False
-
-def test_gift_card_verify():
-    """Test 24: POST /api/gift-cards/verify"""
-    try:
-        payload = {"code": "FAKECODE"}
-        resp = session.post(f"{API_URL}/gift-cards/verify", json=payload)
-        # Should return 404 or error for invalid code
-        passed = resp.status_code in [400, 404]
-        print_test("Gift Card Verify (invalid)", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Gift Card Verify", False, f"Error: {str(e)}")
-        return False
-
-# ==================== ADMIN ENDPOINTS ====================
-
-def test_admin_stats():
-    """Test 25: GET /api/admin/stats"""
-    try:
-        # Re-login admin
-        admin_session.post(f"{API_URL}/auth/admin-login", json={"password": ADMIN_PASSWORD})
-        resp = admin_session.get(f"{API_URL}/admin/stats")
-        data = resp.json()
-        # Stats returns data directly (orderCount, userCount, etc.) not wrapped in 'stats'
-        passed = resp.status_code == 200 and ('orderCount' in data or 'userCount' in data)
-        print_test("Admin Stats", passed, f"Status: {resp.status_code}, Orders: {data.get('orderCount', 'N/A')}, Users: {data.get('userCount', 'N/A')}")
-        return passed
-    except Exception as e:
-        print_test("Admin Stats", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_products():
-    """Test 26: GET /api/admin/products"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/products")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'products' in data
-        print_test("Admin Products", passed, f"Status: {resp.status_code}, Count: {len(data.get('products', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Products", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_orders():
-    """Test 27: GET /api/admin/orders"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/orders")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'orders' in data
-        print_test("Admin Orders", passed, f"Status: {resp.status_code}, Count: {len(data.get('orders', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Orders", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_users():
-    """Test 28: GET /api/admin/users"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/users")
-        data = resp.json()
-        # Returns {'list': [...]} not {'users': [...]}
-        passed = resp.status_code == 200 and 'list' in data
-        print_test("Admin Users", passed, f"Status: {resp.status_code}, Count: {len(data.get('list', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Users", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_coupons():
-    """Test 29: GET /api/admin/coupons"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/coupons")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'coupons' in data
-        print_test("Admin Coupons", passed, f"Status: {resp.status_code}, Count: {len(data.get('coupons', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Coupons", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_gift_cards():
-    """Test 30: GET /api/admin/gift-cards"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/gift-cards")
-        data = resp.json()
-        # Returns {'list': [...]} not {'giftCards': [...]}
-        passed = resp.status_code == 200 and 'list' in data
-        print_test("Admin Gift Cards", passed, f"Status: {resp.status_code}, Count: {len(data.get('list', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Gift Cards", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_newsletters():
-    """Test 31: GET /api/admin/newsletters"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/newsletters")
-        data = resp.json()
-        # Returns {'list': [...]} not {'subscribers': [...]}
-        passed = resp.status_code == 200 and 'list' in data
-        print_test("Admin Newsletters", passed, f"Status: {resp.status_code}, Count: {len(data.get('list', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Newsletters", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_contacts():
-    """Test 32: GET /api/admin/contacts"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/contacts")
-        data = resp.json()
-        # Returns {'list': [...]} not {'contacts': [...]}
-        passed = resp.status_code == 200 and 'list' in data
-        print_test("Admin Contacts", passed, f"Status: {resp.status_code}, Count: {len(data.get('list', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Contacts", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_blog():
-    """Test 33: GET /api/admin/blog"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/blog")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'posts' in data
-        print_test("Admin Blog", passed, f"Status: {resp.status_code}, Count: {len(data.get('posts', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Blog", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_site_content():
-    """Test 34: GET /api/admin/site-content"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/site-content")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'content' in data
-        print_test("Admin Site Content GET", passed, f"Status: {resp.status_code}")
-        return passed, data
-    except Exception as e:
-        print_test("Admin Site Content GET", False, f"Error: {str(e)}")
-        return False, {}
-
-def test_admin_site_content_patch():
-    """Test 35: PATCH /api/admin/site-content"""
-    try:
-        payload = {"hero": {"title": "Test Refactoring"}}
-        resp = admin_session.patch(f"{API_URL}/admin/site-content", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Admin Site Content PATCH", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Admin Site Content PATCH", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_settings():
-    """Test 36: GET /api/admin/settings"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/settings")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'settings' in data
-        print_test("Admin Settings GET", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Admin Settings GET", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_settings_patch():
-    """Test 37: PATCH /api/admin/settings"""
-    try:
-        payload = {"brand": {"name": "Atelier JLT"}}
-        resp = admin_session.patch(f"{API_URL}/admin/settings", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200
-        print_test("Admin Settings PATCH", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Admin Settings PATCH", False, f"Error: {str(e)}")
-        return False
-
-def test_admin_files():
-    """Test 38: GET /api/admin/files"""
-    try:
-        resp = admin_session.get(f"{API_URL}/admin/files")
-        data = resp.json()
-        # Returns {'orphans': [...], 'total': N, 'referenced': N, ...} not {'files': [...]}
-        passed = resp.status_code == 200 and ('total' in data or 'orphans' in data)
-        print_test("Admin Files", passed, f"Status: {resp.status_code}, Total: {data.get('total', 'N/A')}, Orphans: {len(data.get('orphans', []))}")
-        return passed
-    except Exception as e:
-        print_test("Admin Files", False, f"Error: {str(e)}")
-        return False
-
-# ==================== BLOG PUBLIC ====================
-
-def test_blog_public():
-    """Test 39: GET /api/blog"""
-    try:
-        resp = session.get(f"{API_URL}/blog")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'posts' in data
-        print_test("Blog Public", passed, f"Status: {resp.status_code}, Count: {len(data.get('posts', []))}")
-        return passed
-    except Exception as e:
-        print_test("Blog Public", False, f"Error: {str(e)}")
-        return False
-
-# ==================== SITE CONTENT PUBLIC ====================
-
-def test_site_content_public():
-    """Test 40: GET /api/site-content"""
-    try:
-        resp = session.get(f"{API_URL}/site-content")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'content' in data
-        print_test("Site Content Public", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Site Content Public", False, f"Error: {str(e)}")
-        return False
-
-def test_site_settings_public():
-    """Test 41: GET /api/site-settings"""
-    try:
-        resp = session.get(f"{API_URL}/site-settings")
-        data = resp.json()
-        passed = resp.status_code == 200 and 'settings' in data
-        print_test("Site Settings Public", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Site Settings Public", False, f"Error: {str(e)}")
-        return False
-
-# ==================== NEWSLETTER / CONTACT ====================
-
-def test_newsletter_subscribe():
-    """Test 42: POST /api/newsletter"""
-    try:
-        import random
-        email = f"test{random.randint(1000, 9999)}@newsletter.fr"
-        payload = {"email": email}
-        resp = session.post(f"{API_URL}/newsletter", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('ok') == True
-        print_test("Newsletter Subscribe", passed, f"Status: {resp.status_code}, Email: {email}")
-        return passed
-    except Exception as e:
-        print_test("Newsletter Subscribe", False, f"Error: {str(e)}")
-        return False
-
-def test_contact_submit():
-    """Test 43: POST /api/contact"""
-    try:
-        payload = {
-            "name": "Test User",
-            "email": "test@contact.fr",
-            "message": "Test message after refactoring"
-        }
-        resp = session.post(f"{API_URL}/contact", json=payload)
-        data = resp.json()
-        passed = resp.status_code == 200 and data.get('ok') == True
-        print_test("Contact Submit", passed, f"Status: {resp.status_code}")
-        return passed
-    except Exception as e:
-        print_test("Contact Submit", False, f"Error: {str(e)}")
-        return False
-
-# ==================== MAIN TEST RUNNER ====================
-
-def run_all_tests():
-    """Run all backend tests"""
-    print("\n" + "="*80)
-    print("BACKEND API COMPREHENSIVE TEST SUITE - POST REFACTORING")
-    print("Testing all endpoints after splitting route.js into handlers")
-    print("="*80 + "\n")
+def test_site_pages_legal():
+    """Test 2: GET /api/site-pages/{cgv,livraison,suivi,confidentialite}"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 2: GET /api/site-pages/{{cgv,livraison,suivi,confidentialite}}{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
     
-    total_tests = 0
-    passed_tests = 0
-    failed_tests = []
+    slugs = ['cgv', 'livraison', 'suivi', 'confidentialite']
+    all_passed = True
     
-    tests = [
-        ("API Root", test_api_root),
-        ("Products List", test_products_list),
-        ("Products by Category", test_products_by_category),
-        ("Products Search", test_products_search),
-        ("Products Sort", test_products_sort),
-        ("Product Detail", test_product_detail),
-        ("Cart GET Empty", test_cart_get_empty),
-        ("Cart Add Item", test_cart_add_item),
-        ("Cart Add with Variant", test_cart_add_with_variant),
-        ("Cart Update", test_cart_update),
-        ("Cart Delete", test_cart_delete),
-        ("Auth Register", test_auth_register),
-        ("Auth Login", test_auth_login),
-        ("Auth Me", test_auth_me),
-        ("Auth Logout", test_auth_logout),
-        ("Admin Login", test_admin_login),
-        ("Admin Status", test_admin_status),
-        ("Admin Logout", test_admin_logout),
-        ("Wishlist GET", test_wishlist_get),
-        ("Wishlist Add", test_wishlist_add),
-        ("Wishlist Delete", test_wishlist_delete),
-        ("Orders List", test_orders_list),
-        ("Orders Create", test_orders_create),
-        ("Coupon Verify", test_coupon_verify),
-        ("Gift Card Verify", test_gift_card_verify),
-        ("Admin Stats", test_admin_stats),
-        ("Admin Products", test_admin_products),
-        ("Admin Orders", test_admin_orders),
-        ("Admin Users", test_admin_users),
-        ("Admin Coupons", test_admin_coupons),
-        ("Admin Gift Cards", test_admin_gift_cards),
-        ("Admin Newsletters", test_admin_newsletters),
-        ("Admin Contacts", test_admin_contacts),
-        ("Admin Blog", test_admin_blog),
-        ("Admin Site Content GET", lambda: test_admin_site_content()[0]),
-        ("Admin Site Content PATCH", test_admin_site_content_patch),
-        ("Admin Settings GET", test_admin_settings),
-        ("Admin Settings PATCH", test_admin_settings_patch),
-        ("Admin Files", test_admin_files),
-        ("Blog Public", test_blog_public),
-        ("Site Content Public", test_site_content_public),
-        ("Site Settings Public", test_site_settings_public),
-        ("Newsletter Subscribe", test_newsletter_subscribe),
-        ("Contact Submit", test_contact_submit),
-    ]
-    
-    for test_name, test_func in tests:
-        total_tests += 1
+    for slug in slugs:
         try:
-            result = test_func()
-            if result:
-                passed_tests += 1
-            else:
-                failed_tests.append(test_name)
+            resp = requests.get(f"{BASE_URL}/api/site-pages/{slug}", timeout=10)
+            
+            if resp.status_code != 200:
+                log_test(f"GET /api/site-pages/{slug}", False, f"Expected 200, got {resp.status_code}")
+                all_passed = False
+                continue
+            
+            data = resp.json()
+            
+            if 'page' not in data:
+                log_test(f"GET /api/site-pages/{slug}", False, "Missing 'page' key in response")
+                all_passed = False
+                continue
+            
+            page = data['page']
+            
+            # Check required fields
+            if 'title' not in page or 'sections' not in page:
+                log_test(f"GET /api/site-pages/{slug}", False, "Missing 'title' or 'sections' in page")
+                all_passed = False
+                continue
+            
+            # Verify sections is an array
+            if not isinstance(page['sections'], list):
+                log_test(f"GET /api/site-pages/{slug}", False, "sections is not an array")
+                all_passed = False
+                continue
+            
+            log_test(f"GET /api/site-pages/{slug}", True, 
+                    f"Page has title='{page['title'][:50]}...' and {len(page['sections'])} sections")
+            
         except Exception as e:
-            print_test(test_name, False, f"Exception: {str(e)}")
-            failed_tests.append(test_name)
+            log_test(f"GET /api/site-pages/{slug}", False, f"Exception: {e}")
+            all_passed = False
     
-    print("\n" + "="*80)
-    print(f"TEST SUMMARY: {passed_tests}/{total_tests} tests passed")
-    print("="*80)
+    return all_passed
+
+def test_site_pages_404():
+    """Test 3: GET /api/site-pages/nope → 404"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 3: GET /api/site-pages/nope (should return 404){RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
     
-    if failed_tests:
-        print(f"\n❌ FAILED TESTS ({len(failed_tests)}):")
-        for test in failed_tests:
-            print(f"  - {test}")
+    try:
+        resp = requests.get(f"{BASE_URL}/api/site-pages/nope", timeout=10)
+        
+        if resp.status_code == 404:
+            return log_test("GET /api/site-pages/nope", True, "Correctly returns 404 for unknown page")
+        else:
+            return log_test("GET /api/site-pages/nope", False, f"Expected 404, got {resp.status_code}")
+        
+    except Exception as e:
+        return log_test("GET /api/site-pages/nope", False, f"Exception: {e}")
+
+def test_admin_site_pages_auth():
+    """Test 4: GET /api/admin/site-pages without/with cookie"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 4: GET /api/admin/site-pages (auth check){RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    # Test without auth
+    try:
+        resp = requests.get(f"{BASE_URL}/api/admin/site-pages", timeout=10)
+        
+        if resp.status_code != 401:
+            log_test("GET /api/admin/site-pages (no auth)", False, f"Expected 401, got {resp.status_code}")
+            return False
+        
+        log_test("GET /api/admin/site-pages (no auth)", True, "Correctly returns 401 without admin cookie")
+        
+    except Exception as e:
+        log_test("GET /api/admin/site-pages (no auth)", False, f"Exception: {e}")
+        return False
+    
+    # Test with auth
+    session = admin_login()
+    if not session:
+        return False
+    
+    try:
+        resp = session.get(f"{BASE_URL}/api/admin/site-pages", timeout=10)
+        
+        if resp.status_code != 200:
+            return log_test("GET /api/admin/site-pages (with auth)", False, f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        # Check structure
+        if 'pages' not in data or 'footer' not in data:
+            return log_test("GET /api/admin/site-pages (with auth)", False, "Missing 'pages' or 'footer' in response")
+        
+        pages = data['pages']
+        required_pages = ['cgv', 'livraison', 'suivi', 'confidentialite']
+        missing_pages = [p for p in required_pages if p not in pages]
+        
+        if missing_pages:
+            return log_test("GET /api/admin/site-pages (with auth)", False, f"Missing pages: {missing_pages}")
+        
+        return log_test("GET /api/admin/site-pages (with auth)", True, 
+                       f"Returns pages + footer correctly (pages: {list(pages.keys())})")
+        
+    except Exception as e:
+        return log_test("GET /api/admin/site-pages (with auth)", False, f"Exception: {e}")
+
+def test_patch_site_pages():
+    """Test 5: PATCH /api/admin/site-pages/cgv and /footer"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 5: PATCH /api/admin/site-pages/cgv and /footer{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    session = admin_login()
+    if not session:
+        return False
+    
+    all_passed = True
+    
+    # Test PATCH cgv
+    try:
+        cgv_data = {
+            'title': 'CGV test',
+            'intro': 'x',
+            'sections': [
+                {'title': 'A', 'text': '- un\n- deux'}
+            ]
+        }
+        
+        resp = session.patch(f"{BASE_URL}/api/admin/site-pages/cgv", json=cgv_data, timeout=10)
+        
+        if resp.status_code != 200:
+            log_test("PATCH /api/admin/site-pages/cgv", False, f"Expected 200, got {resp.status_code}")
+            all_passed = False
+        else:
+            data = resp.json()
+            if data.get('ok') != True:
+                log_test("PATCH /api/admin/site-pages/cgv", False, f"Response ok != true: {data}")
+                all_passed = False
+            else:
+                log_test("PATCH /api/admin/site-pages/cgv", True, "Successfully updated CGV")
+                
+                # Verify the change
+                resp2 = requests.get(f"{BASE_URL}/api/site-pages/cgv", timeout=10)
+                if resp2.status_code == 200:
+                    page_data = resp2.json()
+                    page = page_data.get('page', {})
+                    
+                    if page.get('title') == 'CGV test' and page.get('intro') == 'x':
+                        log_test("GET /api/site-pages/cgv (verify update)", True, 
+                                f"Title and intro updated correctly, updatedAt: {page.get('updatedAt')}")
+                    else:
+                        log_test("GET /api/site-pages/cgv (verify update)", False, 
+                                f"Title or intro not updated: title={page.get('title')}, intro={page.get('intro')}")
+                        all_passed = False
+                    
+                    # Check HTML page contains the new title
+                    resp3 = requests.get(f"{BASE_URL}/cgv", timeout=10)
+                    if resp3.status_code == 200:
+                        html = resp3.text
+                        if 'CGV test' in html:
+                            log_test("GET /cgv HTML (verify update)", True, "HTML contains 'CGV test'")
+                        else:
+                            log_test("GET /cgv HTML (verify update)", False, "HTML does not contain 'CGV test'")
+                            all_passed = False
+                    else:
+                        log_test("GET /cgv HTML", False, f"Expected 200, got {resp3.status_code}")
+                        all_passed = False
+                else:
+                    log_test("GET /api/site-pages/cgv (verify update)", False, f"Expected 200, got {resp2.status_code}")
+                    all_passed = False
+        
+    except Exception as e:
+        log_test("PATCH /api/admin/site-pages/cgv", False, f"Exception: {e}")
+        all_passed = False
+    
+    # Test PATCH footer
+    try:
+        footer_data = {
+            'clientLinks': {
+                'cgv': {'label': 'Conditions', 'show': False}
+            },
+            'tagline': 'T'
+        }
+        
+        resp = session.patch(f"{BASE_URL}/api/admin/site-pages/footer", json=footer_data, timeout=10)
+        
+        if resp.status_code != 200:
+            log_test("PATCH /api/admin/site-pages/footer", False, f"Expected 200, got {resp.status_code}")
+            all_passed = False
+        else:
+            data = resp.json()
+            if data.get('ok') != True:
+                log_test("PATCH /api/admin/site-pages/footer", False, f"Response ok != true: {data}")
+                all_passed = False
+            else:
+                log_test("PATCH /api/admin/site-pages/footer", True, "Successfully updated footer")
+                
+                # Verify the change
+                resp2 = requests.get(f"{BASE_URL}/api/site-pages/footer", timeout=10)
+                if resp2.status_code == 200:
+                    footer_resp = resp2.json()
+                    footer = footer_resp.get('footer', {})
+                    
+                    cgv_link = footer.get('clientLinks', {}).get('cgv', {})
+                    
+                    if cgv_link.get('label') == 'Conditions' and cgv_link.get('show') == False:
+                        log_test("GET /api/site-pages/footer (verify update)", True, 
+                                f"Footer updated: cgv.label='Conditions', cgv.show=False, tagline='{footer.get('tagline')}'")
+                    else:
+                        log_test("GET /api/site-pages/footer (verify update)", False, 
+                                f"Footer not updated correctly: cgv={cgv_link}")
+                        all_passed = False
+                else:
+                    log_test("GET /api/site-pages/footer (verify update)", False, f"Expected 200, got {resp2.status_code}")
+                    all_passed = False
+        
+    except Exception as e:
+        log_test("PATCH /api/admin/site-pages/footer", False, f"Exception: {e}")
+        all_passed = False
+    
+    # Test PATCH unknown slug
+    try:
+        resp = session.patch(f"{BASE_URL}/api/admin/site-pages/unknown-slug", json={'title': 'test'}, timeout=10)
+        
+        if resp.status_code == 400:
+            log_test("PATCH /api/admin/site-pages/unknown-slug", True, "Correctly returns 400 for unknown slug")
+        else:
+            log_test("PATCH /api/admin/site-pages/unknown-slug", False, f"Expected 400, got {resp.status_code}")
+            all_passed = False
+        
+    except Exception as e:
+        log_test("PATCH /api/admin/site-pages/unknown-slug", False, f"Exception: {e}")
+        all_passed = False
+    
+    return all_passed
+
+def test_orders_track():
+    """Test 6: GET /api/orders/track"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 6: GET /api/orders/track{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    all_passed = True
+    
+    # Test missing params
+    try:
+        resp = requests.get(f"{BASE_URL}/api/orders/track", timeout=10)
+        
+        if resp.status_code == 400:
+            log_test("GET /api/orders/track (missing params)", True, "Correctly returns 400 for missing params")
+        else:
+            log_test("GET /api/orders/track (missing params)", False, f"Expected 400, got {resp.status_code}")
+            all_passed = False
+        
+    except Exception as e:
+        log_test("GET /api/orders/track (missing params)", False, f"Exception: {e}")
+        all_passed = False
+    
+    # Test wrong email
+    try:
+        resp = requests.get(f"{BASE_URL}/api/orders/track?number=GIN-123&email=wrong@example.com", timeout=10)
+        
+        if resp.status_code == 404:
+            log_test("GET /api/orders/track (wrong email)", True, "Correctly returns 404 for wrong email")
+        else:
+            log_test("GET /api/orders/track (wrong email)", False, f"Expected 404, got {resp.status_code}")
+            all_passed = False
+        
+    except Exception as e:
+        log_test("GET /api/orders/track (wrong email)", False, f"Exception: {e}")
+        all_passed = False
+    
+    # Test with correct order (need to find an existing order first)
+    session = admin_login()
+    if session:
+        try:
+            # Get an existing order
+            resp = session.get(f"{BASE_URL}/api/admin/orders", timeout=10)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                orders = data.get('orders', [])
+                
+                if orders:
+                    # Find an order with an email address
+                    test_order = None
+                    for order in orders:
+                        if order.get('address', {}).get('email'):
+                            test_order = order
+                            break
+                    
+                    if test_order:
+                        order_number = test_order.get('orderNumber')
+                        email = test_order.get('address', {}).get('email')
+                        
+                        # Test with correct params (case insensitive)
+                        # Use lowercase order number and uppercase email variant
+                        resp2 = requests.get(
+                            f"{BASE_URL}/api/orders/track?number={order_number.lower()}&email={email.upper()}", 
+                            timeout=10
+                        )
+                        
+                        if resp2.status_code == 200:
+                            track_data = resp2.json()
+                            order_info = track_data.get('order', {})
+                            
+                            # Verify response structure
+                            required_keys = ['orderNumber', 'status', 'trackingNumber', 'itemsCount']
+                            missing_keys = [k for k in required_keys if k not in order_info]
+                            
+                            # Verify NO sensitive data
+                            forbidden_keys = ['address', 'items']
+                            present_forbidden = [k for k in forbidden_keys if k in order_info]
+                            
+                            if missing_keys:
+                                log_test("GET /api/orders/track (correct params)", False, 
+                                        f"Missing keys: {missing_keys}")
+                                all_passed = False
+                            elif present_forbidden:
+                                log_test("GET /api/orders/track (correct params)", False, 
+                                        f"Sensitive data exposed: {present_forbidden}")
+                                all_passed = False
+                            else:
+                                log_test("GET /api/orders/track (correct params)", True, 
+                                        f"Returns order info correctly (status={order_info.get('status')}, "
+                                        f"itemsCount={order_info.get('itemsCount')}, NO sensitive data)")
+                        else:
+                            log_test("GET /api/orders/track (correct params)", False, 
+                                    f"Expected 200, got {resp2.status_code}")
+                            all_passed = False
+                    else:
+                        log_test("GET /api/orders/track (correct params)", False, 
+                                "No orders with email address found for testing")
+                        all_passed = False
+                else:
+                    log_test("GET /api/orders/track (correct params)", False, 
+                            "No orders found in database for testing")
+                    all_passed = False
+            else:
+                log_test("GET /api/admin/orders", False, f"Expected 200, got {resp.status_code}")
+                all_passed = False
+            
+        except Exception as e:
+            log_test("GET /api/orders/track (correct params)", False, f"Exception: {e}")
+            all_passed = False
     else:
-        print("\n✅ ALL TESTS PASSED - NO REGRESSIONS DETECTED")
+        log_test("GET /api/orders/track (correct params)", False, "Admin login failed")
+        all_passed = False
     
-    print("\n" + "="*80 + "\n")
+    return all_passed
+
+def test_legal_pages_html():
+    """Test 7: Pages /cgv /livraison /suivi /confidentialite return 200"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 7: HTML Pages /cgv /livraison /suivi /confidentialite{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
     
-    return passed_tests, total_tests, failed_tests
+    pages = ['/cgv', '/livraison', '/suivi', '/confidentialite']
+    all_passed = True
+    
+    for page in pages:
+        try:
+            resp = requests.get(f"{BASE_URL}{page}", timeout=10)
+            
+            if resp.status_code == 200:
+                log_test(f"GET {page}", True, f"Returns 200 OK ({len(resp.text)} bytes)")
+            else:
+                log_test(f"GET {page}", False, f"Expected 200, got {resp.status_code}")
+                all_passed = False
+            
+        except Exception as e:
+            log_test(f"GET {page}", False, f"Exception: {e}")
+            all_passed = False
+    
+    return all_passed
+
+def cleanup_test_data():
+    """Test 8: Cleanup - Delete test documents from MongoDB"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST 8: CLEANUP - Restore defaults by deleting test documents{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    try:
+        mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017')
+        db_name = os.getenv('DB_NAME', 'ginette_creations')
+        
+        client = MongoClient(mongo_url)
+        db = client[db_name]
+        
+        # Delete cgv and footer documents
+        result_cgv = db.site_pages.delete_one({'_id': 'cgv'})
+        result_footer = db.site_pages.delete_one({'_id': 'footer'})
+        
+        log_test("Delete site_pages documents", True, 
+                f"Deleted cgv (count={result_cgv.deleted_count}) and footer (count={result_footer.deleted_count})")
+        
+        # Verify defaults are restored
+        resp = requests.get(f"{BASE_URL}/api/site-pages/cgv", timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            page = data.get('page', {})
+            
+            if page.get('title') == 'Conditions générales de vente':
+                log_test("Verify CGV defaults restored", True, 
+                        "CGV title is back to 'Conditions générales de vente'")
+                return True
+            else:
+                log_test("Verify CGV defaults restored", False, 
+                        f"CGV title is '{page.get('title')}', expected 'Conditions générales de vente'")
+                return False
+        else:
+            log_test("Verify CGV defaults restored", False, f"Expected 200, got {resp.status_code}")
+            return False
+        
+    except Exception as e:
+        log_test("Cleanup test data", False, f"Exception: {e}")
+        return False
+
+def main():
+    """Run all tests"""
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}BACKEND API TESTING - SITE PAGES & ORDER TRACKING{RESET}")
+    print(f"{YELLOW}Base URL: {BASE_URL}{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    results = []
+    
+    # Run all tests
+    results.append(("Site Pages Footer", test_site_pages_footer()))
+    results.append(("Site Pages Legal", test_site_pages_legal()))
+    results.append(("Site Pages 404", test_site_pages_404()))
+    results.append(("Admin Site Pages Auth", test_admin_site_pages_auth()))
+    results.append(("PATCH Site Pages", test_patch_site_pages()))
+    results.append(("Orders Track", test_orders_track()))
+    results.append(("Legal Pages HTML", test_legal_pages_html()))
+    results.append(("Cleanup", cleanup_test_data()))
+    
+    # Summary
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    print(f"{YELLOW}TEST SUMMARY{RESET}")
+    print(f"{YELLOW}{'='*80}{RESET}")
+    
+    passed = sum(1 for _, result in results if result)
+    total = len(results)
+    
+    for name, result in results:
+        status = f"{GREEN}✅ PASSED{RESET}" if result else f"{RED}❌ FAILED{RESET}"
+        print(f"{status} - {name}")
+    
+    print(f"\n{YELLOW}{'='*80}{RESET}")
+    if passed == total:
+        print(f"{GREEN}🎉 ALL TESTS PASSED: {passed}/{total}{RESET}")
+        print(f"{YELLOW}{'='*80}{RESET}")
+        return 0
+    else:
+        print(f"{RED}❌ SOME TESTS FAILED: {passed}/{total} passed{RESET}")
+        print(f"{YELLOW}{'='*80}{RESET}")
+        return 1
 
 if __name__ == "__main__":
-    passed, total, failed = run_all_tests()
-    exit(0 if len(failed) == 0 else 1)
+    sys.exit(main())

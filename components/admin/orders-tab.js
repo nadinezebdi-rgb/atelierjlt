@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Printer, ChevronDown, Package, Undo2 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
+import { CARRIERS } from '@/lib/tracking'
 
 export const ORDER_STATUSES = [
   ['received', 'Reçue'],
@@ -30,6 +31,10 @@ export default function TabOrders() {
   const [selected, setSelected] = useState(new Set())
   const [openId, setOpenId] = useState(null)
   const [filter, setFilter] = useState('todo')
+  const [conn, setConn] = useState({})
+  useEffect(() => {
+    fetch('/api/admin/shipping', { credentials: 'include' }).then((r) => r.json()).then(setConn).catch(() => {})
+  }, [])
 
   const load = () =>
     fetch('/api/admin/orders', { credentials: 'include' })
@@ -44,8 +49,15 @@ export default function TabOrders() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    const d = await r.json().catch(() => ({}))
     if (r.ok) toast.success(msg)
-    else toast.error('Erreur')
+    else toast.error(d.error || 'Erreur')
+    if (d.email) {
+      if (d.email.ok) toast.success('Email « commande expédiée » envoyé au client')
+      else if (d.email.error === 'not_configured') toast.message('Email non envoyé : la boîte mail OVH n’est pas encore connectée')
+      else if (d.email.error === 'no_email') toast.message('Email non envoyé : pas d’adresse email sur la commande')
+      else toast.error('L’email au client n’a pas pu partir')
+    }
     load()
   }
 
@@ -115,6 +127,8 @@ export default function TabOrders() {
               open={openId === o._id}
               onOpen={() => setOpenId(openId === o._id ? null : o._id)}
               onPatch={(body, msg) => patch(o._id, body, msg)}
+              conn={conn}
+              onReload={load}
             />
           ))}
         </div>
@@ -123,8 +137,34 @@ export default function TabOrders() {
   )
 }
 
-function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch }) {
+function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = {}, onReload }) {
   const [tracking, setTracking] = useState(o.trackingNumber || '')
+  const [carrier, setCarrier] = useState(o.carrier || 'colissimo')
+  const [customUrl, setCustomUrl] = useState(o.carrier === 'other' ? (o.trackingUrl || '') : '')
+  const [provider, setProvider] = useState(conn.boxtal && !conn.colissimo ? 'boxtal' : 'colissimo')
+  const [offer, setOffer] = useState('')
+  const [dims, setDims] = useState({ weight: '', length: '30', width: '20', height: '10' })
+  const [busy, setBusy] = useState(false)
+  const createPaidLabel = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/admin/shipping', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: o._id, provider, offerCode: offer || undefined, ...dims }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Erreur')
+      toast.success('Étiquette affranchie créée')
+      if (d.email?.ok) toast.success('Email « commande expédiée » envoyé au client')
+      if (d.label?.labelUrl) window.open(d.label.labelUrl, '_blank', 'noopener')
+      onReload?.()
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
   const a = o.address || {}
   const name = a.name || [a.firstName, a.lastName].filter(Boolean).join(' ')
   const count = (o.items || []).reduce((n, i) => n + (i.qty || 1), 0)
@@ -186,19 +226,47 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch }) {
           </div>
           <div className="space-y-3">
             <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50">Suivi du colis</div>
+            <select
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm focus:outline-none focus:border-emerald"
+              aria-label="Transporteur"
+            >
+              {CARRIERS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+            </select>
             <input
               value={tracking}
               onChange={(e) => setTracking(e.target.value)}
               placeholder="N° de suivi (ex. 6A123…)"
+              data-testid={`tracking-input-${o._id}`}
               className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm focus:outline-none focus:border-emerald"
             />
+            {carrier === 'other' && (
+              <input
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                placeholder="Lien de suivi (https://…)"
+                className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm focus:outline-none focus:border-emerald"
+              />
+            )}
             <button
               type="button"
-              onClick={() => onPatch({ trackingNumber: tracking.trim(), ...(tracking.trim() && (o.status === 'received' || o.status === 'preparing' || !o.status) ? { status: 'shipped', shippedAt: new Date().toISOString() } : {}) }, 'Suivi enregistré')}
+              data-testid={`tracking-save-${o._id}`}
+              onClick={() => onPatch({
+                trackingNumber: tracking.trim(),
+                carrier,
+                trackingUrl: carrier === 'other' ? customUrl.trim() : (o.carrierLabel?.trackingUrl && o.carrierLabel?.trackingNumber === tracking.trim() ? o.carrierLabel.trackingUrl : ''),
+                ...(tracking.trim() && (o.status === 'received' || o.status === 'preparing' || !o.status) ? { status: 'shipped' } : {}),
+              }, 'Suivi enregistré')}
               className="w-full h-11 bg-ink text-ivory text-[11px] uppercase tracking-[0.2em] hover:bg-emerald"
             >
               Enregistrer le suivi
             </button>
+            <div className="text-[11px] text-ink/55 leading-snug">
+              {o.shippedEmailSentAt
+                ? <>Email d’expédition envoyé le {new Date(o.shippedEmailSentAt).toLocaleString('fr-FR')} · <button type="button" className="underline hover:text-emerald" onClick={() => onPatch({ resendEmail: true }, 'Renvoi demandé')}>Renvoyer</button></>
+                : conn.email ? 'Le client reçoit un email automatiquement au passage en « Expédiée ».' : 'Email automatique : boîte mail OVH pas encore connectée.'}
+            </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => openLabels([o._id], 'label')} className="flex-1 h-10 border border-ink/20 hover:border-ink text-[10px] uppercase tracking-[0.16em] inline-flex items-center justify-center gap-1.5">
                 <Package className="h-3.5 w-3.5" strokeWidth={1.5} /> Étiquette
@@ -207,6 +275,58 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch }) {
                 <Undo2 className="h-3.5 w-3.5" strokeWidth={1.5} /> Retour
               </button>
             </div>
+          </div>
+
+          {/* Étiquette affranchie (transporteur) */}
+          <div className="md:col-span-3 border-t border-linen pt-5" data-testid={`paid-label-${o._id}`}>
+            <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-3">Étiquette affranchie avec suivi</div>
+            {o.carrierLabel?.labelUrl || o.carrierLabel?.trackingNumber ? (
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <span>{o.carrierLabel.provider === 'colissimo' ? 'Colissimo' : 'Boxtal'} · n° {o.carrierLabel.trackingNumber || '—'}</span>
+                {o.carrierLabel.labelUrl && (
+                  <a href={o.carrierLabel.labelUrl} target="_blank" rel="noopener noreferrer" className="h-10 px-4 inline-flex items-center gap-2 bg-emerald text-ivory text-[11px] uppercase tracking-[0.18em]">
+                    <Printer className="h-4 w-4" strokeWidth={1.5} /> Imprimer l’étiquette
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                <label className="block lg:col-span-2">
+                  <span className="block text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-1">Transporteur</span>
+                  <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm">
+                    <option value="colissimo">Colissimo {conn.colissimo ? '' : '(non connecté)'}</option>
+                    <option value="boxtal">Boxtal {conn.boxtal ? '' : '(non connecté)'}</option>
+                  </select>
+                </label>
+                {provider === 'boxtal' && (conn.boxtalOffers || []).length > 1 && (
+                  <label className="block lg:col-span-2">
+                    <span className="block text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-1">Offre</span>
+                    <select value={offer} onChange={(e) => setOffer(e.target.value)} className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm">
+                      {(conn.boxtalOffers || []).map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </label>
+                )}
+                {[['weight', 'Poids (kg)'], ['length', 'Long. (cm)'], ['width', 'Larg. (cm)'], ['height', 'Haut. (cm)']].map(([k, l]) => (
+                  <label key={k} className="block">
+                    <span className="block text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-1">{l}</span>
+                    <input type="number" min="0" step="0.1" value={dims[k]} onChange={(e) => setDims({ ...dims, [k]: e.target.value })} className="w-full bg-ivory border border-ink/15 px-3 h-11 text-sm" />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={createPaidLabel}
+                  disabled={busy || !(provider === 'colissimo' ? conn.colissimo : conn.boxtal)}
+                  className="h-11 px-4 bg-ink text-ivory text-[11px] uppercase tracking-[0.18em] hover:bg-emerald disabled:opacity-40 lg:col-span-2"
+                >
+                  {busy ? 'Création…' : 'Créer l’étiquette affranchie'}
+                </button>
+                {!(provider === 'colissimo' ? conn.colissimo : conn.boxtal) && (
+                  <p className="text-[11px] text-terracotta sm:col-span-2 lg:col-span-6">
+                    {provider === 'colissimo' ? 'Colissimo' : 'Boxtal'} n’est pas encore connecté : ajoutez vos identifiants pour activer les étiquettes payées. En attendant, utilisez l’étiquette simple ci-dessus.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -11,6 +11,10 @@ export default function sitemap() {
     '/a-propos',
     '/journal',
     '/contact',
+    '/cgv',
+    '/livraison',
+    '/suivi',
+    '/confidentialite',
   ].map((p) => ({
     url: `${BASE}${p}`,
     lastModified: now,

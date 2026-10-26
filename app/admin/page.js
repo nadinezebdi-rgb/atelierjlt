@@ -15,6 +15,7 @@ import MediaPickerModal from '@/components/admin/media-picker-modal'
 import MediaLibrary from '@/components/admin/media-library'
 import HomeSectionsEditor from '@/components/admin/home-sections-editor'
 import TabOrders from '@/components/admin/orders-tab'
+import LegalPagesTab from '@/components/admin/legal-pages-tab'
 import PageContentEditor from '@/components/admin/page-content-editor'
 
 /* =========================================================
@@ -151,6 +152,7 @@ export default function AdminPage() {
     { title: 'Site & contenu', items: [
       { key: 'content', label: 'Éditeur de l’accueil', icon: Layers },
       { key: 'blog', label: 'Journal', icon: BookOpen },
+      { key: 'legal', label: 'Footer & pages légales', icon: FileText },
       { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
     ] },
     { title: 'Boutique', items: [
@@ -214,6 +216,7 @@ export default function AdminPage() {
             {tab === 'content' && <TabContent onDirtyChange={setContentDirty} />}
             {tab === 'products' && <TabProducts />}
             {tab === 'blog' && <TabBlog />}
+            {tab === 'legal' && <LegalPagesTab />}
             {tab === 'orders' && <TabOrders />}
             {tab === 'coupons' && <TabCoupons />}
             {tab === 'newsletter' && <TabNewsletter />}
