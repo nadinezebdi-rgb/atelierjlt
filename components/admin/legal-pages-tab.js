@@ -59,7 +59,7 @@ export default function LegalPagesTab() {
       <div className="mb-6">
         <h2 className="font-display text-3xl">Footer & pages légales</h2>
         <p className="text-sm text-ink/60 mt-2 max-w-2xl leading-relaxed">
-          Modifiez le bas de page du site et les pages CGV, Livraison & retours, Suivi de commande et Confidentialité (RGPD).
+          Modifiez le bas de page du site, le texte du bandeau cookies et les pages CGV, Livraison & retours, Suivi de commande, Confidentialité (RGPD) et Mentions légales.
           Chaque bloc s’enregistre séparément.
         </p>
       </div>
@@ -158,6 +158,7 @@ function FooterEditor({ value, onChange }) {
       <label className="block"><span className={LABEL}>Lien Instagram</span><input value={v.instagram || ''} onChange={(e) => upd('instagram', e.target.value)} className={INPUT} placeholder="https://www.instagram.com/…" /></label>
       <label className="block"><span className={LABEL}>Lien Facebook</span><input value={v.facebook || ''} onChange={(e) => upd('facebook', e.target.value)} className={INPUT} placeholder="https://www.facebook.com/…" /></label>
       <label className="block md:col-span-2"><span className={LABEL}>Copyright (après © année)</span><input value={v.copyright || ''} onChange={(e) => upd('copyright', e.target.value)} className={INPUT} /></label>
+      <label className="block md:col-span-2"><span className={LABEL}>Texte du bandeau cookies</span><textarea rows={3} value={v.cookieText || ''} onChange={(e) => upd('cookieText', e.target.value)} className={INPUT} /></label>
 
       <div className="md:col-span-2 pt-2">
         <span className={LABEL}>Liens de la colonne « Client »</span>

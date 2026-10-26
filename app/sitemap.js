@@ -15,6 +15,7 @@ export default function sitemap() {
     '/livraison',
     '/suivi',
     '/confidentialite',
+    '/mentions-legales',
   ].map((p) => ({
     url: `${BASE}${p}`,
     lastModified: now,

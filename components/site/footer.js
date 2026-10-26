@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Instagram, Facebook } from 'lucide-react'
 import Logo from './logo'
 import { FOOTER_DEFAULTS, LEGAL_PAGES, LEGAL_SLUGS, mergeFooter } from '@/lib/legal-defaults'
+import { openCookieSettings } from './cookie-banner'
 
 // Le contenu du footer se modifie dans /admin → Footer & pages légales.
 let footerCache = null
@@ -66,6 +67,9 @@ export default function Footer() {
         </div>
         <div className="mt-16 pt-6 border-t border-ivory/10 flex flex-col md:flex-row items-center justify-between gap-3 text-[10px] uppercase tracking-[0.3em] text-ivory/50 text-center">
           <span>© {new Date().getFullYear()} {f.copyright}</span>
+          <button type="button" onClick={openCookieSettings} className="uppercase tracking-[0.3em] hover:text-ivory transition" data-testid="manage-cookies">
+            Gérer les cookies
+          </button>
           {f.bottomNote && <span>{f.bottomNote}</span>}
         </div>
       </div>

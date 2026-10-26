@@ -2,6 +2,7 @@ import './globals.css'
 import { Providers } from './providers'
 import { Fraunces, Inter, Instrument_Serif } from 'next/font/google'
 import ChatWidget from '@/components/chat/chat-widget'
+import CookieBanner from '@/components/site/cookie-banner'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -91,6 +92,7 @@ export default function RootLayout({ children }) {
         <Providers>
           {children}
           <ChatWidget />
+          <CookieBanner />
         </Providers>
       </body>
     </html>
