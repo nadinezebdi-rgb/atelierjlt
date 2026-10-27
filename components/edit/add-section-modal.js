@@ -2,7 +2,7 @@
 
 /**
  * « Ajouter une section » — bibliothèque de modèles PARTAGÉE entre
- * le mode édition visuel (/?edit=1) et l'admin (/admin → Éditeur de l'accueil).
+ * le mode édition visuel (/?edit=1) et l'admin (/admin → Éditeur du site).
  *   - Carrousels de produits prêts à l'emploi (cadeaux, nouveautés, chambre…)
  *   - Bannières éditoriales prêtes à l'emploi (promo, storytelling…)
  *   - Départ d'une page blanche

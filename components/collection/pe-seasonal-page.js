@@ -20,7 +20,7 @@ import { PE_FIELDS as EDIT_FIELDS } from '@/lib/page-content-config'
  *   6. CTA de retour vers "Les Intemporels"
  *
  * Tout le contenu (hero, ambiance, palette, matières) est éditable depuis
- * `/admin → Éditeur de l'accueil → Collection Printemps / Été 2026-2027`
+ * `/admin → Éditeur du site → Collection Printemps / Été 2026-2027`
  * ou en mode visuel iPad via `?edit=1`.
  */
 export default function PESeasonalPage({ content: initialContent, products }) {

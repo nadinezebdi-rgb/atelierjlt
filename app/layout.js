@@ -73,7 +73,8 @@ export const metadata = {
     description: 'Maison française de décoration artisanale.',
   },
   icons: {
-    icon: '/favicon.ico',
+    icon: [{ url: '/favicon.ico', sizes: '32x32' }, { url: '/icon.png', type: 'image/png', sizes: '256x256' }],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180' }],
   },
 }
 

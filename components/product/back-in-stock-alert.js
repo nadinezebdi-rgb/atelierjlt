@@ -19,6 +19,13 @@ export default function BackInStockAlert({ slug, variant, size, label }) {
   }, [])
   // Nouvelle combinaison choisie → nouveau formulaire
   useEffect(() => { setDone(false); setError('') }, [variant, size])
+  // Nombre de personnes déjà en attente (pour cette couleur)
+  const [waiting, setWaiting] = useState(0)
+  useEffect(() => {
+    const q = new URLSearchParams({ slug })
+    if (variant) q.set('variant', variant)
+    fetch(`/api/stock-alerts?${q}`).then((r) => r.json()).then((d) => setWaiting(Number(d.waiting) || 0)).catch(() => {})
+  }, [slug, variant, done])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -44,6 +51,11 @@ export default function BackInStockAlert({ slug, variant, size, label }) {
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.26em] text-terracotta">
         <span className="h-2 w-2 rounded-full bg-terracotta" /> Épuisé{label ? ` — ${label}` : ''}
       </div>
+      {waiting > 0 && (
+        <p className="mt-2 text-xs text-ink/60" data-testid="back-in-stock-waiting">
+          {waiting === 1 ? '1 personne attend' : `${waiting} personnes attendent`} son retour
+        </p>
+      )}
       {done ? (
         <p className="mt-3 text-sm text-ink/80 flex items-start gap-2" data-testid="back-in-stock-done">
           <Check className="h-4 w-4 text-emerald mt-0.5 flex-none" strokeWidth={2} />

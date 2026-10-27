@@ -11,7 +11,7 @@ const items = [
   { icon: Gift,   title: 'Emballage soigné',       text: 'Un rituel de déballage pensé pour être gardé.', color: 'text-terracotta' },
 ]
 
-export default function WhyGinette() {
+export default function WhyJlt() {
   return (
     <section className="py-20 md:py-28 bg-cream">
       <div className="container">

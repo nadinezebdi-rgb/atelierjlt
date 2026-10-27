@@ -17,7 +17,9 @@ import HomeSectionsEditor from '@/components/admin/home-sections-editor'
 import TabOrders from '@/components/admin/orders-tab'
 import LegalPagesTab from '@/components/admin/legal-pages-tab'
 import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
+import { availableUnits, lowStockItems } from '@/lib/stock'
 import PageContentEditor from '@/components/admin/page-content-editor'
+import CategoryPagesEditor from '@/components/admin/category-pages-editor'
 
 /* =========================================================
    ONGLET — CONTENU DU SITE (hero + collections)
@@ -151,7 +153,7 @@ export default function AdminPage() {
   const groups = [
     { title: 'Vue générale', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
     { title: 'Site & contenu', items: [
-      { key: 'content', label: 'Éditeur de l’accueil', icon: Layers },
+      { key: 'content', label: 'Éditeur du site', icon: Layers },
       { key: 'blog', label: 'Journal', icon: BookOpen },
       { key: 'legal', label: 'Menu, footer & pages', icon: FileText },
       { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
@@ -168,7 +170,7 @@ export default function AdminPage() {
   ]
   const activeLabel = groups.flatMap((group) => group.items).find((item) => item.key === tab)?.label
   const selectTab = (key) => {
-    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’accueil ne sont pas enregistrées. Quitter sans enregistrer ?')) return
+    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’éditeur du site ne sont pas enregistrées. Quitter sans enregistrer ?')) return
     setTab(key)
     setMobileNavOpen(false)
     if (key !== 'content') setContentDirty(false)
@@ -265,9 +267,33 @@ function TabProducts() {
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
+  const [selected, setSelected] = useState(() => new Set())
+  const [waitingMap, setWaitingMap] = useState({})
 
   const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    fetch('/api/admin/stock-alerts', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => setWaitingMap(Object.fromEntries((d.summary || []).map((s) => [s.slug, s.count]))))
+      .catch(() => {})
+  }, [])
+
+  // Modification groupée (Nouveau / Édition limitée)
+  const bulk = async (set) => {
+    const slugs = [...selected]
+    const r = await fetch('/api/admin/products/bulk', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs, set }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (r.ok) {
+      toast.success(`${d.updated} produit${d.updated > 1 ? 's' : ''} mis à jour`)
+      setSelected(new Set())
+      load()
+    } else toast.error(d.error || 'Erreur')
+  }
 
   // Produits filtrés par recherche + catégorie — permet à la fille de trouver
   // instantanément « Plaid Sylvestre » sans faire défiler toute la liste.
@@ -416,19 +442,71 @@ function TabProducts() {
         </div>
       )}
 
+      {/* Barre d'actions groupées */}
+      {filtered.length > 0 && (
+        <div className={`sticky top-0 z-10 mb-3 border p-3 flex flex-wrap items-center gap-2 ${selected.size ? 'bg-emerald/5 border-emerald' : 'bg-ivory border-linen'}`} data-testid="bulk-bar">
+          <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none mr-2">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-emerald"
+              checked={filtered.length > 0 && filtered.every((p) => selected.has(p.slug))}
+              onChange={(e) => {
+                const next = new Set(selected)
+                filtered.forEach((p) => (e.target.checked ? next.add(p.slug) : next.delete(p.slug)))
+                setSelected(next)
+              }}
+              data-testid="bulk-select-all"
+            />
+            {selected.size ? `${selected.size} sélectionné${selected.size > 1 ? 's' : ''}` : 'Tout sélectionner'}
+          </label>
+          {selected.size > 0 && (
+            <>
+              <button type="button" onClick={() => bulk({ isNew: true })} data-testid="bulk-new-on" className="h-10 px-3 bg-emerald text-ivory text-[10px] uppercase tracking-[0.18em] hover:bg-emeraldDark">Marquer « Nouveau »</button>
+              <button type="button" onClick={() => bulk({ isNew: false })} data-testid="bulk-new-off" className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Nouveau »</button>
+              <button type="button" onClick={() => bulk({ isLimited: true })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Marquer « Édition limitée »</button>
+              <button type="button" onClick={() => bulk({ isLimited: false })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Édition limitée »</button>
+              <button type="button" onClick={() => setSelected(new Set())} className="h-10 px-3 text-[10px] uppercase tracking-[0.18em] text-ink/55 hover:text-ink">Annuler</button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {filtered.map((p) => (
-          <div key={p.slug} className="border border-linen bg-ivory">
-            <div className="flex items-center gap-4 p-3">
+        {filtered.map((p) => {
+          const units = availableUnits(p)
+          const lowItems = lowStockItems(p)
+          const waiting = waitingMap[p.slug] || 0
+          return (
+          <div key={p.slug} className={`border bg-ivory ${selected.has(p.slug) ? 'border-emerald' : 'border-linen'}`} data-testid={`admin-product-${p.slug}`}>
+            <div className="flex items-center gap-4 p-3 flex-wrap sm:flex-nowrap">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-emerald flex-none"
+                checked={selected.has(p.slug)}
+                onChange={() => { const n = new Set(selected); n.has(p.slug) ? n.delete(p.slug) : n.add(p.slug); setSelected(n) }}
+                aria-label={`Sélectionner ${p.name}`}
+                data-testid={`select-${p.slug}`}
+              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.images?.[0]} alt="" className="w-16 h-16 object-cover bg-cream" />
               <div className="flex-1 min-w-0">
                 <div className="font-display text-lg leading-tight">{p.name}</div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{p.category} · {p.slug}</div>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {p.isNew && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-emerald/10 text-emerald">Nouveau</span>}
+                  {p.isLimited && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-brique/10 text-brique">Édition limitée</span>}
+                  {units === 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-ink text-ivory">Épuisé</span>}
+                  {lowItems.length > 0 && (
+                    <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-terracotta/15 text-terracotta" title={lowItems.map((i) => `${i.name} : ${i.stock}`).join(' · ')}>
+                      Stock faible · {lowItems.map((i) => `${i.name} (${i.stock})`).join(', ')}
+                    </span>
+                  )}
+                  {waiting > 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-cream border border-linen" data-testid={`waiting-${p.slug}`}>🔔 {waiting} en attente</span>}
+                </div>
               </div>
               <div className="text-right">
                 <div className="font-display text-lg tabular-nums">{formatPrice(p.price)}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Stock : {p.stock}</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Stock : {units}</div>
               </div>
               <button onClick={() => setEditing(editing === p.slug ? null : p.slug)} className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-ink transition">
                 {editing === p.slug ? 'Fermer' : 'Modifier'}
@@ -446,7 +524,8 @@ function TabProducts() {
             </div>
             {editing === p.slug && <ProductEditor product={p} onSave={save} />}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -1183,8 +1262,8 @@ function TabContent({ onDirtyChange }) {
     <div>
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="font-display text-3xl">Éditeur de l’accueil</h2>
-          <p className="text-sm text-ink/60 mt-2">Personnalisez les textes, les images et l’ordre des sections de la page d’accueil.</p>
+          <h2 className="font-display text-3xl">Éditeur du site</h2>
+          <p className="text-sm text-ink/60 mt-2">Accueil (bannière, sections), pages À propos, Collection Printemps/Été, Contact, Pages Collections et Médiathèque — tout le contenu du site au même endroit.</p>
           <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
@@ -1205,7 +1284,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été'], ['#admin-page-contact', 'Page Contact'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Collections'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1231,6 +1310,7 @@ function TabContent({ onDirtyChange }) {
           <PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} />
           <PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} />
           <PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} />
+          <CategoryPagesEditor />
         </div>
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>

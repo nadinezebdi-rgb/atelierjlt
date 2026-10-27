@@ -3,7 +3,7 @@
 /**
  * Champs d'édition d'une section de la page d'accueil — PARTAGÉS entre :
  *   - le mode édition visuel (/?edit=1) → panneau latéral SectionEditorPanel
- *   - l'admin (/admin → Éditeur de l'accueil) → HomeSectionsEditor
+ *   - l'admin (/admin → Éditeur du site) → HomeSectionsEditor
  * Ainsi l'administratrice retrouve exactement les mêmes fonctions partout.
  */
 import { useEffect, useMemo, useState } from 'react'

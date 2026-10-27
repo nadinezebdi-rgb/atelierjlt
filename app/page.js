@@ -114,7 +114,7 @@ async function App({ searchParams }) {
           <HeroCarousel slides={slides} intervalMs={rotationInterval} />
         )}
 
-        {/* Sections modulaires — pilotées depuis /admin → Éditeur de l'accueil */}
+        {/* Sections modulaires — pilotées depuis /admin → Éditeur du site */}
         {editMode ? (
           <LiveSections fallback={sections} />
         ) : (

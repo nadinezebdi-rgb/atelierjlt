@@ -94,7 +94,7 @@ function SingleLeaf({ className = '' }) {
   )
 }
 
-export default function ChezGinette() {
+export default function ChezJlt() {
   const [i, setI] = useState(0)
   const next = () => setI((v) => (v + 1) % scenes.length)
   const prev = () => setI((v) => (v - 1 + scenes.length) % scenes.length)

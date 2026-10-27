@@ -14,6 +14,11 @@ function CollectionsInner() {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  // Titres / sous-titres des catégories : modifiables dans /admin → Éditeur du site
+  const [cats, setCats] = useState(CATEGORIES)
+  useEffect(() => {
+    fetch('/api/site-pages/categories').then((r) => r.json()).then((d) => Array.isArray(d.categories) && setCats(d.categories)).catch(() => {})
+  }, [])
   const cat = params.get('cat') || ''
   const collection = params.get('collection') || ''
   const q = params.get('q') || ''
@@ -43,10 +48,10 @@ function CollectionsInner() {
     router.push(`${pathname || '/produits'}?${next.toString()}`)
   }
 
-  const activeCat = CATEGORIES.find((c) => c.slug === cat)
+  const activeCat = cats.find((c) => c.slug === cat)
   const activeCol = COLLECTIONS.find((c) => c.slug === collection)
   const title = activeCat?.name || activeCol?.name || 'Tous nos produits'
-  const subtitle = activeCat?.tagline || activeCol?.story || 'Une sélection complète de la maison.'
+  const subtitle = (activeCat ? activeCat.tagline : '') || activeCol?.story || (activeCat ? '' : 'Une sélection complète de la maison.')
 
   return (
     <div className="min-h-screen bg-ivory">
@@ -58,7 +63,7 @@ function CollectionsInner() {
           transition={{ duration: 0.9 }}
           className="container pb-10 md:pb-16 border-b border-linen"
         >
-          <span className="text-[10px] uppercase tracking-[0.36em] text-emerald">Produits</span>
+          <span className="text-[10px] uppercase tracking-[0.36em] text-emerald">{activeCat?.eyebrow || 'Produits'}</span>
           <h1 className="font-display font-normal text-4xl md:text-6xl mt-4 leading-[1.02] text-balance text-emerald"
               style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>{title}</h1>
           <p className="text-ink/60 mt-4 max-w-xl italic">{subtitle}</p>
@@ -70,7 +75,7 @@ function CollectionsInner() {
               onClick={() => set('cat', '')}
               className={`text-[11px] uppercase tracking-[0.22em] whitespace-nowrap py-1 border-b ${!cat ? 'border-ink' : 'border-transparent text-ink/50'}`}
             >Tout</button>
-            {CATEGORIES.map((c) => (
+            {cats.map((c) => (
               <button
                 key={c.slug}
                 onClick={() => set('cat', c.slug)}

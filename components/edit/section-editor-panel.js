@@ -6,7 +6,7 @@
  *   - Desktop : panneau 440px flottant à droite
  *
  * Les champs eux-mêmes sont dans ./section-fields.js — partagés avec l'admin
- * (/admin → Éditeur de l'accueil) pour offrir exactement les mêmes fonctions.
+ * (/admin → Éditeur du site) pour offrir exactement les mêmes fonctions.
  */
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'

@@ -4,11 +4,13 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Bell, ChevronDown, Send, Trash2, AlertCircle } from 'lucide-react'
-import { isSoldOut } from '@/lib/stock'
+import { isSoldOut, lowStockItems } from '@/lib/stock'
 
 export default function StockAlertsPanel({ products = [] }) {
   const [data, setData] = useState(null)
   const [open, setOpen] = useState(false)
+  // S'ouvre tout seul s'il y a du stock faible ou des ruptures
+  useEffect(() => { if (products.some((p) => isSoldOut(p) || lowStockItems(p).length)) setOpen(true) }, [products.length])
   const load = () =>
     fetch('/api/admin/stock-alerts', { credentials: 'include' })
       .then((r) => r.json())
@@ -21,6 +23,7 @@ export default function StockAlertsPanel({ products = [] }) {
     (p.variants || []).filter((v) => Number(v.stock || 0) === 0).map((v) => ({ p, v }))
   ).filter(({ p }) => !isSoldOut(p))
   const alerts = data?.alerts || []
+  const low = products.flatMap((p) => lowStockItems(p).map((it) => ({ p, it })))
 
   const notify = async (slug) => {
     const r = await fetch(`/api/admin/stock-alerts/notify?slug=${encodeURIComponent(slug)}`, { method: 'POST', credentials: 'include' })
@@ -41,9 +44,9 @@ export default function StockAlertsPanel({ products = [] }) {
       <button type="button" onClick={() => setOpen(!open)} className="w-full p-5 flex flex-wrap items-center gap-4 text-left">
         <Bell className="h-5 w-5 text-emerald" strokeWidth={1.5} />
         <div className="flex-1 min-w-[200px]">
-          <div className="font-display text-lg">Ruptures & alertes retour en stock</div>
+          <div className="font-display text-lg">Stock : ruptures, stock faible & alertes</div>
           <div className="text-xs text-ink/55 mt-0.5">
-            {soldOut.length} produit{soldOut.length > 1 ? 's' : ''} épuisé{soldOut.length > 1 ? 's' : ''} · {lowVariants.length} couleur{lowVariants.length > 1 ? 's' : ''} épuisée{lowVariants.length > 1 ? 's' : ''} · {alerts.length} client{alerts.length > 1 ? 's' : ''} en attente
+            {soldOut.length} produit{soldOut.length > 1 ? 's' : ''} épuisé{soldOut.length > 1 ? 's' : ''} · {lowVariants.length} couleur{lowVariants.length > 1 ? 's' : ''} épuisée{lowVariants.length > 1 ? 's' : ''} · <span className={low.length ? 'text-terracotta font-medium' : ''}>{low.length} en stock faible</span> · {alerts.length} client{alerts.length > 1 ? 's' : ''} en attente
           </div>
         </div>
         <ChevronDown className={`h-4 w-4 text-ink/40 transition-transform ${open ? 'rotate-180' : ''}`} strokeWidth={1.5} />
@@ -57,6 +60,22 @@ export default function StockAlertsPanel({ products = [] }) {
               <span className="block mt-1 text-terracotta inline-flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Boîte mail OVH pas encore connectée : les inscriptions sont gardées et partiront dès la connexion.</span>
             )}
           </p>
+
+          <div data-testid="low-stock-list">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Stock faible (1 ou 2 pièces)</div>
+            {low.length === 0 ? (
+              <p className="text-ink/55">Rien à signaler.</p>
+            ) : (
+              <ul className="space-y-1">
+                {low.map(({ p, it }) => (
+                  <li key={p.slug + it.kind + it.name} className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-terracotta flex-none" />
+                    <span><strong className="font-medium">{p.name}</strong>{it.kind !== 'Produit' ? <> — {it.kind.toLowerCase()} <em>{it.name}</em></> : null} : plus que <strong>{it.stock}</strong> pièce{it.stock > 1 ? 's' : ''}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div>
             <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Épuisés</div>

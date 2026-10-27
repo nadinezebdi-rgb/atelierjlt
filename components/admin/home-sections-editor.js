@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Admin → Éditeur de l'accueil → Sections de la page d'accueil.
+ * Admin → Éditeur du site → Sections de la page d'accueil.
  *
  * Utilise EXACTEMENT les mêmes champs (SectionFields) et la même bibliothèque
  * de modèles (AddSectionModal) que le mode édition visuel /?edit=1 :
