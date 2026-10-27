@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, ArrowRight, Plus } from 'lucide-react'
 import { useCart } from '@/components/site/cart-provider'
 import { toast } from 'sonner'
 import { filterProductsForCarousel } from '@/lib/homepage-sections'
+import { isSoldOut } from '@/lib/stock'
 
 /**
  * Carrousel produits style Ferm Living — défilement horizontal souple,
@@ -152,6 +153,9 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
                   )}
                   {!hideBadges && p.isLimited && (
                     <span className="absolute top-3 right-3 bg-brique text-ivory text-[9px] uppercase tracking-[0.3em] px-2 py-1">Édition</span>
+                  )}
+                  {isSoldOut(p) && (
+                    <span className="absolute bottom-3 left-3 bg-ink text-ivory text-[9px] uppercase tracking-[0.3em] px-2 py-1">Épuisé</span>
                   )}
                 </div>
                 <div className="pt-4 flex items-start justify-between gap-3">

@@ -12,6 +12,7 @@ import * as site from '@/lib/api/handlers/site'
 import * as newsletter from '@/lib/api/handlers/newsletter'
 import * as contact from '@/lib/api/handlers/contact'
 import * as sitePages from '@/lib/api/handlers/site-pages'
+import * as stockAlertsPublic from '@/lib/api/handlers/stock-alerts'
 
 // -------------------- MAIN DISPATCHER --------------------
 // Thin router : chaque domaine est g\u00e9r\u00e9 par un handler s\u00e9par\u00e9 dans /lib/api/handlers
@@ -41,6 +42,7 @@ async function handler(request, { params }) {
       case 'newsletter':    res = await newsletter.handle(ctx); break
       case 'contact':       res = await contact.handle(ctx); break
       case 'site-pages':    res = await sitePages.handle(ctx); break
+      case 'stock-alerts':  res = await stockAlertsPublic.handle(ctx); break
     }
 
     if (res) return res

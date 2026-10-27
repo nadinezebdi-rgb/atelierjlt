@@ -16,6 +16,7 @@ import MediaLibrary from '@/components/admin/media-library'
 import HomeSectionsEditor from '@/components/admin/home-sections-editor'
 import TabOrders from '@/components/admin/orders-tab'
 import LegalPagesTab from '@/components/admin/legal-pages-tab'
+import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
 import PageContentEditor from '@/components/admin/page-content-editor'
 
 /* =========================================================
@@ -152,7 +153,7 @@ export default function AdminPage() {
     { title: 'Site & contenu', items: [
       { key: 'content', label: 'Éditeur de l’accueil', icon: Layers },
       { key: 'blog', label: 'Journal', icon: BookOpen },
-      { key: 'legal', label: 'Footer & pages légales', icon: FileText },
+      { key: 'legal', label: 'Menu, footer & pages', icon: FileText },
       { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
     ] },
     { title: 'Boutique', items: [
@@ -293,7 +294,13 @@ function TabProducts() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p),
     })
-    if (r.ok) { toast.success('Enregistré'); setEditing(null); load() }
+    if (r.ok) {
+      toast.success('Enregistré'); setEditing(null); load()
+      const d = await r.json().catch(() => ({}))
+      const sa = d.stockAlerts
+      if (sa?.sent) toast.success(`${sa.sent} client${sa.sent > 1 ? 's' : ''} prévenu${sa.sent > 1 ? 's' : ''} du retour en stock`)
+      else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : boîte mail OVH pas encore connectée`)
+    }
     else toast.error('Erreur')
   }
 
@@ -345,6 +352,8 @@ function TabProducts() {
     <div>
       {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
       <MissingMediaRecovery />
+
+      <StockAlertsPanel products={products} />
 
       {/* En-tête + action principale */}
       <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">

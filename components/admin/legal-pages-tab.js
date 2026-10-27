@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ChevronDown, Eye, Plus, Trash2, ArrowUp, ArrowDown, AlertTriangle, Save } from 'lucide-react'
 import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal-defaults'
+import { NAV_PAGE_OPTIONS, NAVBAR_DEFAULTS } from '@/lib/navbar'
 
 const INPUT = 'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald rounded-sm'
 const LABEL = 'block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2'
@@ -18,12 +19,12 @@ export default function LegalPagesTab() {
   const [data, setData] = useState(null)
   const [dirty, setDirty] = useState({})
   const [saving, setSaving] = useState('')
-  const [open, setOpen] = useState('footer')
+  const [open, setOpen] = useState('navbar')
 
   useEffect(() => {
     fetch('/api/admin/site-pages', { credentials: 'include' })
       .then((r) => r.json())
-      .then((d) => setData({ footer: d.footer, ...d.pages }))
+      .then((d) => setData({ footer: d.footer, navbar: d.navbar, ...d.pages }))
       .catch(() => toast.error('Chargement impossible'))
   }, [])
 
@@ -57,12 +58,25 @@ export default function LegalPagesTab() {
   return (
     <div className="space-y-4" data-testid="admin-legal-tab">
       <div className="mb-6">
-        <h2 className="font-display text-3xl">Footer & pages légales</h2>
+        <h2 className="font-display text-3xl">Menu, footer & pages</h2>
         <p className="text-sm text-ink/60 mt-2 max-w-2xl leading-relaxed">
-          Modifiez le bas de page du site, le texte du bandeau cookies et les pages CGV, Livraison & retours, Suivi de commande, Confidentialité (RGPD) et Mentions légales.
+          Modifiez le menu du haut, le bas de page du site, le texte du bandeau cookies et les pages CGV, Livraison & retours, Suivi de commande, Confidentialité (RGPD) et Mentions légales.
           Chaque bloc s’enregistre séparément.
         </p>
       </div>
+
+      <Card
+        id="navbar"
+        title="Menu de navigation (navbar)"
+        subtitle="Les liens affichés en haut du site — nom, page reliée, ordre"
+        open={open === 'navbar'}
+        onToggle={() => setOpen(open === 'navbar' ? '' : 'navbar')}
+        dirty={dirty.navbar}
+        saving={saving === 'navbar'}
+        onSave={() => save('navbar')}
+      >
+        <NavbarEditor value={data.navbar} onChange={(v) => set('navbar', v)} />
+      </Card>
 
       <Card
         id="footer"
@@ -227,6 +241,70 @@ function PageEditor({ value, onChange }) {
           className="mt-3 h-11 px-4 border border-dashed border-ink/30 hover:border-emerald hover:text-emerald text-[11px] uppercase tracking-[0.2em] inline-flex items-center gap-2"
         >
           <Plus className="h-4 w-4" strokeWidth={1.5} /> Ajouter une partie
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function NavbarEditor({ value, onChange }) {
+  const items = Array.isArray(value?.items) ? value.items : []
+  const setItems = (next) => onChange({ ...(value || {}), items: next })
+  const upd = (i, patch) => setItems(items.map((it, j) => (j === i ? { ...it, ...patch } : it)))
+  const move = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= items.length) return
+    const next = items.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setItems(next)
+  }
+  const known = new Set(NAV_PAGE_OPTIONS.map((o) => o.href))
+  return (
+    <div className="space-y-3" data-testid="navbar-editor">
+      <p className="text-xs text-ink/55 leading-relaxed">
+        Chaque ligne = un titre du menu. Choisissez la page vers laquelle il mène : le titre est ainsi toujours relié à la bonne page. Le lien en cours est souligné en vert sur le site.
+      </p>
+      {items.map((it, i) => {
+        const custom = !known.has(it.href)
+        return (
+          <div key={i} className={`border bg-ivory p-3 grid sm:grid-cols-[1fr_1.3fr_auto] gap-2 items-center ${it.show === false ? 'border-dashed border-ink/20 opacity-70' : 'border-linen'}`} data-testid={`nav-item-${i}`}>
+            <input value={it.label || ''} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Titre du menu" className={INPUT} aria-label="Titre du menu" />
+            <div className="space-y-2">
+              <select
+                value={custom ? '__custom' : it.href}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '__custom') return upd(i, { href: '' })
+                  const opt = NAV_PAGE_OPTIONS.find((o) => o.href === v)
+                  upd(i, { href: v, ...(it.label ? {} : { label: opt?.label || '' }) })
+                }}
+                className={INPUT}
+                aria-label="Page reliée"
+              >
+                {NAV_PAGE_OPTIONS.map((o) => <option key={o.href} value={o.href}>{o.label}</option>)}
+                <option value="__custom">Autre lien…</option>
+              </select>
+              {custom && (
+                <input value={it.href || ''} onChange={(e) => upd(i, { href: e.target.value })} placeholder="/ma-page ou https://…" className={INPUT} aria-label="Lien personnalisé" />
+              )}
+            </div>
+            <div className="flex items-center gap-1 justify-end">
+              <button type="button" onClick={() => upd(i, { show: it.show === false })} className={`h-10 px-2 text-[10px] uppercase tracking-[0.16em] border min-w-[78px] ${it.show !== false ? 'border-emerald text-emerald' : 'border-ink/20 text-ink/45'}`} aria-pressed={it.show !== false}>
+                {it.show !== false ? 'Affiché' : 'Masqué'}
+              </button>
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Monter" className="h-10 w-10 flex items-center justify-center border border-ink/10 hover:border-ink disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Descendre" className="h-10 w-10 flex items-center justify-center border border-ink/10 hover:border-ink disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => { if (confirm('Retirer ce lien du menu ?')) setItems(items.filter((_, j) => j !== i)) }} aria-label="Supprimer" className="h-10 w-10 flex items-center justify-center text-terracotta hover:bg-terracotta/10"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+            </div>
+          </div>
+        )
+      })}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setItems([...items, { label: 'Nouveau lien', href: '/', show: true }])} data-testid="nav-add" className="h-11 px-4 border border-dashed border-ink/30 hover:border-emerald hover:text-emerald text-[11px] uppercase tracking-[0.2em] inline-flex items-center gap-2">
+          <Plus className="h-4 w-4" strokeWidth={1.5} /> Ajouter un lien
+        </button>
+        <button type="button" onClick={() => { if (confirm('Revenir au menu par défaut ?')) setItems(NAVBAR_DEFAULTS.items.map((x) => ({ ...x }))) }} className="h-11 px-4 border border-ink/20 hover:border-ink text-[11px] uppercase tracking-[0.2em]">
+          Menu par défaut
         </button>
       </div>
     </div>

@@ -4,20 +4,31 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu, Search, Heart, User, ShoppingBag, X, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import { mergeNavbar, isActiveHref } from '@/lib/navbar'
 import { useCart } from './cart-provider'
 import { useAuth } from './auth-provider'
 import Logo from './logo'
 import { cn } from '@/lib/utils'
 
-const nav = [
-  { name: 'Collections',        href: '/collections' },
-  { name: 'Nouveautés',         href: '/collections?cat=nouveautes' },
-  { name: 'Éditions limitées',  href: '/collections?cat=editions-limitees' },
-  { name: 'À propos de nous',    href: '/a-propos' },
-  { name: 'Journal',            href: '/journal' },
-  { name: 'Contact',            href: '/contact' },
-]
+// Menu modifiable dans /admin → Menu, footer & pages (valeurs par défaut ci-dessous)
+let navCache = null
+function useNavItems() {
+  const [items, setItems] = useState(() => (navCache || mergeNavbar(null)).items)
+  useEffect(() => {
+    if (navCache) return
+    fetch('/api/site-pages/navbar')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.navbar?.items) {
+          navCache = d.navbar
+          setItems(d.navbar.items)
+        }
+      })
+      .catch(() => {})
+  }, [])
+  return items.filter((i) => i.show !== false).map((i) => ({ name: i.label, href: i.href }))
+}
 
 export default function Header({ transparent = false }) {
   const [scrolled, setScrolled] = useState(false)
@@ -25,6 +36,14 @@ export default function Header({ transparent = false }) {
   const { count, setOpen } = useCart()
   const { user } = useAuth()
   const router = useRouter()
+  const nav = useNavItems()
+  const pathname = usePathname() || '/'
+  const [search, setSearch] = useState('')
+  useEffect(() => {
+    const s = window.location.search
+    if (s !== search) setSearch(s)
+  })
+  const isActive = (href) => isActiveHref(href, pathname, search)
   // Retour : page précédente si elle existe, sinon l'accueil
   const goBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) router.back()
@@ -135,11 +154,12 @@ export default function Header({ transparent = false }) {
           <div className="container flex items-center justify-center gap-8 xl:gap-12 h-12">
             {nav.map((n) => (
               <Link
-                key={n.name}
+                key={n.name + n.href}
                 href={n.href}
+                aria-current={isActive(n.href) ? 'page' : undefined}
                 className={cn(
-                  'text-[11px] uppercase tracking-[0.22em] transition-colors',
-                  'text-ink/75 hover:text-emerald'
+                  'text-[11px] uppercase tracking-[0.22em] transition-colors py-1 border-b',
+                  isActive(n.href) ? 'text-emerald border-emerald' : 'text-ink/75 hover:text-emerald border-transparent'
                 )}
               >
                 {n.name}
@@ -176,10 +196,11 @@ export default function Header({ transparent = false }) {
               <div className="flex-1 overflow-auto p-6 space-y-2">
                 {nav.map((n) => (
                   <Link
-                    key={n.name}
+                    key={n.name + n.href}
                     href={n.href}
                     onClick={() => setMobile(false)}
-                    className="block font-display text-2xl py-2 hover:text-terracotta transition"
+                    aria-current={isActive(n.href) ? 'page' : undefined}
+                    className={cn('block font-display text-2xl py-2 hover:text-terracotta transition', isActive(n.href) && 'text-emerald')}
                   >
                     {n.name}
                   </Link>

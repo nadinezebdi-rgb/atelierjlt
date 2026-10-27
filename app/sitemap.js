@@ -6,7 +6,7 @@ export default function sitemap() {
   const now = new Date()
   const staticPages = [
     '',
-    '/collections',
+    '/produits',
     '/collection/printemps-ete-2026-2027',
     '/a-propos',
     '/journal',

@@ -58,9 +58,9 @@ export default function Footer() {
             ['Nous contacter', '/contact'],
           ]} />
           <FooterCol title="Boutique" items={[
-            ['Toutes les collections', '/collections'],
-            ['Nouveautés', '/collections?cat=nouveautes'],
-            ['Éditions limitées', '/collections?cat=editions-limitees'],
+            ['Tous les produits', '/produits'],
+            ['Nouveautés', '/produits?cat=nouveautes'],
+            ['Éditions limitées', '/produits?cat=editions-limitees'],
             ['Cartes cadeaux', '/carte-cadeau'],
           ]} />
           <FooterCol title="Client" items={clientItems} />

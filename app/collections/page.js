@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
@@ -13,6 +13,7 @@ import { Search, SlidersHorizontal, X } from 'lucide-react'
 function CollectionsInner() {
   const params = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const cat = params.get('cat') || ''
   const collection = params.get('collection') || ''
   const q = params.get('q') || ''
@@ -39,12 +40,12 @@ function CollectionsInner() {
     const next = new URLSearchParams(params.toString())
     if (val) next.set(key, val)
     else next.delete(key)
-    router.push(`/collections?${next.toString()}`)
+    router.push(`${pathname || '/produits'}?${next.toString()}`)
   }
 
   const activeCat = CATEGORIES.find((c) => c.slug === cat)
   const activeCol = COLLECTIONS.find((c) => c.slug === collection)
-  const title = activeCat?.name || activeCol?.name || 'Toutes les créations'
+  const title = activeCat?.name || activeCol?.name || 'Tous nos produits'
   const subtitle = activeCat?.tagline || activeCol?.story || 'Une sélection complète de la maison.'
 
   return (
@@ -57,7 +58,7 @@ function CollectionsInner() {
           transition={{ duration: 0.9 }}
           className="container pb-10 md:pb-16 border-b border-linen"
         >
-          <span className="text-[10px] uppercase tracking-[0.36em] text-emerald">Collections</span>
+          <span className="text-[10px] uppercase tracking-[0.36em] text-emerald">Produits</span>
           <h1 className="font-display font-normal text-4xl md:text-6xl mt-4 leading-[1.02] text-balance text-emerald"
               style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>{title}</h1>
           <p className="text-ink/60 mt-4 max-w-xl italic">{subtitle}</p>

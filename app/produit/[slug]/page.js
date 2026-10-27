@@ -12,6 +12,7 @@ import { useCart } from '@/components/site/cart-provider'
 import { formatPrice } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Minus, Plus, Heart, Truck, Shield, Sparkles, ChevronDown } from 'lucide-react'
+import BackInStockAlert from '@/components/product/back-in-stock-alert'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -276,7 +277,16 @@ export default function ProductPage() {
               <MetaRow k="Origine" v="Fabrication française" />
             </div>
 
-            {/* Qty + CTA */}
+            {/* Qty + CTA — ou alerte retour en stock si épuisé */}
+            {effectiveStock === 0 ? (
+              <BackInStockAlert
+                slug={p.slug}
+                variant={selectedVariant?.name || null}
+                size={selectedSize?.label || null}
+                label={[selectedVariant?.name, selectedSize?.label].filter(Boolean).join(' · ')}
+              />
+            ) : (
+            <>
             <div className="mt-10 flex items-stretch gap-3">
               <div className="flex items-center border border-ink/30">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-3 h-full hover:bg-linen/40" aria-label="Diminuer"><Minus className="h-3.5 w-3.5" strokeWidth={1.5} /></button>
@@ -285,10 +295,9 @@ export default function ProductPage() {
               </div>
               <button
                 onClick={handleAdd}
-                disabled={effectiveStock === 0}
-                className="flex-1 bg-emerald text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-emeraldDark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-emerald text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-emeraldDark transition-colors"
               >
-                {effectiveStock === 0 ? 'Rupture de stock' : `Ajouter au panier — ${formatPrice(effectivePrice * qty)}`}
+                {`Ajouter au panier — ${formatPrice(effectivePrice * qty)}`}
               </button>
               <button
                 onClick={() => toast('Ajouté aux favoris')}
@@ -298,9 +307,11 @@ export default function ProductPage() {
                 <Heart className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </div>
-            <div className="mt-3 text-[11px] uppercase tracking-[0.22em] text-ink/50">
-              {effectiveStock === 0 ? 'Épuisé — reviendra bientôt' : effectiveStock > 5 ? 'En stock' : `Plus que ${effectiveStock} exemplaires`}
+            <div className="mt-3 text-[11px] uppercase tracking-[0.22em] text-ink/50" data-testid="stock-status">
+              {effectiveStock > 5 ? 'En stock' : `Plus que ${effectiveStock} exemplaire${effectiveStock > 1 ? 's' : ''}`}
             </div>
+            </>
+            )}
 
             {/* Trust */}
             <div className="mt-10 grid grid-cols-3 gap-4 text-[11px] uppercase tracking-[0.18em] text-ink/60 border-t border-linen pt-6">

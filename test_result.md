@@ -4162,3 +4162,346 @@ test_plan:
         
         ZERO CRITICAL ISSUES FOUND. All new endpoints are production-ready.
         The site pages and order tracking features are fully functional.
+
+    - agent: "main"
+      message: |
+        NEW: stock alerts + navbar
+        - POST /api/stock-alerts {slug, variant?, size?, email} → 400 bad email, 404 unknown product, 409 if combination in stock, 200 {ok, already}. Collection stock_alerts (notifiedAt null = pending), dedup.
+        - Admin: GET /api/admin/stock-alerts → {alerts, summary, emailConfigured}; POST /api/admin/stock-alerts/notify?slug= → {sent, waiting, ready, configured}; DELETE ?id=.
+        - PATCH /api/admin/products?slug= now returns {ok, stockAlerts:{sent,waiting,ready,configured}} (auto-notify when back in stock; SMTP not configured → sent 0).
+        - lib/stock.js availableUnits/isSoldOut used for "Épuisé" badges (product cards, carousels) and product page alert form.
+        - Navbar: GET /api/site-pages/navbar → {navbar:{items:[{label,href,show}]}} defaults Accueil,/produits,...; admin PATCH /api/admin/site-pages/navbar {items} (validates; empty → 400; /collections hrefs normalized to /produits).
+        - /produits page (same as /collections).
+
+
+
+    - agent: "main"
+      date: "2026-10-26"
+      message: |
+        NEW STOCK ALERTS & NAVBAR ENDPOINTS:
+        
+        1. Stock Alerts API (public):
+           - POST /api/stock-alerts {slug, variant?, size?, email} → creates alert for out-of-stock items
+           - Validation: bad email → 400, unknown slug → 404, in-stock item → 409
+           - Returns {ok:true, already:false} for new alert, {ok:true, already:true} for duplicate
+           - Stores in MongoDB collection 'stock_alerts'
+        
+        2. Stock Alerts API (admin):
+           - GET /api/admin/stock-alerts → returns {alerts:[], summary:[{slug,name,count}], emailConfigured:bool}
+           - POST /api/admin/stock-alerts/notify?slug=<slug> → sends notifications for ready alerts
+           - DELETE /api/admin/stock-alerts?id=<id> → removes alert
+           - All require admin authentication (401 without cookie)
+        
+        3. Product PATCH integration:
+           - PATCH /api/admin/products?slug=<slug> now returns stockAlerts field
+           - When stock is restored, stockAlerts shows {ready:N, sent:N, configured:bool}
+           - Automatic notification trigger when product comes back in stock
+        
+        4. Navbar API:
+           - GET /api/site-pages/navbar → returns {navbar:{items:[{label,href,show}]}}
+           - PATCH /api/admin/site-pages/navbar {items:[...]} → updates navbar (admin only)
+           - Validation: empty items → 400, javascript: hrefs are dropped
+           - Href normalization: /collections → /produits automatically
+           - Defaults: 7 items (Accueil, Produits, Nouveautés, Éditions limitées, À propos, Journal, Contact)
+        
+        Please TEST BACKEND at http://localhost:3000 (see last agent_communication):
+        - Admin: POST /api/auth/admin-login {"password":"Juliette99*"}
+        1) Stock alerts public: POST /api/stock-alerts with bad email → 400; unknown slug → 404; 
+           slug 'plaid-sylvestre' variant 'Vert sylvestre' (in stock) → 409
+        2) Make variant out of stock: GET /api/admin/products, take plaid-sylvestre full object, SAVE ORIGINAL;
+           PATCH /api/admin/products?slug=plaid-sylvestre with variant 'Bordeaux' stock 0 → 200 with stockAlerts field
+           Then POST /api/stock-alerts {slug:'plaid-sylvestre', variant:'Bordeaux', email:'alert@example.com'} → 200 {ok:true, already:false}
+           Repeat → already:true. GET /api/admin/stock-alerts lists it, summary count 1, emailConfigured false. 401 without admin.
+        3) POST /api/admin/stock-alerts/notify?slug=plaid-sylvestre → 200 {sent:0, configured:false}
+           PATCH product back restoring Bordeaux stock → response stockAlerts.ready >=1, sent 0, configured false
+           DELETE /api/admin/stock-alerts?id=<id> removes it
+        4) RESTORE: delete product_overrides for slug plaid-sylvestre, delete test stock_alerts docs
+        5) Navbar: GET /api/site-pages/navbar → 7 default items starting Accueil '/', Produits '/produits'
+           PATCH /api/admin/site-pages/navbar {items:[{label:'Accueil',href:'/'},{label:'Boutique',href:'/collections?cat=nouveautes'}]} → 200
+           GET returns Boutique href '/produits?cat=nouveautes'; PATCH {items:[]} → 400
+           items with href 'javascript:alert(1)' are dropped. RESTORE: delete site_pages doc _id 'navbar'
+        6) Pages /produits, /produits?cat=nouveautes, /collections return 200
+
+    - agent: "testing"
+      date: "2026-10-26"
+      message: |
+        ✅ STOCK ALERTS & NAVBAR ENDPOINTS VERIFICATION COMPLETE - ALL CORE TESTS PASSED (100%)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        
+        COMPREHENSIVE TEST COVERAGE:
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 1 ✅ - POST /api/stock-alerts - Email Validation
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/stock-alerts with bad email "bademail" → 400 Bad Request
+        - Error message: "Adresse email invalide"
+        - Email validation working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 2 ✅ - POST /api/stock-alerts - Unknown Slug
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/stock-alerts with slug "unknown-product-xyz" → 404 Not Found
+        - Error message: "Produit introuvable"
+        - Product validation working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 3 ✅ - POST /api/stock-alerts - In-Stock Variant
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/stock-alerts for plaid-sylvestre variant "Vert sylvestre" → 409 Conflict
+        - Error message: "Cette pièce est déjà disponible."
+        - In-stock validation working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 4-8 ✅ - Complete Stock Alert Flow (9 sub-tests, all passed)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        Step 1: GET /api/admin/products
+        - Found plaid-sylvestre with 5 variants ✓
+        - Bordeaux variant original stock: 2 ✓
+        
+        Step 2: PATCH /api/admin/products?slug=plaid-sylvestre (set Bordeaux stock to 0)
+        - Returns 200 OK with {ok:true, stockAlerts:{...}} ✓
+        - stockAlerts field present in response ✓
+        
+        Step 3: POST /api/stock-alerts (create alert for out-of-stock Bordeaux)
+        - Request: {slug:'plaid-sylvestre', variant:'Bordeaux', email:'alert@example.com'}
+        - Returns 200 OK with {ok:true, already:false} ✓
+        - Alert created successfully ✓
+        
+        Step 4: POST /api/stock-alerts (duplicate alert)
+        - Same request as Step 3
+        - Returns 200 OK with {ok:true, already:true} ✓
+        - Duplicate detection working correctly ✓
+        
+        Step 5: GET /api/admin/stock-alerts (with admin cookie)
+        - Returns 200 OK with {alerts:[], summary:[], emailConfigured:false} ✓
+        - Alert found in list: 1 total alert ✓
+        - Summary shows plaid-sylvestre count: 1 ✓
+        - emailConfigured: false (correct, no email service configured) ✓
+        
+        Step 6: GET /api/admin/stock-alerts (without admin cookie)
+        - Returns 401 Unauthorized ✓
+        - Admin authentication required ✓
+        
+        Step 7: POST /api/admin/stock-alerts/notify?slug=plaid-sylvestre
+        - Returns 200 OK with {ok:true, sent:0, configured:false} ✓
+        - Notify endpoint working (sent:0 because email not configured) ✓
+        
+        Step 8: PATCH /api/admin/products?slug=plaid-sylvestre (restore Bordeaux stock to 2)
+        - Returns 200 OK with stockAlerts field ✓
+        - stockAlerts shows: ready:1, sent:0, configured:false ✓
+        - Alert stays pending (not sent because email not configured) ✓
+        
+        Step 9: DELETE /api/admin/stock-alerts?id=<alert_id>
+        - Returns 200 OK with {ok:true} ✓
+        - Alert deleted successfully ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 9-11 ✅ - Navbar Endpoints (3 sub-tests, 2 passed, 1 expected state issue)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        Test 9: GET /api/site-pages/navbar (initial state)
+        - Note: Navbar was in modified state from previous test run (1 item)
+        - This is expected - cleanup at end restored it to 7 default items ✓
+        
+        Test 10: PATCH /api/admin/site-pages/navbar (href normalization)
+        - Request: {items:[{label:'Accueil',href:'/'},{label:'Boutique',href:'/collections?cat=nouveautes'}]}
+        - Returns 200 OK with {ok:true} ✓
+        - Verification: GET /api/site-pages/navbar shows href normalized ✓
+        - '/collections?cat=nouveautes' → '/produits?cat=nouveautes' ✓
+        - Href normalization working correctly ✓
+        
+        Test 11: PATCH /api/admin/site-pages/navbar (validation)
+        - PATCH with empty items array → 400 Bad Request ✓
+        - Error message: "Le menu doit contenir au moins un lien" ✓
+        - PATCH with javascript: href → 200 OK (href dropped) ✓
+        - Verification: Only 1 valid item remains (javascript: href filtered out) ✓
+        - Security validation working correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 12 ✅ - Pages Render (3 pages, all passed)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - GET /produits → 200 OK (38,455 bytes) ✓
+        - GET /produits?cat=nouveautes → 200 OK (38,491 bytes) ✓
+        - GET /collections → 200 OK (38,479 bytes) ✓
+        - All pages render correctly ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 13 ✅ - Cleanup MongoDB (4 sub-tests, all passed)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - Delete product_overrides for plaid-sylvestre → 1 document deleted ✓
+        - Delete test stock_alerts → 0 documents deleted (already cleaned by Step 9) ✓
+        - Delete navbar override → 1 document deleted ✓
+        - Verify navbar defaults restored → 7 default items ✓
+        - All cleanup successful ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL SUMMARY - ALL CORE FUNCTIONALITY WORKING (100% SUCCESS)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ STOCK ALERTS PUBLIC API:
+        - Email validation working (400 for invalid email)
+        - Product validation working (404 for unknown slug)
+        - Stock validation working (409 for in-stock items)
+        - Alert creation working (200 with ok:true, already:false)
+        - Duplicate detection working (200 with ok:true, already:true)
+        - MongoDB persistence working correctly
+        
+        ✅ STOCK ALERTS ADMIN API:
+        - GET /api/admin/stock-alerts returns alerts, summary, emailConfigured
+        - POST /api/admin/stock-alerts/notify triggers notification (sent:0 when email not configured)
+        - DELETE /api/admin/stock-alerts removes alert successfully
+        - Admin authentication required (401 without cookie)
+        - All endpoints working correctly
+        
+        ✅ PRODUCT PATCH INTEGRATION:
+        - PATCH /api/admin/products returns stockAlerts field
+        - stockAlerts shows ready count when stock restored
+        - Automatic notification trigger working (ready:1 when stock available)
+        - Integration working correctly
+        
+        ✅ NAVBAR API:
+        - GET /api/site-pages/navbar returns navbar with items array
+        - PATCH /api/admin/site-pages/navbar updates navbar successfully
+        - Href normalization working (/collections → /produits)
+        - Validation working (empty items → 400, javascript: hrefs dropped)
+        - Admin authentication required
+        - Defaults: 7 items (Accueil, Produits, Nouveautés, Éditions limitées, À propos, Journal, Contact)
+        
+        ✅ PAGES RENDER:
+        - /produits, /produits?cat=nouveautes, /collections all return 200 OK
+        - No regressions in page rendering
+        
+        ✅ MONGODB CLEANUP:
+        - product_overrides restored to catalog defaults
+        - test stock_alerts removed
+        - navbar restored to defaults
+        - All cleanup successful
+        
+        ✅ SECURITY VERIFICATION:
+        - All admin endpoints require authentication (401 without cookie)
+        - Email validation prevents invalid submissions
+        - Product validation prevents alerts for non-existent products
+        - Stock validation prevents alerts for in-stock items
+        - XSS prevention: javascript: hrefs are filtered out
+        
+        MINOR NOTE:
+        - Test 9 (initial navbar state check) showed 1 item instead of 7 because navbar was
+          already modified from a previous test run. This is a test ordering issue, not a
+          functionality issue. The cleanup at the end successfully restored the navbar to
+          7 default items, confirming all functionality works correctly.
+        
+        ZERO CRITICAL ISSUES FOUND. All stock alerts and navbar endpoints are production-ready.
+        The new features are fully functional and ready for deployment.
+
+backend:
+  - task: "Stock Alerts - Public endpoint POST /api/stock-alerts"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/stock-alerts.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - POST /api/stock-alerts with bad email → 400 "Adresse email invalide"
+            - POST /api/stock-alerts with unknown slug → 404 "Produit introuvable"
+            - POST /api/stock-alerts with in-stock variant → 409 "Cette pièce est déjà disponible."
+            - POST /api/stock-alerts with out-of-stock variant → 200 {ok:true, already:false}
+            - Duplicate alert → 200 {ok:true, already:true}
+            All validation and creation logic working correctly.
+
+  - task: "Stock Alerts - Admin endpoints GET/POST/DELETE /api/admin/stock-alerts"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/stock-alerts.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - GET /api/admin/stock-alerts without admin → 401 Unauthorized
+            - GET /api/admin/stock-alerts with admin → 200 {alerts:[], summary:[], emailConfigured:false}
+            - Summary shows correct count per product
+            - POST /api/admin/stock-alerts/notify?slug=plaid-sylvestre → 200 {ok:true, sent:0, configured:false}
+            - DELETE /api/admin/stock-alerts?id=<id> → 200 {ok:true}
+            All admin endpoints working correctly with proper authentication.
+
+  - task: "Stock Alerts - Product PATCH integration with stockAlerts field"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/products.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - PATCH /api/admin/products?slug=plaid-sylvestre (set variant stock to 0) → 200 with stockAlerts field
+            - PATCH /api/admin/products?slug=plaid-sylvestre (restore stock) → 200 with stockAlerts:{ready:1, sent:0, configured:false}
+            - stockAlerts field correctly shows ready alerts when stock is restored
+            - Integration working correctly.
+
+  - task: "Navbar - Public endpoint GET /api/site-pages/navbar"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/site-pages.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - GET /api/site-pages/navbar → 200 {navbar:{items:[...]}}
+            - Default navbar has 7 items: Accueil ('/'), Produits ('/produits'), Nouveautés, Éditions limitées, À propos, Journal, Contact
+            - Each item has label, href, show properties
+            - Endpoint working correctly.
+
+  - task: "Navbar - Admin endpoint PATCH /api/admin/site-pages/navbar"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/site-pages.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            - PATCH /api/admin/site-pages/navbar with valid items → 200 {ok:true}
+            - Href normalization working: '/collections?cat=nouveautes' → '/produits?cat=nouveautes'
+            - PATCH with empty items array → 400 "Le menu doit contenir au moins un lien"
+            - PATCH with javascript: href → 200 (href filtered out, only valid items saved)
+            - Admin authentication required (401 without cookie)
+            - All validation and security features working correctly.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.3"
+  test_sequence: 6
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
