@@ -20,6 +20,7 @@ import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
 import { availableUnits, lowStockItems } from '@/lib/stock'
 import PageContentEditor from '@/components/admin/page-content-editor'
 import CategoryPagesEditor from '@/components/admin/category-pages-editor'
+import NavbarBlock from '@/components/admin/navbar-block'
 
 /* =========================================================
    ONGLET — CONTENU DU SITE (hero + collections)
@@ -1284,11 +1285,13 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Collections'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-navbar', 'Menu de navigation'], ['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Collections'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
       <div className="space-y-10 max-w-5xl">
+        {/* MENU DE NAVIGATION — enregistré séparément */}
+        <NavbarBlock />
         {/* HERO — Compositeur V2 (WYSIWYG + contraste auto + multi-slides + parallaxe) */}
         <HeroComposer
           hero={c.hero}

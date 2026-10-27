@@ -13,8 +13,8 @@ import { cn } from '@/lib/utils'
 
 // Menu modifiable dans /admin → Menu, footer & pages (valeurs par défaut ci-dessous)
 let navCache = null
-function useNavItems() {
-  const [items, setItems] = useState(() => (navCache || mergeNavbar(null)).items)
+function useNavConfig() {
+  const [cfg, setCfg] = useState(() => navCache || mergeNavbar(null))
   useEffect(() => {
     if (navCache) return
     fetch('/api/site-pages/navbar')
@@ -22,12 +22,15 @@ function useNavItems() {
       .then((d) => {
         if (d?.navbar?.items) {
           navCache = d.navbar
-          setItems(d.navbar.items)
+          setCfg(d.navbar)
         }
       })
       .catch(() => {})
   }, [])
-  return items.filter((i) => i.show !== false).map((i) => ({ name: i.label, href: i.href }))
+  return {
+    items: (cfg.items || []).filter((i) => i.show !== false).map((i) => ({ name: i.label, href: i.href })),
+    options: cfg.options || mergeNavbar(null).options,
+  }
 }
 
 export default function Header({ transparent = false }) {
@@ -36,7 +39,7 @@ export default function Header({ transparent = false }) {
   const { count, setOpen } = useCart()
   const { user } = useAuth()
   const router = useRouter()
-  const nav = useNavItems()
+  const { items: nav, options: navOpt } = useNavConfig()
   const pathname = usePathname() || '/'
   const [search, setSearch] = useState('')
   useEffect(() => {
@@ -68,7 +71,8 @@ export default function Header({ transparent = false }) {
       <header
         className={cn(
           'left-0 right-0 z-40 transition-colors duration-500',
-          'sticky top-0 bg-ivory/95 backdrop-blur-md border-b border-linen/60',
+          navOpt.sticky ? 'sticky top-0' : 'relative',
+          'bg-ivory/95 backdrop-blur-md border-b border-linen/60',
           scrolled ? 'shadow-[0_1px_0_rgba(0,0,0,0.02)]' : ''
         )}
       >
@@ -84,7 +88,7 @@ export default function Header({ transparent = false }) {
             </button>
             <div className="flex items-center">
               {/* Navigation précédente / suivante */}
-              <div className="flex items-center gap-1.5" data-testid="header-history-nav">
+              <div className={cn('flex items-center gap-1.5', !navOpt.showArrows && 'hidden')} data-testid="header-history-nav">
                 <button
                   type="button"
                   onClick={goBack}
@@ -115,22 +119,27 @@ export default function Header({ transparent = false }) {
             className="absolute left-1/2 -translate-x-1/2 flex items-center"
             aria-label="Atelier JLT — accueil"
           >
-            <Logo variant="dark" size="lg" />
+            {navOpt.logoImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={navOpt.logoImage} alt="Atelier JLT" className={navOpt.logoSize === 'md' ? 'h-12 md:h-16 w-auto object-contain' : 'h-16 md:h-24 w-auto object-contain'} />
+            ) : (
+              <Logo variant="dark" size={navOpt.logoSize === 'md' ? 'md' : 'lg'} />
+            )}
           </Link>
 
           {/* Right: icons */}
           <div className={cn('flex items-center gap-4 md:gap-5', 'text-ink')}>
-            <Link href="/wishlist" className="hidden md:block hover:opacity-60 transition" aria-label="Favoris">
+            <Link href="/wishlist" className={cn('hidden hover:opacity-60 transition', navOpt.showWishlist && 'md:block')} aria-label="Favoris">
               <Heart className="h-[18px] w-[18px]" strokeWidth={1.5} />
             </Link>
-            <Link href="/compte" className="hidden md:flex items-center gap-1.5 hover:opacity-60 transition" aria-label="Mon compte">
+            <Link href="/compte" className={cn('hidden items-center gap-1.5 hover:opacity-60 transition', navOpt.showAccount && 'md:flex')} aria-label="Mon compte">
               <User className="h-[18px] w-[18px]" strokeWidth={1.5} />
               {user && <span className="text-[11px] uppercase tracking-[0.22em] max-w-[100px] truncate">{(user.name || user.email.split('@')[0])}</span>}
             </Link>
             <button
               onClick={() => setOpen(true)}
               aria-label="Panier"
-              className="relative flex items-center gap-2 hover:opacity-60 transition"
+              className={cn('relative items-center gap-2 hover:opacity-60 transition', navOpt.showCart ? 'flex' : 'hidden')}
             >
               <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.5} />
               <span className="hidden md:inline text-[11px] uppercase tracking-[0.22em] tabular-nums">
@@ -148,10 +157,10 @@ export default function Header({ transparent = false }) {
         {/* Desktop nav */}
         <nav
           className={cn(
-            'hidden lg:block border-t border-linen/60'
+            'hidden border-t border-linen/60', navOpt.visible && 'lg:block'
           )}
         >
-          <div className="container flex items-center justify-center gap-8 xl:gap-12 h-12">
+          <div className={cn('container flex items-center gap-8 xl:gap-12 h-12', navOpt.linksAlign === 'left' ? 'justify-start' : navOpt.linksAlign === 'right' ? 'justify-end' : 'justify-center')}>
             {nav.map((n) => (
               <Link
                 key={n.name + n.href}

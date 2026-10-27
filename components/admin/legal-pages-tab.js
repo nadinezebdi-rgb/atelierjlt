@@ -10,7 +10,8 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ChevronDown, Eye, Plus, Trash2, ArrowUp, ArrowDown, AlertTriangle, Save } from 'lucide-react'
 import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal-defaults'
-import { NAV_PAGE_OPTIONS, NAVBAR_DEFAULTS } from '@/lib/navbar'
+import { NAV_PAGE_OPTIONS, NAVBAR_DEFAULTS, NAVBAR_OPTION_DEFAULTS } from '@/lib/navbar'
+import { ImageField } from '@/components/edit/section-fields'
 
 const INPUT = 'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald rounded-sm'
 const LABEL = 'block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2'
@@ -247,8 +248,10 @@ function PageEditor({ value, onChange }) {
   )
 }
 
-function NavbarEditor({ value, onChange }) {
+export function NavbarEditor({ value, onChange }) {
   const items = Array.isArray(value?.items) ? value.items : []
+  const opt = { ...NAVBAR_OPTION_DEFAULTS, ...(value?.options || {}) }
+  const setOpt = (patch) => onChange({ ...(value || {}), options: { ...opt, ...patch } })
   const setItems = (next) => onChange({ ...(value || {}), items: next })
   const upd = (i, patch) => setItems(items.map((it, j) => (j === i ? { ...it, ...patch } : it)))
   const move = (i, dir) => {
@@ -306,6 +309,49 @@ function NavbarEditor({ value, onChange }) {
         <button type="button" onClick={() => { if (confirm('Revenir au menu par défaut ?')) setItems(NAVBAR_DEFAULTS.items.map((x) => ({ ...x }))) }} className="h-11 px-4 border border-ink/20 hover:border-ink text-[11px] uppercase tracking-[0.2em]">
           Menu par défaut
         </button>
+      </div>
+
+      {/* Réglages d'affichage de la barre */}
+      <div className="pt-5 mt-2 border-t border-linen space-y-4" data-testid="navbar-options">
+        <span className={LABEL}>Affichage de la barre</span>
+        <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1">
+          {[
+            ['visible', 'Afficher la ligne de liens (ordinateur)'],
+            ['sticky', 'Barre fixe en haut pendant le défilement'],
+            ['showArrows', 'Flèches page précédente / suivante'],
+            ['showWishlist', 'Icône Favoris'],
+            ['showAccount', 'Icône Mon compte'],
+            ['showCart', 'Panier'],
+          ].map(([k, label]) => (
+            <label key={k} className="flex items-center justify-between gap-3 py-2 border-b border-linen/60 cursor-pointer select-none">
+              <span className="text-sm text-ink/80">{label}</span>
+              <input type="checkbox" checked={!!opt[k]} onChange={(e) => setOpt({ [k]: e.target.checked })} className="h-5 w-5 accent-emerald" data-testid={`navopt-${k}`} />
+            </label>
+          ))}
+        </div>
+        {!opt.showCart && <p className="text-[11px] text-terracotta">Sans le panier, les clients ne peuvent plus voir leur panier depuis la barre.</p>}
+        <div className="grid sm:grid-cols-2 gap-5">
+          <div>
+            <span className={LABEL}>Position des liens</span>
+            <div className="flex gap-1 p-1 bg-cream">
+              {[['left', 'Gauche'], ['center', 'Centre'], ['right', 'Droite']].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => setOpt({ linksAlign: v })} className={`flex-1 h-10 text-[11px] uppercase tracking-[0.18em] ${opt.linksAlign === v ? 'bg-ink text-ivory' : 'text-ink/60 hover:text-ink'}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className={LABEL}>Taille du logo</span>
+            <div className="flex gap-1 p-1 bg-cream">
+              {[['md', 'Moyen'], ['lg', 'Grand']].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => setOpt({ logoSize: v })} className={`flex-1 h-10 text-[11px] uppercase tracking-[0.18em] ${opt.logoSize === v ? 'bg-ink text-ivory' : 'text-ink/60 hover:text-ink'}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div>
+          <span className={LABEL}>Logo (image facultative — sinon le logo texte « Atelier JLT »)</span>
+          <ImageField value={opt.logoImage} onChange={(url) => setOpt({ logoImage: url || '' })} />
+        </div>
       </div>
     </div>
   )
