@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Menu, Search, Heart, User, ShoppingBag, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Menu, Search, Heart, User, ShoppingBag, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { mergeNavbar, isActiveHref } from '@/lib/navbar'
 import { useCart } from './cart-provider'
@@ -28,7 +28,10 @@ function useNavConfig() {
       .catch(() => {})
   }, [])
   return {
-    items: (cfg.items || []).filter((i) => i.show !== false).map((i) => ({ name: i.label, href: i.href })),
+    items: (cfg.items || []).filter((i) => i.show !== false).map((i) => ({
+      name: i.label, href: i.href,
+      children: (i.children || []).filter((c) => c.show !== false).map((c) => ({ name: c.label, href: c.href })),
+    })),
     options: cfg.options || mergeNavbar(null).options,
   }
 }
@@ -162,17 +165,7 @@ export default function Header({ transparent = false }) {
         >
           <div className={cn('container flex items-center gap-8 xl:gap-12 h-12', navOpt.linksAlign === 'left' ? 'justify-start' : navOpt.linksAlign === 'right' ? 'justify-end' : 'justify-center')}>
             {nav.map((n) => (
-              <Link
-                key={n.name + n.href}
-                href={n.href}
-                aria-current={isActive(n.href) ? 'page' : undefined}
-                className={cn(
-                  'text-[11px] uppercase tracking-[0.22em] transition-colors py-1 border-b',
-                  isActive(n.href) ? 'text-emerald border-emerald' : 'text-ink/75 hover:text-emerald border-transparent'
-                )}
-              >
-                {n.name}
-              </Link>
+              <DesktopNavItem key={n.name + n.href} item={n} isActive={isActive} />
             ))}
           </div>
         </nav>
@@ -204,15 +197,30 @@ export default function Header({ transparent = false }) {
               </div>
               <div className="flex-1 overflow-auto p-6 space-y-2">
                 {nav.map((n) => (
-                  <Link
-                    key={n.name + n.href}
-                    href={n.href}
-                    onClick={() => setMobile(false)}
-                    aria-current={isActive(n.href) ? 'page' : undefined}
-                    className={cn('block font-display text-2xl py-2 hover:text-terracotta transition', isActive(n.href) && 'text-emerald')}
-                  >
-                    {n.name}
-                  </Link>
+                  <div key={n.name + n.href}>
+                    <Link
+                      href={n.href}
+                      onClick={() => setMobile(false)}
+                      aria-current={isActive(n.href) ? 'page' : undefined}
+                      className={cn('block font-display text-2xl py-2 hover:text-terracotta transition', isActive(n.href) && 'text-emerald')}
+                    >
+                      {n.name}
+                    </Link>
+                    {n.children?.length > 0 && (
+                      <div className="pl-4 pb-2 border-l border-linen ml-1 space-y-1">
+                        {n.children.map((c) => (
+                          <Link
+                            key={c.name + c.href}
+                            href={c.href}
+                            onClick={() => setMobile(false)}
+                            className={cn('block text-[13px] uppercase tracking-[0.2em] py-1.5 text-ink/70 hover:text-terracotta', isActive(c.href) && 'text-emerald')}
+                          >
+                            {c.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
               <div className="p-6 border-t border-linen/60 space-y-3 text-[11px] uppercase tracking-[0.24em]">
@@ -224,5 +232,67 @@ export default function Header({ transparent = false }) {
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+/** Lien du menu (ordinateur / iPad) — avec sous-menu déroulant s'il a des sous-liens. */
+function DesktopNavItem({ item, isActive }) {
+  const [open, setOpen] = useState(false)
+  const hasChildren = item.children?.length > 0
+  const active = isActive(item.href) || (hasChildren && item.children.some((c) => isActive(c.href)))
+  const linkCls = cn(
+    'text-[11px] uppercase tracking-[0.22em] transition-colors py-1 border-b inline-flex items-center gap-1',
+    active ? 'text-emerald border-emerald' : 'text-ink/75 hover:text-emerald border-transparent'
+  )
+  if (!hasChildren) {
+    return (
+      <Link href={item.href} aria-current={isActive(item.href) ? 'page' : undefined} className={linkCls}>
+        {item.name}
+      </Link>
+    )
+  }
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+      data-testid={`nav-dropdown-${item.name}`}
+    >
+      <div className="flex items-center">
+        <Link href={item.href} aria-current={isActive(item.href) ? 'page' : undefined} className={linkCls}>
+          {item.name}
+        </Link>
+        <button
+          type="button"
+          aria-label={`Ouvrir le sous-menu ${item.name}`}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="h-8 w-6 flex items-center justify-center text-ink/60 hover:text-emerald"
+        >
+          <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} strokeWidth={1.8} />
+        </button>
+      </div>
+      {open && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-full pt-2 z-50">
+          <div className="min-w-[220px] bg-ivory border border-linen shadow-xl py-2" role="menu">
+            {item.children.map((c) => (
+              <Link
+                key={c.name + c.href}
+                href={c.href}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className={cn(
+                  'block px-5 py-2.5 text-[11px] uppercase tracking-[0.2em] whitespace-nowrap transition-colors',
+                  isActive(c.href) ? 'text-emerald bg-emerald/5' : 'text-ink/75 hover:text-emerald hover:bg-cream/60'
+                )}
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

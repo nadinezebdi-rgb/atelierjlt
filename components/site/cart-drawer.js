@@ -39,7 +39,7 @@ export default function CartDrawer() {
   const discount = coupon ? (coupon.type === 'percent' ? Math.round(subtotal * coupon.value / 100) : coupon.value) : 0
   const afterDiscount = Math.max(0, subtotal - discount)
   const giftApplied = gift ? Math.min(gift.balance, afterDiscount) : 0
-  const shipping = subtotal >= 150 ? 0 : (items.length ? 8.9 : 0)
+  const shipping = items.length ? 8.9 : 0
   const total = Math.max(0, afterDiscount - giftApplied) + shipping
 
   const placeOrder = async () => {
@@ -176,7 +176,7 @@ export default function CartDrawer() {
                     >
                       Passer commande <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
                     </Link>
-                    <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 text-center">Livraison offerte dès 150 € · Paiement sécurisé</div>
+                    <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 text-center">Livraison 8,90 € · Paiement sécurisé</div>
                   </footer>
                 )}
               </>

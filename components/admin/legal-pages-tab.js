@@ -264,13 +264,14 @@ export function NavbarEditor({ value, onChange }) {
   const known = new Set(NAV_PAGE_OPTIONS.map((o) => o.href))
   return (
     <div className="space-y-3" data-testid="navbar-editor">
+      <NavbarPreview value={value} />
       <p className="text-xs text-ink/55 leading-relaxed">
         Chaque ligne = un titre du menu. Choisissez la page vers laquelle il mène : le titre est ainsi toujours relié à la bonne page. Le lien en cours est souligné en vert sur le site.
       </p>
       {items.map((it, i) => {
         const custom = !known.has(it.href)
         return (
-          <div key={i} className={`border bg-ivory p-3 grid sm:grid-cols-[1fr_1.3fr_auto] gap-2 items-center ${it.show === false ? 'border-dashed border-ink/20 opacity-70' : 'border-linen'}`} data-testid={`nav-item-${i}`}>
+          <div key={i} className={`border bg-ivory p-3 grid sm:grid-cols-[1fr_1.3fr_auto] gap-2 items-start ${it.show === false ? 'border-dashed border-ink/20 opacity-70' : 'border-linen'}`} data-testid={`nav-item-${i}`}>
             <input value={it.label || ''} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Titre du menu" className={INPUT} aria-label="Titre du menu" />
             <div className="space-y-2">
               <select
@@ -299,6 +300,10 @@ export function NavbarEditor({ value, onChange }) {
               <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Descendre" className="h-10 w-10 flex items-center justify-center border border-ink/10 hover:border-ink disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
               <button type="button" onClick={() => { if (confirm('Retirer ce lien du menu ?')) setItems(items.filter((_, j) => j !== i)) }} aria-label="Supprimer" className="h-10 w-10 flex items-center justify-center text-terracotta hover:bg-terracotta/10"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
             </div>
+            <SubMenuEditor
+              items={it.children || []}
+              onChange={(children) => upd(i, { children })}
+            />
           </div>
         )
       })}
@@ -351,6 +356,130 @@ export function NavbarEditor({ value, onChange }) {
         <div>
           <span className={LABEL}>Logo (image facultative — sinon le logo texte « Atelier JLT »)</span>
           <ImageField value={opt.logoImage} onChange={(url) => setOpt({ logoImage: url || '' })} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Sous-menu déroulant d'un titre du menu. */
+function SubMenuEditor({ items, onChange }) {
+  const [open, setOpen] = useState(items.length > 0)
+  const upd = (i, patch) => onChange(items.map((it, j) => (j === i ? { ...it, ...patch } : it)))
+  const move = (i, dir) => {
+    const j = i + dir
+    if (j < 0 || j >= items.length) return
+    const next = items.slice()
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+  return (
+    <div className="sm:col-span-3 mt-1">
+      <button type="button" onClick={() => setOpen(!open)} className="text-[10px] uppercase tracking-[0.2em] text-emerald hover:underline inline-flex items-center gap-1.5" data-testid="submenu-toggle">
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        Sous-menu déroulant ({items.length})
+      </button>
+      {open && (
+        <div className="mt-2 pl-4 border-l-2 border-emerald/30 space-y-2">
+          {items.map((c, i) => (
+            <div key={i} className="grid sm:grid-cols-[1fr_1.3fr_auto] gap-2 items-center">
+              <input value={c.label || ''} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Titre du sous-lien" className={INPUT} aria-label="Titre du sous-lien" />
+              <select
+                value={NAV_PAGE_OPTIONS.some((o) => o.href === c.href) ? c.href : '__custom'}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '__custom') return upd(i, { href: '' })
+                  const opt = NAV_PAGE_OPTIONS.find((o) => o.href === v)
+                  upd(i, { href: v, ...(c.label ? {} : { label: opt?.label || '' }) })
+                }}
+                className={INPUT}
+                aria-label="Page reliée"
+              >
+                {NAV_PAGE_OPTIONS.map((o) => <option key={o.href} value={o.href}>{o.label}</option>)}
+                <option value="__custom">Autre lien…</option>
+              </select>
+              <div className="flex items-center gap-1 justify-end">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Monter" className="h-10 w-10 flex items-center justify-center border border-ink/10 hover:border-ink disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Descendre" className="h-10 w-10 flex items-center justify-center border border-ink/10 hover:border-ink disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label="Supprimer le sous-lien" className="h-10 w-10 flex items-center justify-center text-terracotta hover:bg-terracotta/10"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
+              </div>
+              {!NAV_PAGE_OPTIONS.some((o) => o.href === c.href) && (
+                <input value={c.href || ''} onChange={(e) => upd(i, { href: e.target.value })} placeholder="/ma-page ou https://…" className={`${INPUT} sm:col-span-3`} aria-label="Lien personnalisé" />
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => onChange([...items, { label: '', href: '/produits', show: true }])} className="h-10 px-3 border border-dashed border-ink/30 hover:border-emerald hover:text-emerald text-[10px] uppercase tracking-[0.18em] inline-flex items-center gap-1.5" data-testid="submenu-add">
+            <Plus className="h-3.5 w-3.5" /> Ajouter un sous-lien
+          </button>
+          {items.length > 0 && <p className="text-[11px] text-ink/50">Sur le site, une petite flèche ▾ apparaît à côté du titre : le sous-menu s'ouvre au survol (ordinateur) ou d'un toucher (iPad).</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Aperçu en direct de la barre du haut (reflète les réglages non enregistrés). */
+export function NavbarPreview({ value }) {
+  const items = (value?.items || []).filter((i) => i.show !== false)
+  const o = { ...NAVBAR_OPTION_DEFAULTS, ...(value?.options || {}) }
+  const [openIdx, setOpenIdx] = useState(-1)
+  const align = o.linksAlign === 'left' ? 'justify-start' : o.linksAlign === 'right' ? 'justify-end' : 'justify-center'
+  return (
+    <div className="sticky top-16 z-20 mb-6" data-testid="navbar-preview">
+      <div className="text-[10px] uppercase tracking-[0.26em] text-ink/50 mb-2 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald animate-pulse" /> Aperçu en direct (non enregistré tant que vous ne cliquez pas sur Enregistrer)
+      </div>
+      <div className="border border-linen bg-ivory shadow-sm overflow-visible">
+        <div className="relative flex items-center justify-between h-16 px-4">
+          <div className="flex items-center gap-1">
+            {o.showArrows && (
+              <>
+                <span className="h-7 w-7 rounded-full border border-ink/15 flex items-center justify-center text-ink/60 text-xs">‹</span>
+                <span className="h-7 w-7 rounded-full border border-ink/15 flex items-center justify-center text-ink/60 text-xs">›</span>
+              </>
+            )}
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 text-center leading-none">
+            {o.logoImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={o.logoImage} alt="Logo" className={o.logoSize === 'md' ? 'h-8 w-auto' : 'h-11 w-auto'} />
+            ) : (
+              <span className={`font-display text-emerald ${o.logoSize === 'md' ? 'text-base' : 'text-xl'}`}>
+                <span className="block text-[0.6em] tracking-[0.1em]">Atelier</span>JLT
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.18em] text-ink/70">
+            {o.showWishlist && <span aria-label="Favoris">♡</span>}
+            {o.showAccount && <span aria-label="Compte">◯</span>}
+            {o.showCart && <span>Panier (0)</span>}
+          </div>
+        </div>
+        {o.visible ? (
+          <div className={`flex flex-wrap items-center gap-x-6 gap-y-1 min-h-10 px-4 py-2 border-t border-linen/60 ${align}`}>
+            {items.map((it, i) => {
+              const kids = (it.children || []).filter((c) => c.show !== false)
+              return (
+                <div key={i} className="relative" onMouseEnter={() => setOpenIdx(i)} onMouseLeave={() => setOpenIdx(-1)}>
+                  <button type="button" onClick={() => setOpenIdx(openIdx === i ? -1 : i)} className="text-[10px] uppercase tracking-[0.2em] text-ink/75 hover:text-emerald inline-flex items-center gap-1">
+                    {it.label || '—'}{kids.length > 0 && <ChevronDown className="h-3 w-3" />}
+                  </button>
+                  {kids.length > 0 && openIdx === i && (
+                    <div className="absolute left-0 top-full pt-1 z-30">
+                      <div className="min-w-[180px] bg-ivory border border-linen shadow-lg py-1">
+                        {kids.map((c, j) => <div key={j} className="px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-ink/75 whitespace-nowrap">{c.label || '—'}</div>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="px-4 py-2 border-t border-linen/60 text-[10px] uppercase tracking-[0.2em] text-ink/40 text-center">Ligne de liens masquée sur ordinateur</div>
+        )}
+        <div className="px-4 py-1.5 bg-cream/50 text-[10px] text-ink/50 border-t border-linen/60">
+          {o.sticky ? 'La barre reste en haut pendant le défilement' : 'La barre défile avec la page'}
         </div>
       </div>
     </div>

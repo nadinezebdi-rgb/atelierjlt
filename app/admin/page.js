@@ -36,7 +36,7 @@ const DEFAULT_CONTENT = {
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
     ctaSecondary: { label: 'À propos de nous', href: '/a-propos' },
     signature: 'Plaid Sylvestre · Crochet main',
-    image: '/api/img/jlt-hero-beige',
+    image: '',
     showEyebrow: true,
     showTitle: true,
     showSubtitle: true,
@@ -57,14 +57,14 @@ const DEFAULT_CONTENT = {
   sectionTitle: 'Deux collections, une même main.',
   sectionEyebrow: 'Nos collections',
   collections: [
-    { key: 'racine',    name: 'Racine',    tagline: 'Plaids · Coussins · Paniers · Chemins de table', image: '/api/img/jlt-plaid-beige' },
+    { key: 'racine',    name: 'Racine',    tagline: 'Plaids · Coussins · Paniers · Chemins de table', image: '/api/img/jlt-plaid-01' },
     { key: 'empreinte', name: 'Empreinte', tagline: 'Tapis · Macramé mural · Suspensions',            image: 'https://images.pexels.com/photos/6208095/pexels-photo-6208095.jpeg?auto=compress&cs=tinysrgb&w=1400' },
   ],
   sections: HOMEPAGE_SECTION_DEFAULTS.map((s) => ({ ...s, content: { ...s.content } })),
   mediaLibrary: [],
   // Page "À propos de nous" — image hero éditable depuis le CMS
   about: {
-    heroImage: '/api/img/jlt-hero-beige',
+    heroImage: '',
     heroImageAlt: 'Atelier JLT — créations faites main',
   },
 }
@@ -96,7 +96,7 @@ const DEFAULT_SETTINGS = {
     pinterest: '',
   },
   marquee: {
-    line1: 'Livraison offerte dès 150 €',
+    line1: 'Fait main en France',
     line2: 'Fabrication française',
     line3: 'Emballage soigné',
   },

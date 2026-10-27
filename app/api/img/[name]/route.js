@@ -14,13 +14,16 @@ export const dynamic = 'force-dynamic'
  *      les cadres gris sur la home après redéploiement / migration).
  *   4. Sinon 404.
  */
-const FALLBACK_DISK_NAME = 'jlt-hero-beige.jpeg'
+// Plus d'image de secours : une photo perdue renvoie 404 (au lieu d'afficher
+// la photo du plaid en doublon partout). Remplacez-la depuis l'admin.
+const FALLBACK_DISK_NAME = ''
 const FALLBACK_DIRS = [
   path.join(process.cwd(), 'lib', 'product-images'),
   path.join(process.cwd(), 'public', 'product-images'),
 ]
 
 function loadFallback() {
+  if (!FALLBACK_DISK_NAME) return null
   for (const dir of FALLBACK_DIRS) {
     const p = path.join(dir, FALLBACK_DISK_NAME)
     if (fs.existsSync(p)) {

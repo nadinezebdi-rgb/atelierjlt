@@ -13,7 +13,7 @@ const themes = [
   {
     name: 'Racine',
     tagline: 'Les tissages du foyer — plaids, coussins et paniers noués à la main pour envelopper et adoucir.',
-    image: IMAGES.plaidBeige,
+    image: IMAGES.heroPlaid,
     links: [
       { label: 'Plaids',            href: '/collections?cat=racine' },
       { label: 'Coussins',          href: '/collections?cat=racine' },

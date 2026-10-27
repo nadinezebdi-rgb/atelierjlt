@@ -36,7 +36,7 @@ export default function TrackForm() {
       <form onSubmit={submit} className="border border-linen bg-cream/30 p-5 md:p-6 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
         <label className="block">
           <span className="block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2">N° de commande</span>
-          <input value={number} onChange={(e) => setNumber(e.target.value)} required placeholder="GIN-…" className="w-full bg-ivory border border-ink/15 px-3 h-12 text-sm focus:outline-none focus:border-emerald uppercase" data-testid="track-number" />
+          <input value={number} onChange={(e) => setNumber(e.target.value)} required placeholder="JLT-…" className="w-full bg-ivory border border-ink/15 px-3 h-12 text-sm focus:outline-none focus:border-emerald uppercase" data-testid="track-number" />
         </label>
         <label className="block">
           <span className="block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2">Email de la commande</span>

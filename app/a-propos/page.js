@@ -8,9 +8,9 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
-import { ABOUT_DEFAULTS, ABOUT_FIELDS } from '@/lib/page-content-config'
+import { ABOUT_DEFAULTS, ABOUT_FIELDS, cleanImage } from '@/lib/page-content-config'
 
-const DEFAULT_IMAGE = IMAGES.heroBeige || IMAGES.plaidBeige
+const DEFAULT_IMAGE = ''
 
 const DEFAULT_CONTENT = ABOUT_DEFAULTS
 const EDIT_FIELDS = ABOUT_FIELDS
@@ -48,7 +48,8 @@ export default function AProposPage() {
       <Header />
       <main>
         {/* Hero — image plein cadre */}
-        <section className="relative h-[70vh] min-h-[500px] overflow-hidden bg-ink">
+        <section className="relative h-[70vh] min-h-[500px] overflow-hidden bg-gradient-to-br from-emerald to-ink">
+          {cleanImage(c.heroImage) && (
           <motion.div
             key={c.heroImage}
             initial={{ scale: 1.08, opacity: 0 }}
@@ -58,18 +59,14 @@ export default function AProposPage() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={c.heroImage || DEFAULT_IMAGE}
+              src={cleanImage(c.heroImage)}
               alt={c.heroImageAlt || DEFAULT_CONTENT.heroImageAlt}
               className="w-full h-full object-cover"
-              onError={(e) => {
-                if (!e.currentTarget.dataset.fallback) {
-                  e.currentTarget.dataset.fallback = '1'
-                  e.currentTarget.src = DEFAULT_IMAGE
-                }
-              }}
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
             <div className="absolute inset-0 bg-ink/40" />
           </motion.div>
+          )}
           <div className="relative h-full container flex items-end pb-14 md:pb-20">
             <motion.div
               initial={{ opacity: 0, y: 30 }}

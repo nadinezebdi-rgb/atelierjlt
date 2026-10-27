@@ -4491,6 +4491,90 @@ backend:
             - PATCH with javascript: href → 200 (href filtered out, only valid items saved)
             - Admin authentication required (401 without cookie)
             - All validation and security features working correctly.
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ COMPREHENSIVE RE-VERIFICATION (Review Request Testing):
+            
+            TEST 1 - GET /api/site-pages/navbar structure:
+            - Returns {navbar: {items: [...], options: {...}}}
+            - Produits item has exactly 5 children as required:
+              * Tous les produits
+              * Nouveautés
+              * Les Intemporels
+              * Éditions limitées
+              * Printemps / Été 26-27
+            - Options object has all 9 required fields:
+              * visible, sticky, linksAlign, logoSize, logoImage
+              * showArrows, showWishlist, showAccount, showCart
+            
+            TEST 2 - PATCH validation and sanitization:
+            - javascript: hrefs correctly filtered out (XSS prevention)
+            - Empty labels correctly filtered out
+            - logoImage with javascript:alert(1) sanitized to empty string
+            - Options merge correctly (sticky:false, linksAlign:left, showCart:false)
+            - MongoDB cleanup successful (navbar restored to defaults)
+            
+            All navbar functionality working correctly per review request requirements.
+
+  - task: "Image Serving - Fallback disabled for upload-* images"
+    implemented: true
+    working: true
+    file: "app/api/img/[name]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 1 - Missing upload-* image (no fallback):
+            - GET /api/img/upload-doesnotexist → 404 Not Found
+            - NO fallback image served (correct behavior)
+            - NO X-Fallback-Image header present
+            - Fallback mechanism disabled as per review request
+            
+            TEST 2 - Real catalog image:
+            - GET /api/img/jlt-plaid-01 → 200 OK
+            - Content-Type: image/jpeg
+            - Content-Length: 151,073 bytes (valid image data)
+            
+            CRITICAL FINDINGS:
+            - Fallback mechanism disabled for upload-* images (FALLBACK_DISK_NAME = '')
+            - Missing upload-* images now return 404 instead of fallback
+            - Real catalog images (jlt-*) serve correctly from disk or MongoDB
+            - Image serving working as expected per review request requirements.
+
+  - task: "Page Rendering - Homepage, À propos, Journal, and Journal article"
+    implemented: true
+    working: true
+    file: "app/page.js, app/a-propos/page.js, app/journal/page.js, app/journal/[slug]/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-26"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            All 4 pages render successfully:
+            - GET / (Homepage) → 200 OK (46,986 bytes)
+            - GET /a-propos (À propos) → 200 OK (39,457 bytes)
+            - GET /journal (Journal) → 200 OK (43,008 bytes)
+            - GET /journal/tendances-deco-2026-2027 (Journal article) → 200 OK (96,038 bytes)
+            
+            CRITICAL FINDINGS:
+            - All pages return 200 OK status
+            - No 404 or 500 errors
+            - Content sizes reasonable (39-96 KB)
+            - All pages render without errors
+            - Page routing working correctly
 
 metadata:
   created_by: "main_agent"
@@ -4716,3 +4800,238 @@ agent_communication:
         ZERO CRITICAL ISSUES FOUND. All three new features are production-ready.
         The endpoints are fully functional with proper authentication, validation,
         and data integrity checks in place.
+
+    - agent: "testing"
+      date: "2026-10-26"
+      message: |
+        ✅ NAVBAR ENDPOINTS & IMAGE SERVING VERIFICATION COMPLETE - ALL 6 TESTS PASSED (100%)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        Admin password: Juliette99*
+        
+        COMPREHENSIVE TEST COVERAGE:
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 1 ✅ - GET /api/site-pages/navbar (Navbar Structure)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ GET /api/site-pages/navbar → 200 OK
+        ✅ Response structure: {navbar: {items: [...], options: {...}}}
+        ✅ Items count: 7 (Accueil, Produits, Nouveautés, Éditions limitées, À propos, Journal, Contact)
+        ✅ 'Produits' item found with children array
+        ✅ Produits children count: 5 (exactly as expected)
+        ✅ Children labels verified:
+           - Tous les produits
+           - Nouveautés
+           - Les Intemporels
+           - Éditions limitées
+           - Printemps / Été 26-27
+        ✅ Options object present with all 9 required keys:
+           - visible: true
+           - sticky: true
+           - linksAlign: center
+           - logoSize: lg
+           - logoImage: (empty string)
+           - showArrows: true
+           - showWishlist: true
+           - showAccount: true
+           - showCart: true
+        
+        CRITICAL FINDINGS:
+        - Navbar structure matches requirements exactly
+        - All expected children present in correct order
+        - Options object complete with all required fields
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 2 ✅ - PATCH /api/admin/site-pages/navbar (Validation & Sanitization)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        Test 2a: Bad hrefs and empty labels
+        ✅ PATCH /api/admin/site-pages/navbar with:
+           - items containing javascript: href (should be dropped)
+           - items with empty label (should be dropped)
+           - options.logoImage with javascript:alert(1) (should be sanitized)
+        ✅ PATCH accepted: 200 OK
+        ✅ Verification via GET:
+           - Produits children count: 1 (only valid Nouveautés child remains)
+           - javascript: href correctly filtered out
+           - Empty label correctly filtered out
+        ✅ Options updated correctly:
+           - sticky: false (updated)
+           - linksAlign: left (updated)
+           - showCart: false (updated)
+           - logoImage: '' (sanitized from javascript:alert(1))
+        
+        Test 2b: Restore defaults
+        ✅ Deleted navbar override document from MongoDB: 1 document
+        ✅ Verification via GET:
+           - Navbar restored to defaults
+           - Produits has 5 children again
+        
+        CRITICAL FINDINGS:
+        - XSS prevention working: javascript: hrefs are filtered out
+        - Empty labels are filtered out
+        - logoImage sanitization working correctly
+        - Options merge correctly with defaults
+        - MongoDB cleanup successful
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 3 ✅ - Image Serving (upload-* and jlt-* images)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        Test 3a: Missing upload-* image (no fallback)
+        ✅ GET /api/img/upload-doesnotexist → 404 Not Found
+        ✅ NO fallback image served (correct behavior)
+        ✅ NO X-Fallback-Image header present
+        
+        Test 3b: Real catalog image
+        ✅ GET /api/img/jlt-plaid-01 → 200 OK
+        ✅ Content-Type: image/jpeg
+        ✅ Content-Length: 151,073 bytes (valid image data)
+        
+        CRITICAL FINDINGS:
+        - Fallback mechanism disabled for upload-* images (as per review request)
+        - Missing upload-* images now return 404 instead of fallback
+        - Real catalog images (jlt-*) serve correctly
+        - Image serving working as expected
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 4 ✅ - Page Rendering (4 pages)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ GET / (Homepage) → 200 OK (46,986 bytes)
+        ✅ GET /a-propos (À propos) → 200 OK (39,457 bytes)
+        ✅ GET /journal (Journal) → 200 OK (43,008 bytes)
+        ✅ GET /journal/tendances-deco-2026-2027 (Journal article) → 200 OK (96,038 bytes)
+        
+        CRITICAL FINDINGS:
+        - All 4 pages render successfully
+        - No 404 or 500 errors
+        - Content sizes reasonable (39-96 KB)
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL SUMMARY - ALL TESTS PASSED (100% SUCCESS)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ NAVBAR STRUCTURE:
+        - GET /api/site-pages/navbar returns correct structure
+        - Produits item has exactly 5 children as required
+        - Options object has all 9 required fields
+        - Default values correct
+        
+        ✅ NAVBAR VALIDATION:
+        - PATCH /api/admin/site-pages/navbar validates and sanitizes input
+        - javascript: hrefs are filtered out (XSS prevention)
+        - Empty labels are filtered out
+        - logoImage sanitized correctly
+        - Options merge with defaults correctly
+        - MongoDB persistence working
+        
+        ✅ IMAGE SERVING:
+        - Missing upload-* images return 404 (no fallback)
+        - Real catalog images (jlt-*) serve correctly
+        - Content-Type and Content-Length headers correct
+        
+        ✅ PAGE RENDERING:
+        - All 4 pages render successfully (200 OK)
+        - No errors or broken pages
+        
+        ✅ SECURITY:
+        - XSS prevention working (javascript: hrefs filtered)
+        - Admin authentication required for PATCH
+        - Input validation and sanitization working correctly
+        
+        ZERO CRITICAL ISSUES FOUND. All navbar endpoints, image serving, and page rendering
+        are working correctly. The implementation matches the review request requirements exactly.
+
+  - task: "Shipping Costs - Free shipping removed, standard 8.9€ and express 14.9€"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/orders.js, lib/legal-defaults.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-27"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            COMPREHENSIVE SHIPPING COSTS TESTING (9/9 tests passed):
+            
+            ✅ Test 1: Add plaid-sylvestre to cart
+               - POST /api/cart with {"slug":"plaid-sylvestre", "qty":1}
+               - Returns 200 OK with cart count:1, subtotal:340 €
+               - Session cookie maintained correctly
+            
+            ✅ Test 2: Create order with standard shipping
+               - POST /api/orders with shippingMethod:"standard"
+               - Returns 200 OK with order
+               - Order ID: GIN-MVQVENAQ
+               - Shipping cost: 8.9 € (expected 8.9 €) ✓
+               - Total calculation: 348.9 € = 340 (subtotal) - 0 (discount) + 8.9 (shipping) ✓
+            
+            ✅ Test 3: Add plaid-sylvestre to cart again
+               - POST /api/cart with same item
+               - Returns 200 OK with cart count:1, subtotal:340 €
+               - Cart cleared after first order, new session working correctly
+            
+            ✅ Test 4: Create order with express shipping
+               - POST /api/orders with shippingMethod:"express"
+               - Returns 200 OK with order
+               - Order ID: GIN-MVQVENFR
+               - Shipping cost: 14.9 € (expected 14.9 €) ✓
+               - Total calculation: 354.9 € = 340 (subtotal) - 0 (discount) + 14.9 (shipping) ✓
+            
+            ✅ Test 5: GET /api/site-pages/livraison verification
+               - Returns 200 OK with livraison page data
+               - Found section "Frais de livraison" with text:
+                 "- Livraison standard : 8,90 €\n- Livraison express : 14,90 €"
+               - ✓ Mentions 8,90 € (standard shipping)
+               - ✓ Mentions 14,90 € (express shipping)
+               - ✓ Does NOT contain "Offerte" (free shipping removed)
+            
+            CRITICAL FINDINGS:
+            
+            1. ✅ FREE SHIPPING REMOVED
+               - No free shipping logic in orders.js (line 82)
+               - Shipping always charged: standard 8.9€ or express 14.9€
+               - No threshold for free shipping (previously was 150€)
+            
+            2. ✅ SHIPPING COSTS CORRECTLY APPLIED
+               - Standard shipping: 8.9 € (when shippingMethod = "standard" or default)
+               - Express shipping: 14.9 € (when shippingMethod = "express")
+               - Total calculation: subtotal - discount - giftCredit + shipping
+            
+            3. ✅ LIVRAISON PAGE UPDATED
+               - /api/site-pages/livraison correctly shows both shipping options
+               - Text mentions "8,90 €" and "14,90 €"
+               - No mention of "Offerte" (free shipping)
+               - Default text from legal-defaults.js (line 32)
+            
+            4. ✅ SESSION COOKIE PERSISTENCE
+               - Single session maintained across multiple requests
+               - Cart cleared after order creation
+               - New cart session starts correctly for second order
+            
+            5. ✅ ORDER CREATION
+               - Two orders created successfully:
+                 * GIN-MVQVENAQ (standard shipping, total: 348.9 €)
+                 * GIN-MVQVENFR (express shipping, total: 354.9 €)
+               - Both orders have correct shipping costs
+               - Both orders have correct total calculations
+            
+            CODE VERIFICATION:
+            - /app/lib/api/handlers/orders.js line 82:
+              const shipping = (body.address?.shippingMethod === 'express') ? 14.9 : 8.9
+            - /app/lib/legal-defaults.js line 32:
+              { title: 'Frais de livraison', text: '- Livraison standard : 8,90 €\n- Livraison express : 14,90 €' }
+            
+            CONCLUSION:
+            Free shipping has been successfully removed. All orders now have shipping costs:
+            - Standard: 8.9 €
+            - Express: 14.9 €
+            The livraison page correctly displays these costs and does not mention free shipping.
+            All shipping cost calculations are working correctly.
+

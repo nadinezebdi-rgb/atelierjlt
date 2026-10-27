@@ -72,7 +72,6 @@ export default function CheckoutPage() {
   const giftApplied = gift ? Math.min(gift.balance, afterDiscount) : 0
   const shippingCost = useMemo(() => {
     if (items.length === 0) return 0
-    if (subtotal >= 150 && shippingMethod === 'standard') return 0
     return shippingMethod === 'express' ? 14.9 : 8.9
   }, [items.length, subtotal, shippingMethod])
   const total = Math.max(0, afterDiscount - giftApplied) + shippingCost
@@ -260,7 +259,7 @@ export default function CheckoutPage() {
                 icon={Truck}
                 title="Livraison soignée"
                 description="Emballage de l'atelier · 3 à 5 jours ouvrés"
-                price={subtotal >= 150 ? 'Offerte' : formatPrice(8.9)}
+                price={formatPrice(8.9)}
               />
               <ShippingOption
                 selected={shippingMethod === 'express'}

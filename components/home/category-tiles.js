@@ -13,7 +13,7 @@ const tiles = [
     name: 'Racine',
     tagline: 'Plaids · Coussins · Paniers · Chemins de table',
     href: '/collections?cat=racine',
-    image: IMAGES.plaidBeige,
+    image: IMAGES.heroPlaid,
   },
   {
     name: 'Empreinte',

@@ -11,7 +11,7 @@ const TITLE = 'Tendances déco 2026-2027 : couleurs, matières et crochet'
 const DESCRIPTION =
   'Découvrez les tendances déco 2026 et 2027 : terre cuite, tons minéraux, crochet et matières naturelles. Nos idées pour créer un intérieur chaleureux.'
 const URL = 'https://atelierjlt.fr/journal/tendances-deco-2026-2027'
-const IMAGE = IMAGES.heroBeige // canapé crème + plaid — image d'ouverture
+const IMAGE = IMAGES.couvDecli
 const IMAGE_ALT =
   'Salon aux murs minéraux, sol en terre cuite, canapé en lin et plaid au crochet écru, rouille et vert olive.'
 const PUBLISHED = '2025-06-15'

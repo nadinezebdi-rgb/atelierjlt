@@ -315,7 +315,7 @@ export default function ProductPage() {
 
             {/* Trust */}
             <div className="mt-10 grid grid-cols-3 gap-4 text-[11px] uppercase tracking-[0.18em] text-ink/60 border-t border-linen pt-6">
-              <div className="flex items-center gap-2"><Truck className="h-4 w-4 text-terracotta" strokeWidth={1.5} />Livraison offerte 150€</div>
+              <div className="flex items-center gap-2"><Truck className="h-4 w-4 text-terracotta" strokeWidth={1.5} />Expédition soignée</div>
               <div className="flex items-center gap-2"><Shield className="h-4 w-4 text-terracotta" strokeWidth={1.5} />Paiement sécurisé</div>
               <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-terracotta" strokeWidth={1.5} />Emballage soigné</div>
             </div>

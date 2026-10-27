@@ -1,3 +1,4 @@
+import { cleanImage } from '@/lib/page-content-config'
 import { notFound } from 'next/navigation'
 import { marked } from 'marked'
 import Header from '@/components/site/header'
@@ -15,7 +16,9 @@ export const revalidate = 0
 async function getPost(slug) {
   try {
     const db = await getDb()
-    return await db.collection('blog_posts').findOne({ slug, published: true })
+    const post = await db.collection('blog_posts').findOne({ slug, published: true })
+    if (post) post.image = cleanImage(post.image)
+    return post
   } catch (e) {
     return null
   }
