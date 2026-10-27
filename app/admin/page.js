@@ -326,7 +326,7 @@ function TabProducts() {
       const d = await r.json().catch(() => ({}))
       const sa = d.stockAlerts
       if (sa?.sent) toast.success(`${sa.sent} client${sa.sent > 1 ? 's' : ''} prévenu${sa.sent > 1 ? 's' : ''} du retour en stock`)
-      else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : boîte mail OVH pas encore connectée`)
+      else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : envoi des emails pas encore activé`)
     }
     else toast.error('Erreur')
   }

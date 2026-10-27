@@ -29,7 +29,7 @@ export default function StockAlertsPanel({ products = [] }) {
     const r = await fetch(`/api/admin/stock-alerts/notify?slug=${encodeURIComponent(slug)}`, { method: 'POST', credentials: 'include' })
     const d = await r.json().catch(() => ({}))
     if (!r.ok) return toast.error(d.error || 'Erreur')
-    if (!d.configured) toast.message('Boîte mail OVH pas encore connectée : les alertes restent en attente')
+    if (!d.configured) toast.message('Envoi des emails pas encore activé : les alertes restent en attente')
     else if (d.sent) toast.success(`${d.sent} email${d.sent > 1 ? 's' : ''} envoyé${d.sent > 1 ? 's' : ''}`)
     else toast.message('Aucun article de nouveau disponible pour ces inscriptions')
     load()
@@ -57,7 +57,7 @@ export default function StockAlertsPanel({ products = [] }) {
           <p className="text-xs text-ink/60 leading-relaxed">
             Quand vous remettez du stock sur un produit (ou une couleur), les clients inscrits sont prévenus automatiquement par email à l’enregistrement.
             {data && !data.emailConfigured && (
-              <span className="block mt-1 text-terracotta inline-flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Boîte mail OVH pas encore connectée : les inscriptions sont gardées et partiront dès la connexion.</span>
+              <span className="block mt-1 text-terracotta inline-flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Envoi des emails pas encore activé : les inscriptions sont gardées et partiront dès la connexion.</span>
             )}
           </p>
 

@@ -5035,3 +5035,323 @@ agent_communication:
             The livraison page correctly displays these costs and does not mention free shipping.
             All shipping cost calculations are working correctly.
 
+
+# ---- Emails transactionnels (session actuelle) ----
+backend:
+  - task: "Emails transactionnels (Resend) + mot de passe oublié"
+    implemented: true
+    working: true
+    file: "/app/lib/email.js, /app/lib/api/handlers/auth.js, /app/lib/api/handlers/orders.js, /app/lib/api/handlers/admin/emails.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Resend via RESEND_API_KEY (clé actuelle refusée par Resend → envois en statut failed, attendu). POST /api/orders envoie confirmation + alerte propriétaire sans bloquer la commande. POST /api/auth/forgot-password (réponse générique), POST /api/auth/reset-password {token,password}. GET/POST /api/admin/emails (logs + test). Logs dans collection email_logs."
+      - working: true
+        agent: "testing"
+        date: "2026-10-27"
+        comment: |
+          ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+          
+          ALL 6 TESTS PASSED (100% SUCCESS):
+          
+          ✅ TEST 1 - POST /api/orders:
+          - Order created with orderNumber starting JLT-
+          - Shipping: 8.9 € (standard), 14.9 € (express) ✓
+          - Response includes email:{confirmation:false, owner:false} ✓
+          - Order persisted despite email failures ✓
+          
+          ✅ TEST 2 - GET /api/admin/emails:
+          - Unauthenticated → 401 ✓
+          - With admin auth → 200 {configured:true, ownerEmail:'contact@atelierjlt.fr', logs:[...]} ✓
+          - Logs show kind:'order_confirmation' and 'owner_new_order' with status:'failed' ✓
+          
+          ✅ TEST 3 - POST /api/admin/emails:
+          - {to:'bad'} → 400 ✓
+          - {to:'test@example.com'} → 502 {ok:false, error:'send_failed'} ✓
+          
+          ✅ TEST 4 - POST /api/auth/forgot-password:
+          - {email:'test@atelierjlt.fr'} → 200 with generic message ✓
+          - {email:'unknown@x.fr'} → 200 with same message (security) ✓
+          - Verified in Mongo: resetTokenHash + resetTokenExpiresAt created ✓
+          - Second call within 60s doesn't change hash (rate limiting) ✓
+          - GET /api/auth/me doesn't leak reset fields ✓
+          
+          ✅ TEST 5 - POST /api/auth/reset-password:
+          - Bad token → 400 ✓
+          - Password < 6 → 400 ✓
+          - Valid flow: generated token, wrote hash to Mongo, reset with 'MonSecret123' → 200 ✓
+          - Session cookie set after reset ✓
+          - Token cleared (reuse → 400) ✓
+          - Login with test@atelierjlt.fr / MonSecret123 works ✓
+          - Expired token → 400 ✓
+          
+          ✅ TEST 6 - PATCH /api/admin/orders:
+          - {status:'shipped', trackingNumber:'TEST123', carrier:'colissimo'} → 200 ✓
+          - Response includes email:{ok:false, error:'send_failed'} ✓
+          - Order update succeeded despite email failure ✓
+          
+          CRITICAL FINDINGS:
+          ✓ Invalid RESEND_API_KEY causes graceful degradation
+          ✓ Orders created and persisted despite email failures
+          ✓ Email logs show 'failed' status with error "API key is invalid"
+          ✓ Password reset flow works correctly
+          ✓ No sensitive data leaked in /api/auth/me
+          ✓ Order updates succeed despite email failures
+          
+          Cleanup: Deleted test orders, unset resetRequestedAt on test user.
+          
+          All transactional email endpoints working correctly with graceful degradation.
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+    - agent: "testing"
+      date: "2026-10-27"
+      message: |
+        ✅ TRANSACTIONAL EMAIL BACKEND VERIFICATION COMPLETE - ALL 6 TESTS PASSED (100%)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        
+        CONTEXT:
+        - RESEND_API_KEY is set but invalid (returns "API key is invalid")
+        - Testing graceful degradation when email sending fails
+        - All email functionality should fail gracefully without blocking operations
+        
+        COMPREHENSIVE TEST COVERAGE:
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 1 ✅ - POST /api/orders - Order creation with email sending
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        1.1 Cart setup:
+        - POST /api/cart with plaid-sylvestre (qty:1) → 200 OK
+        - Cart count: 1, subtotal: 340 €
+        
+        1.2 Order creation with standard shipping:
+        - POST /api/orders with address and shippingMethod:'standard' → 200 OK
+        - Order created: JLT-MVQWA9ST
+        - Subtotal: 340 €
+        - Shipping: 8.9 € (expected: 8.9 €) ✓
+        - Total: 348.9 € (340 + 8.9) ✓
+        - Email status in response:
+          * confirmation: false (expected: false) ✓
+          * owner: false (expected: false) ✓
+        
+        CRITICAL FINDINGS:
+        ✓ Order persisted successfully despite email failures
+        ✓ Shipping cost correct (8.9 € for standard)
+        ✓ Email sending failed gracefully (as expected with invalid API key)
+        ✓ Response includes email status showing both emails failed
+        ✓ Order creation NOT blocked by email failures
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 2 ✅ - Admin GET /api/admin/emails - Email logs and configuration
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        2.1 Admin authentication:
+        - POST /api/auth/admin-login with password "Juliette99*" → 200 OK
+        - Admin cookie set correctly
+        
+        2.2 Unauthenticated access:
+        - GET /api/admin/emails without auth → 401 Unauthorized ✓
+        
+        2.3 Authenticated access:
+        - GET /api/admin/emails with admin cookie → 200 OK
+        - Response structure:
+          * configured: true ✓
+          * ownerEmail: 'contact@atelierjlt.fr' ✓
+          * logs: array with 7 entries ✓
+        
+        - Recent failed email logs found (4 entries):
+          * kind: 'order_confirmation', status: 'failed', error: 'API key is invalid'
+          * kind: 'owner_new_order', status: 'failed', error: 'API key is invalid'
+        
+        CRITICAL FINDINGS:
+        ✓ Email logs endpoint requires admin authentication (401 without)
+        ✓ Logs show 'failed' status with error details
+        ✓ Both order_confirmation and owner_new_order emails logged as failed
+        ✓ Error message "API key is invalid" correctly captured
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 3 ✅ - Admin POST /api/admin/emails - Test email sending
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        3.1 Invalid email validation:
+        - POST /api/admin/emails with {to:'bad'} → 400 Bad Request ✓
+        - Error message: "Adresse email invalide"
+        
+        3.2 Valid email (expected to fail):
+        - POST /api/admin/emails with {to:'test@example.com'} → 502 Bad Gateway ✓
+        - Response indicates send failure (as expected with invalid API key)
+        
+        CRITICAL FINDINGS:
+        ✓ Email validation working (400 for invalid email)
+        ✓ Test email endpoint returns 502 for send failure
+        ✓ Graceful failure handling (no crash, proper error response)
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 4 ✅ - POST /api/auth/forgot-password - Password reset flow
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        4.1 Existing user:
+        - POST /api/auth/forgot-password with {email:'test@atelierjlt.fr'} → 200 OK
+        - Response: "Si un compte existe avec cette adresse, un email vient de vous être envoyé."
+        - Verified in MongoDB:
+          * resetTokenHash created (sha256 hash) ✓
+          * resetTokenExpiresAt set to 1 hour from now ✓
+          * resetRequestedAt set to current time ✓
+        
+        4.2 Rate limiting:
+        - Second call within 60s → 200 OK
+        - resetTokenHash unchanged (rate limiting working) ✓
+        
+        4.3 Unknown email:
+        - POST /api/auth/forgot-password with {email:'unknown@example.fr'} → 200 OK
+        - Returns same generic message (security feature) ✓
+        
+        4.4 Data leak prevention:
+        - GET /api/auth/me after login → 200 OK
+        - Response does NOT contain sensitive fields:
+          * resetTokenHash ✓
+          * resetTokenExpiresAt ✓
+          * resetRequestedAt ✓
+          * passwordHash ✓
+        
+        CRITICAL FINDINGS:
+        ✓ Forgot password flow working correctly
+        ✓ Reset token hash created in database
+        ✓ Rate limiting prevents spam (1 email per 60s per account)
+        ✓ Generic response for unknown emails (security)
+        ✓ /api/auth/me doesn't leak reset fields
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 5 ✅ - POST /api/auth/reset-password - Password reset completion
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        5.1 Bad token validation:
+        - POST /api/auth/reset-password with {token:'badtoken123', password:'NewPass123'} → 400 Bad Request ✓
+        
+        5.2 Password length validation:
+        - POST /api/auth/reset-password with {token:'sometoken', password:'12345'} → 400 Bad Request ✓
+        - Error: "Mot de passe trop court (min 6)"
+        
+        5.3 Valid reset flow:
+        - Generated raw token (64 hex chars)
+        - Computed sha256 hash
+        - Wrote hash + future expiry to MongoDB
+        - POST /api/auth/reset-password with {token:<raw>, password:'MonSecret123'} → 200 OK ✓
+        - Response: {ok: true}
+        - Verified in MongoDB:
+          * resetTokenHash cleared ✓
+          * resetTokenExpiresAt cleared ✓
+          * resetRequestedAt cleared ✓
+        - Session cookie 'ginette_sid' set after reset ✓
+        
+        5.4 Token reuse prevention:
+        - POST /api/auth/reset-password with same token → 400 Bad Request ✓
+        - Token correctly rejected after first use
+        
+        5.5 Login verification:
+        - POST /api/auth/login with {email:'test@atelierjlt.fr', password:'MonSecret123'} → 200 OK ✓
+        - Login works with reset password
+        
+        5.6 Expired token:
+        - Generated token with past expiry (1 hour ago)
+        - POST /api/auth/reset-password → 400 Bad Request ✓
+        - Expired token correctly rejected
+        
+        CRITICAL FINDINGS:
+        ✓ Password reset flow working correctly
+        ✓ Token validation working (bad token → 400)
+        ✓ Password length validation working (< 6 chars → 400)
+        ✓ Reset token cleared after successful reset
+        ✓ Session cookie set after reset (auto-login)
+        ✓ Token reuse prevented (400 on second use)
+        ✓ Expired tokens rejected (400)
+        ✓ Login works with new password
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 6 ✅ - Admin PATCH /api/admin/orders - Order status update with email
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        6.1 Order status update to shipped:
+        - PATCH /api/admin/orders?id=<order_id> with:
+          * status: 'shipped'
+          * trackingNumber: 'TEST123'
+          * carrier: 'colissimo'
+        - Response: 200 OK
+        - Response structure:
+          * ok: true ✓
+          * email: {ok: false, error: 'send_failed'} ✓
+        
+        CRITICAL FINDINGS:
+        ✓ Order update succeeded despite email failure
+        ✓ Email result included in response showing failure
+        ✓ Email sending failed gracefully (as expected with invalid API key)
+        ✓ Order status, trackingNumber, and carrier updated correctly
+        ✓ No crash or blocking due to email failure
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL SUMMARY - ALL TESTS PASSED (100% SUCCESS)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ GRACEFUL DEGRADATION VERIFIED:
+        - Invalid RESEND_API_KEY causes graceful degradation
+        - Orders created and persisted despite email failures
+        - Order updates succeed despite email failures
+        - Email logs show 'failed' status with error details
+        - No operations blocked by email failures
+        
+        ✅ ORDER CREATION (TEST 1):
+        - POST /api/orders creates order with correct shipping (8.9 € standard)
+        - Response includes email status: {confirmation: false, owner: false}
+        - Order persisted successfully despite email failures
+        
+        ✅ EMAIL LOGS (TEST 2):
+        - GET /api/admin/emails requires admin authentication (401 without)
+        - Returns {configured: true, ownerEmail, logs: [...]}
+        - Logs show failed emails with kind and error details
+        
+        ✅ TEST EMAIL (TEST 3):
+        - POST /api/admin/emails validates email (400 for invalid)
+        - Returns 502 for send failure (graceful error handling)
+        
+        ✅ FORGOT PASSWORD (TEST 4):
+        - POST /api/auth/forgot-password creates reset token in database
+        - Rate limiting: 1 email per 60s per account
+        - Generic response for unknown emails (security)
+        - /api/auth/me doesn't leak reset fields
+        
+        ✅ RESET PASSWORD (TEST 5):
+        - POST /api/auth/reset-password validates token and password
+        - Clears reset token after successful reset
+        - Sets session cookie (auto-login)
+        - Prevents token reuse and expired tokens
+        
+        ✅ ORDER UPDATE (TEST 6):
+        - PATCH /api/admin/orders updates order status
+        - Returns email result in response
+        - Order update succeeds despite email failure
+        
+        ✅ SECURITY VERIFICATION:
+        - Admin endpoints require authentication (401 without)
+        - /api/auth/me doesn't leak sensitive fields
+        - Generic response for unknown emails (forgot-password)
+        - Token reuse prevented
+        - Expired tokens rejected
+        
+        ✅ DATA INTEGRITY:
+        - Orders persisted correctly
+        - Reset tokens created and cleared correctly
+        - Email logs persisted with status and error details
+        - Session cookies set correctly
+        
+        ZERO CRITICAL ISSUES FOUND. All transactional email endpoints working correctly
+        with graceful degradation when RESEND_API_KEY is invalid. The app handles email
+        failures gracefully without blocking any operations.
+

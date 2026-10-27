@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { Printer, ChevronDown, Package, Undo2 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { CARRIERS } from '@/lib/tracking'
+import EmailsPanel from '@/components/admin/emails-panel'
 
 export const ORDER_STATUSES = [
   ['received', 'Reçue'],
@@ -54,7 +55,7 @@ export default function TabOrders() {
     else toast.error(d.error || 'Erreur')
     if (d.email) {
       if (d.email.ok) toast.success('Email « commande expédiée » envoyé au client')
-      else if (d.email.error === 'not_configured') toast.message('Email non envoyé : la boîte mail OVH n’est pas encore connectée')
+      else if (d.email.error === 'not_configured') toast.message('Email non envoyé : l’envoi des emails n’est pas encore activé')
       else if (d.email.error === 'no_email') toast.message('Email non envoyé : pas d’adresse email sur la commande')
       else toast.error('L’email au client n’a pas pu partir')
     }
@@ -99,6 +100,8 @@ export default function TabOrders() {
           <Printer className="h-4 w-4" strokeWidth={1.5} /> Imprimer la sélection ({selectedIds.length})
         </button>
       </div>
+
+      <EmailsPanel />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {[['todo', 'À expédier'], ['shipped', 'Expédiées'], ['all', 'Toutes']].map(([v, l]) => (
@@ -265,7 +268,7 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = 
             <div className="text-[11px] text-ink/55 leading-snug">
               {o.shippedEmailSentAt
                 ? <>Email d’expédition envoyé le {new Date(o.shippedEmailSentAt).toLocaleString('fr-FR')} · <button type="button" className="underline hover:text-emerald" onClick={() => onPatch({ resendEmail: true }, 'Renvoi demandé')}>Renvoyer</button></>
-                : conn.email ? 'Le client reçoit un email automatiquement au passage en « Expédiée ».' : 'Email automatique : boîte mail OVH pas encore connectée.'}
+                : conn.email ? 'Le client reçoit un email automatiquement au passage en « Expédiée ».' : 'Email automatique : envoi des emails pas encore activé.'}
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => openLabels([o._id], 'label')} className="flex-1 h-10 border border-ink/20 hover:border-ink text-[10px] uppercase tracking-[0.16em] inline-flex items-center justify-center gap-1.5">

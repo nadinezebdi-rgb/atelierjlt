@@ -42,9 +42,20 @@ function AuthCard({ mode, setMode, onLogin, onRegister }) {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const [sentMsg, setSentMsg] = useState('')
+
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
+    if (mode === 'forgot') {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+      }).catch(() => null)
+      const d = await res?.json().catch(() => ({}))
+      setSentMsg(d?.message || 'Si un compte existe avec cette adresse, un email vient de vous être envoyé.')
+      setBusy(false)
+      return
+    }
     const r = mode === 'login' ? await onLogin(email, password) : await onRegister(email, password, name)
     if (!r.ok) toast.error(r.error || 'Erreur')
     else toast.success('Bienvenue chez Atelier JLT')
@@ -55,13 +66,18 @@ function AuthCard({ mode, setMode, onLogin, onRegister }) {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="max-w-md mx-auto">
       <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Mon compte</span>
       <h1 className="font-display font-bold text-4xl md:text-5xl mt-3 leading-tight">
-        {mode === 'login' ? 'Bonjour à nouveau.' : 'Bienvenue dans la maison.'}
+        {mode === 'login' ? 'Bonjour à nouveau.' : mode === 'forgot' ? 'Mot de passe oublié.' : 'Bienvenue dans la maison.'}
       </h1>
       <p className="text-ink/60 mt-3">
         {mode === 'login'
           ? 'Retrouvez vos commandes, votre wishlist et vos adresses.'
-          : 'Créez votre compte en 30 secondes.'}
+          : mode === 'forgot'
+            ? 'Indiquez votre email : nous vous envoyons un lien pour choisir un nouveau mot de passe.'
+            : 'Créez votre compte en 30 secondes.'}
       </p>
+      {mode === 'forgot' && sentMsg && (
+        <p data-testid="forgot-sent" className="mt-8 border border-emerald/30 bg-emerald/5 text-emerald px-4 py-3 text-sm">{sentMsg}</p>
+      )}
       <form onSubmit={submit} className="space-y-5 mt-10">
         {mode === 'register' && (
           <Field label="Votre prénom">
@@ -71,15 +87,24 @@ function AuthCard({ mode, setMode, onLogin, onRegister }) {
         <Field label="Email">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-transparent border-b border-ink/20 focus:border-ink outline-none py-3" />
         </Field>
-        <Field label="Mot de passe">
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full bg-transparent border-b border-ink/20 focus:border-ink outline-none py-3" />
-        </Field>
+        {mode !== 'forgot' && (
+          <Field label="Mot de passe">
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full bg-transparent border-b border-ink/20 focus:border-ink outline-none py-3" />
+          </Field>
+        )}
+        {mode === 'login' && (
+          <div className="text-right -mt-2">
+            <button type="button" data-testid="forgot-link" onClick={() => { setMode('forgot'); setSentMsg('') }} className="text-xs text-ink/60 underline underline-offset-4 hover:text-terracotta">
+              Mot de passe oublié ?
+            </button>
+          </div>
+        )}
         <button disabled={busy} className="w-full bg-ink text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition-colors disabled:opacity-70">
-          {busy ? '…' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
+          {busy ? '…' : mode === 'login' ? 'Se connecter' : mode === 'forgot' ? 'Recevoir le lien' : 'Créer mon compte'}
         </button>
       </form>
       <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="mt-6 text-[11px] uppercase tracking-[0.24em] text-ink/60 hover:text-terracotta transition w-full text-center">
-        {mode === 'login' ? 'Nouveau chez Atelier JLT — créer un compte' : "Déjà un compte — me connecter"}
+        {mode === 'login' ? 'Nouveau chez Atelier JLT — créer un compte' : mode === 'forgot' ? 'Retour à la connexion' : "Déjà un compte — me connecter"}
       </button>
     </motion.div>
   )
