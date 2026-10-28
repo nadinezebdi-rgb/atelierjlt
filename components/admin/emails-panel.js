@@ -14,6 +14,7 @@ const KIND = {
   welcome: 'Bienvenue',
   cart_reminder_1: 'Panier abandonné — relance 1',
   cart_reminder_2: 'Panier abandonné — relance 2',
+  guest_cart_link: 'Lien panier (visiteur)',
   test: 'Email de test',
   generic: 'Email',
 }
@@ -42,12 +43,54 @@ export default function EmailsPanel() {
       .catch(() => setData({ configured: false, logs: [], carts: [] }))
   useEffect(() => { load() }, [])
 
+  // Textes du modèle choisi
+  const [tpl, setTpl] = useState(null)
+  const [values, setValues] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [savedValues, setSavedValues] = useState(null)
   useEffect(() => {
     if (!open) return
-    setPreview(null)
-    fetch(`/api/admin/emails/preview?kind=${encodeURIComponent(kind)}`, { credentials: 'include' })
-      .then((r) => r.json()).then(setPreview).catch(() => setPreview({ error: true }))
+    setTpl(null); setValues(null); setPreview(null)
+    fetch(`/api/admin/emails/templates?kind=${encodeURIComponent(kind)}`, { credentials: 'include' })
+      .then((r) => r.json()).then((d) => { setTpl(d); setValues(d.values); setSavedValues(d.values) })
+      .catch(() => setPreview({ error: true }))
   }, [kind, open])
+
+  // Aperçu en direct (petit délai pendant la frappe)
+  useEffect(() => {
+    if (!open || !values) return
+    const id = setTimeout(() => {
+      fetch('/api/admin/emails/preview', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, texts: values }),
+      }).then((r) => r.json()).then(setPreview).catch(() => setPreview({ error: true }))
+    }, 350)
+    return () => clearTimeout(id)
+  }, [values, kind, open])
+
+  const dirty = !!(values && savedValues && JSON.stringify(values) !== JSON.stringify(savedValues))
+  const saveTexts = async () => {
+    setSaving(true)
+    const r = await fetch('/api/admin/emails/templates', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, values }),
+    })
+    setSaving(false)
+    if (!r.ok) return toast.error('Enregistrement impossible')
+    const d = await r.json().catch(() => ({}))
+    toast.success('Textes enregistrés : les prochains e-mails les utiliseront')
+    setSavedValues(values)
+    setTpl((t) => (t ? { ...t, customized: !!d.customized } : t))
+    load()
+  }
+  const resetTexts = async () => {
+    if (!confirm('Revenir au texte d’origine pour ce modèle ?')) return
+    await fetch(`/api/admin/emails/templates?kind=${encodeURIComponent(kind)}`, { method: 'DELETE', credentials: 'include' })
+    toast.success('Texte d’origine rétabli')
+    setValues(tpl?.defaults || null); setSavedValues(tpl?.defaults || null)
+    setTpl((t) => (t ? { ...t, customized: false } : t))
+    load()
+  }
 
   const sendTest = async (withKind) => {
     setBusy(true)
@@ -69,7 +112,7 @@ export default function EmailsPanel() {
     const d = await r.json().catch(() => ({}))
     setRunning(false)
     if (!d.configured) toast.message('L’envoi des emails n’est pas encore activé')
-    else if (d.sent) toast.success(`${d.sent} relance${d.sent > 1 ? 's' : ''} envoyée${d.sent > 1 ? 's' : ''}`)
+    else if (d.sent || d.guestSent) toast.success(`${(d.sent || 0) + (d.guestSent || 0)} e-mail(s) de panier envoyé(s)`)
     else toast.message('Aucune relance à envoyer pour le moment')
     load()
   }
@@ -100,36 +143,94 @@ export default function EmailsPanel() {
             Envoyés automatiquement : bienvenue (avec le code BIENVENUE10), confirmation de commande, alerte « nouvelle commande » à {data?.ownerEmail || 'l’atelier'}, colis expédié avec lien de suivi, retour en stock, relances de panier abandonné (3 h puis 3 jours après) et mot de passe oublié. Les réponses des clients arrivent à contact@atelierjlt.fr.
           </p>
 
-          {/* --- Aperçu --- */}
+          {/* --- Textes + aperçu --- */}
           <div data-testid="email-preview">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Aperçu des emails</div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <select value={kind} onChange={(e) => setKind(e.target.value)} data-testid="email-preview-kind" className="h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none flex-1 min-w-[220px]">
-                {kinds.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Modifier les textes et voir l’aperçu</div>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <select value={kind} onChange={(e) => { if (dirty && !confirm('Vos modifications non enregistrées seront perdues. Continuer ?')) return; setKind(e.target.value) }} data-testid="email-preview-kind" className="h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none flex-1 min-w-[220px]">
+                {kinds.map(([k, l]) => <option key={k} value={k}>{l}{(data?.customized || []).includes(k) ? ' — modifié' : ''}</option>)}
               </select>
               <div className="inline-flex border border-ink/20">
                 <button type="button" onClick={() => setDevice('desktop')} aria-label="Aperçu ordinateur" className={`h-10 w-10 flex items-center justify-center ${device === 'desktop' ? 'bg-ink text-ivory' : ''}`}><Monitor className="h-4 w-4" strokeWidth={1.5} /></button>
                 <button type="button" onClick={() => setDevice('mobile')} aria-label="Aperçu mobile" data-testid="email-preview-mobile" className={`h-10 w-10 flex items-center justify-center ${device === 'mobile' ? 'bg-ink text-ivory' : ''}`}><Smartphone className="h-4 w-4" strokeWidth={1.5} /></button>
               </div>
             </div>
-            <div className="text-xs text-ink/60 mb-2">
-              Objet : <strong className="text-ink" data-testid="email-preview-subject">{preview?.subject || '…'}</strong>
+
+            <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
+              <div className="space-y-4" data-testid="email-texts-editor">
+                {!tpl || !values ? (
+                  <p className="text-ink/50">Chargement…</p>
+                ) : (
+                  <>
+                    {(tpl.fields || []).map((f) => (
+                      <label key={f.key} className="block">
+                        <span className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-1">
+                          {f.label}
+                          {values[f.key] !== tpl.defaults?.[f.key] && (
+                            <button type="button" onClick={(e) => { e.preventDefault(); setValues({ ...values, [f.key]: tpl.defaults[f.key] }) }} className="normal-case tracking-normal text-[11px] text-ink/50 underline hover:text-terracotta">texte d’origine</button>
+                          )}
+                        </span>
+                        {f.multiline ? (
+                          <textarea
+                            value={values[f.key] || ''} rows={f.key === 'intro' ? 4 : 2}
+                            onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                            data-testid={`email-field-${f.key}`}
+                            className="w-full px-3 py-2 bg-transparent border border-ink/20 focus:border-ink outline-none text-sm leading-relaxed resize-y"
+                          />
+                        ) : (
+                          <input
+                            value={values[f.key] || ''}
+                            onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                            data-testid={`email-field-${f.key}`}
+                            className="w-full h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none text-sm"
+                          />
+                        )}
+                      </label>
+                    ))}
+                    {tpl.vars?.length > 0 && (
+                      <div className="text-[11px] text-ink/55 leading-relaxed">
+                        Mots remplacés automatiquement :{' '}
+                        {tpl.vars.map((v) => (
+                          <span key={v.key} className="inline-block mr-2"><code className="bg-linen/60 px-1">{`{${v.key}}`}</code> {v.label}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-ink/45">Un champ laissé vide reprend le texte d’origine. La liste des pièces, les montants et les liens sont ajoutés automatiquement.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={saveTexts} disabled={!dirty || saving} data-testid="email-texts-save" className="h-10 px-4 bg-emerald text-ivory text-[10px] uppercase tracking-[0.18em] disabled:opacity-40">
+                        {saving ? 'Enregistrement…' : dirty ? 'Enregistrer' : 'Enregistré'}
+                      </button>
+                      {tpl.customized && (
+                        <button type="button" onClick={resetTexts} data-testid="email-texts-reset" className="h-10 px-4 border border-ink/20 hover:border-terracotta hover:text-terracotta text-[10px] uppercase tracking-[0.18em]">
+                          Tout remettre d’origine
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="text-xs text-ink/60 mb-2">
+                  Objet : <strong className="text-ink" data-testid="email-preview-subject">{preview?.subject || '…'}</strong>
+                </div>
+                <div className="bg-linen/40 border border-linen p-3 flex justify-center overflow-hidden">
+                  {preview?.html ? (
+                    <iframe
+                      title="Aperçu de l’email"
+                      srcDoc={preview.html}
+                      sandbox=""
+                      data-testid="email-preview-frame"
+                      className="bg-white border border-linen transition-all"
+                      style={{ width: device === 'mobile' ? 375 : '100%', maxWidth: '100%', height: 620 }}
+                    />
+                  ) : (
+                    <div className="h-[200px] flex items-center justify-center text-ink/50">{preview?.error ? 'Aperçu indisponible' : 'Chargement…'}</div>
+                  )}
+                </div>
+                <p className="text-[11px] text-ink/50 mt-2">Exemple avec un client fictif et de vraies pièces du catalogue. Rien n’est envoyé.</p>
+              </div>
             </div>
-            <div className="bg-linen/40 border border-linen p-3 flex justify-center overflow-hidden">
-              {preview?.html ? (
-                <iframe
-                  title="Aperçu de l’email"
-                  srcDoc={preview.html}
-                  sandbox=""
-                  data-testid="email-preview-frame"
-                  className="bg-white border border-linen transition-all"
-                  style={{ width: device === 'mobile' ? 375 : '100%', maxWidth: '100%', height: 560 }}
-                />
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-ink/50">{preview?.error ? 'Aperçu indisponible' : 'Chargement…'}</div>
-              )}
-            </div>
-            <p className="text-[11px] text-ink/50 mt-2">Exemple avec un client fictif et de vraies pièces du catalogue. Rien n’est envoyé.</p>
           </div>
 
           {/* --- Test --- */}
@@ -142,7 +243,7 @@ export default function EmailsPanel() {
                 className="flex-1 min-w-[220px] h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none"
                 placeholder="adresse@exemple.fr"
               />
-              <button type="button" onClick={() => sendTest(kind)} disabled={busy || !to} data-testid="email-test-send" className="h-10 px-4 border border-ink/20 hover:border-emerald hover:text-emerald text-[10px] uppercase tracking-[0.18em] inline-flex items-center gap-1.5 disabled:opacity-50">
+              <button type="button" onClick={() => sendTest(kind)} disabled={busy || !to || dirty} title={dirty ? 'Enregistrez d’abord vos modifications' : ''} data-testid="email-test-send" className="h-10 px-4 border border-ink/20 hover:border-emerald hover:text-emerald text-[10px] uppercase tracking-[0.18em] inline-flex items-center gap-1.5 disabled:opacity-50">
                 <Send className="h-3.5 w-3.5" strokeWidth={1.5} /> {busy ? 'Envoi…' : 'M’envoyer ce modèle'}
               </button>
             </div>

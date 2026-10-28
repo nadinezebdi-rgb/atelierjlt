@@ -1,9 +1,9 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Minus, Plus, ShoppingBag, Tag, Gift, Check, ArrowRight, Trash2 } from 'lucide-react'
+import { X, Minus, Plus, ShoppingBag, Tag, Gift, Check, ArrowRight, Trash2, Mail } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCart } from './cart-provider'
 import { useAuth } from './auth-provider'
 import { formatPrice } from '@/lib/utils'
@@ -12,6 +12,13 @@ import { toast } from 'sonner'
 export default function CartDrawer() {
   const { items, subtotal, open, setOpen, update, remove, refresh } = useCart()
   const { user } = useAuth()
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('panier') === 'expire') {
+      toast.message('Ce lien de panier a expiré : vos pièces sont toujours en boutique')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
   const [couponCode, setCouponCode] = useState('')
   const [coupon, setCoupon] = useState(null)
   const [giftCode, setGiftCode] = useState('')
@@ -177,6 +184,7 @@ export default function CartDrawer() {
                       Passer commande <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
                     </Link>
                     <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 text-center">Livraison 8,90 € · Paiement sécurisé</div>
+                    {!user && <SaveCartByEmail />}
                   </footer>
                 )}
               </>
@@ -238,3 +246,51 @@ function Input({ placeholder, value, onChange }) {
     <input placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent border-b border-ink/20 focus:border-ink outline-none py-3 text-sm" />
   )
 }
+
+// Visiteur non connecté : recevoir un lien vers son panier (un seul e-mail)
+function SaveCartByEmail() {
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    const r = await fetch('/api/cart/save', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+    }).catch(() => null)
+    const d = await r?.json().catch(() => ({}))
+    setBusy(false)
+    if (r?.ok) { setSent(true); toast.success('Votre panier vous attend dans votre boîte mail') }
+    else toast.error(d?.error || 'Envoi impossible pour le moment')
+  }
+
+  if (sent) {
+    return (
+      <p data-testid="save-cart-sent" className="text-xs text-emerald text-center flex items-center justify-center gap-1.5">
+        <Check className="h-3.5 w-3.5" /> Lien envoyé à {email}
+      </p>
+    )
+  }
+  if (!open) {
+    return (
+      <button type="button" data-testid="save-cart-open" onClick={() => setOpen(true)} className="w-full text-xs text-ink/60 underline underline-offset-4 hover:text-terracotta inline-flex items-center justify-center gap-1.5">
+        <Mail className="h-3.5 w-3.5" strokeWidth={1.5} /> Pas tout de suite ? Recevoir mon panier par e-mail
+      </button>
+    )
+  }
+  return (
+    <form onSubmit={submit} className="border border-linen p-3 space-y-2" data-testid="save-cart-form">
+      <div className="text-[11px] text-ink/60">Nous vous envoyons un lien pour retrouver ce panier plus tard, sur n’importe quel appareil. Un seul e-mail, sans inscription.</div>
+      <div className="flex gap-2">
+        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.fr" data-testid="save-cart-email" className="flex-1 min-w-0 bg-transparent border-b border-ink/20 focus:border-ink outline-none py-2 text-sm" />
+        <button disabled={busy} data-testid="save-cart-submit" className="px-3 text-[10px] uppercase tracking-[0.2em] bg-ink text-ivory hover:bg-terracotta transition disabled:opacity-60">
+          {busy ? '…' : 'Envoyer'}
+        </button>
+      </div>
+    </form>
+  )
+}
+

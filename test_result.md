@@ -5651,3 +5651,409 @@ agent_communication:
         Welcome emails, cart reminders, cron endpoint, unsubscribe, admin preview,
         admin dashboard, and test send all working correctly.
         No critical issues found. Ready for production.
+  - task: "Textes d'e-mails modifiables + lien panier visiteur"
+    implemented: true
+    working: "NA"
+    file: "/app/lib/email-texts.js, /app/lib/email.js, /app/lib/api/handlers/admin/emails.js, /app/lib/api/handlers/cart.js, /app/lib/cart-reminders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Admin: GET/PUT/DELETE /api/admin/emails/templates (kind), POST /api/admin/emails/preview {kind,texts}. Textes stockés dans email_templates (seulement les différences). Visiteur: POST /api/cart/save {email} (envoi immédiat d'un lien, anti-spam 2 min), POST /api/cart/checkout-email {email} (visiteur uniquement), GET /api/cart/restore?t= (fusionne + redirige /checkout?panier=retrouve). Cron runCartReminders envoie aussi UN lien aux visiteurs 'checkout' 3h après la saisie."
+
+  - task: "Editable Email Templates - GET /api/admin/emails/templates"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/emails.js, lib/email-texts.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 1 - GET /api/admin/emails/templates?kind=X:
+            - Without auth → 401 Unauthorized ✓
+            - With admin auth → 200 OK for all 9 kinds:
+              * welcome, order_confirmation, owner_new_order, order_shipped
+              * back_in_stock, cart_reminder_1, cart_reminder_2
+              * guest_cart_link, password_reset
+            - Response structure verified:
+              * kind, fields[], vars[], defaults{}, values{}, customized (bool)
+            - Unknown kind → 400 Bad Request ✓
+            
+            All email template GET endpoints working correctly.
+
+  - task: "Editable Email Templates - PUT /api/admin/emails/templates"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/emails.js, lib/email-texts.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 2 - PUT /api/admin/emails/templates:
+            - Without auth → 401 Unauthorized ✓
+            - Customize order_confirmation:
+              * subject: "Commande {commande} bien reçue"
+              * intro: "Merci {prenom} !\nDeuxième ligne <b>x</b>"
+              * Returns {ok:true, customized:true} ✓
+            - Customization persisted correctly ✓
+            - Empty string falls back to default ✓
+            - Over-long subject truncated to 200 chars ✓
+            - Only changed fields stored in email_templates collection ✓
+            - Values identical to default not stored ✓
+            
+            All email template customization working correctly.
+
+  - task: "Editable Email Templates - POST /api/admin/emails/preview"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/emails.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 3 - POST /api/admin/emails/preview (non-persistent):
+            - Preview with custom texts: {kind:'welcome', texts:{subject:'Hey {prenom}'}}
+            - Returns {subject:'Hey Camille', html:'...', text:'...'} ✓
+            - Custom texts rendered correctly ✓
+            - Texts did NOT persist (GET templates shows original) ✓
+            
+            TEST 3b - GET /api/admin/emails/preview?kind=X:
+            - Uses customized texts from database ✓
+            - subject: 'Commande JLT-APERCU bien reçue' ✓
+            - HTML contains 'Merci Camille !' ✓
+            - HTML escaping working: <b>x</b> → &lt;b&gt;x&lt;/b&gt; ✓
+            
+            All email preview endpoints working correctly.
+
+  - task: "Editable Email Templates - Real order uses custom texts"
+    implemented: true
+    working: true
+    file: "lib/email.js, lib/api/handlers/orders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 4 - Real order uses customized texts:
+            - Created order with email contact@atelierjlt.fr ✓
+            - Order number: JLT-MVS5UCEP ✓
+            - Checked email_logs for order_confirmation ✓
+            - Email subject uses custom text: 'Commande JLT-MVS5UCEP bien reçue' ✓
+            - Custom intro text used in email body ✓
+            
+            Real orders correctly use customized email templates.
+
+  - task: "Editable Email Templates - DELETE /api/admin/emails/templates"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/emails.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 5 - DELETE /api/admin/emails/templates?kind=X:
+            - DELETE order_confirmation → {ok:true} ✓
+            - GET templates shows customized:false ✓
+            - Values back to defaults ✓
+            - GET /api/admin/emails includes customized[] array ✓
+            - order_confirmation not in customized list after DELETE ✓
+            
+            Email template deletion and default restoration working correctly.
+
+  - task: "Guest Cart Link - POST /api/cart/save"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/cart.js, lib/email.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 6 - POST /api/cart/save (guest cart link):
+            - Bad email → 400 "Adresse e-mail invalide" ✓
+            - Empty cart → 400 "Votre panier est vide" ✓
+            - Valid email with items → 200 {ok:true} ✓
+            - saved_carts doc created with:
+              * email, items[], source:'cart', expiresAt (~30 days) ✓
+            - carts doc updated with guestLinkSentAt ✓
+            - email_logs has guest_cart_link entry ✓
+            - Second call within 2 min → 429 rate limit ✓
+            
+            Guest cart save with email validation working correctly.
+
+  - task: "Guest Cart Link - GET /api/cart/restore"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/cart.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 7 - GET /api/cart/restore?t=<token>:
+            - Valid token with NEW cookie jar:
+              * Returns 302 to /checkout?panier=retrouve ✓
+              * Set-Cookie header present ✓
+              * Cart restored with items ✓
+            - Restoring into jar with same item:
+              * qty = max(existing, restored), not summed ✓
+            - Bad/expired token:
+              * Returns 302 to /?panier=expire ✓
+            
+            Cart restoration from guest link working correctly.
+
+  - task: "Guest Cart Link - POST /api/cart/checkout-email"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/cart.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 8 - POST /api/cart/checkout-email:
+            - Guest with items → 200 {ok:true} ✓
+            - carts doc updated with:
+              * guestEmail, guestEmailSource:'checkout', guestEmailAt ✓
+            - Logged-in user → {ok:true, skipped:'logged_in'} ✓
+            - guestLinkSentAt not overwritten if already set ✓
+            
+            Checkout email capture working correctly.
+
+  - task: "Guest Cart Link - POST /api/admin/emails/run-reminders"
+    implemented: true
+    working: true
+    file: "lib/api/handlers/admin/emails.js, lib/cart-reminders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 9 - POST /api/admin/emails/run-reminders (cron logic):
+            - Guest cart with guestEmailAt 4h ago:
+              * run-reminders → guestSent:1 ✓
+              * guestLinkSentAt set ✓
+              * saved_carts doc created with source:'checkout' ✓
+            - Second run → guestSent:0 (no duplicate) ✓
+            - Cart with guestEmailAt 1h ago → not sent (too recent) ✓
+            - Cart with userId → not sent (not guest flow) ✓
+            - Empty cart → not sent ✓
+            
+            Guest cart reminder cron logic working correctly.
+
+  - task: "Guest Cart Link - Regression: logged-in cart reminders"
+    implemented: true
+    working: true
+    file: "lib/cart-reminders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          date: "2026-10-28"
+          comment: |
+            ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+            
+            TEST 10 - Regression: logged-in cart reminders:
+            - Created cart for logged-in user with lastActivityAt 3h ago ✓
+            - run-reminders executed successfully ✓
+            - POST /api/cron/cart-reminders without bearer → 401 ✓
+            - Logged-in cart reminder flow still working ✓
+            
+            No regressions in existing cart reminder functionality.
+
+agent_communication:
+    - agent: "testing"
+      date: "2026-10-28"
+      message: |
+        ✅ EDITABLE EMAIL TEMPLATES & GUEST CART LINK VERIFICATION COMPLETE - ALL 11 TESTS PASSED (100%)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        Admin password: Juliette99*
+        Valid email for real sends: contact@atelierjlt.fr
+        
+        COMPREHENSIVE TEST COVERAGE:
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        PART A ✅ - EDITABLE EMAIL TEMPLATES (5/5 tests passed)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ TEST 1 - GET /api/admin/emails/templates?kind=X:
+           - 401 without auth ✓
+           - 200 with admin auth for all 9 kinds ✓
+           - Response structure: kind, fields[], vars[], defaults{}, values{}, customized ✓
+           - 400 for unknown kind ✓
+        
+        ✅ TEST 2 - PUT /api/admin/emails/templates:
+           - 401 without auth ✓
+           - Customization persisted correctly ✓
+           - Empty string falls back to default ✓
+           - Over-long subject truncated to 200 chars ✓
+           - Only changed fields stored ✓
+        
+        ✅ TEST 3 - POST /api/admin/emails/preview:
+           - Non-persistent preview working ✓
+           - Custom texts rendered correctly ✓
+           - Texts did NOT persist ✓
+        
+        ✅ TEST 3b - GET /api/admin/emails/preview?kind=X:
+           - Uses customized texts from database ✓
+           - HTML escaping working: <b>x</b> → &lt;b&gt;x&lt;/b&gt; ✓
+        
+        ✅ TEST 4 - Real order uses customized texts:
+           - Order created with custom email subject ✓
+           - email_logs shows custom text used ✓
+        
+        ✅ TEST 5 - DELETE /api/admin/emails/templates?kind=X:
+           - Deletion successful ✓
+           - Values back to defaults ✓
+           - GET /api/admin/emails includes customized[] array ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        PART B ✅ - GUEST CART LINK (6/6 tests passed)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ TEST 6 - POST /api/cart/save:
+           - Email validation: bad email → 400 ✓
+           - Empty cart validation: → 400 ✓
+           - Valid save: saved_carts doc created ✓
+           - carts doc updated with guestLinkSentAt ✓
+           - email_logs has guest_cart_link entry ✓
+           - Rate limiting: 2nd call within 2 min → 429 ✓
+        
+        ✅ TEST 7 - GET /api/cart/restore?t=<token>:
+           - Valid token → 302 to /checkout?panier=retrouve ✓
+           - Set-Cookie header present ✓
+           - Cart restored with items ✓
+           - Qty = max (not summed) when restoring duplicate item ✓
+           - Bad/expired token → 302 to /?panier=expire ✓
+        
+        ✅ TEST 8 - POST /api/cart/checkout-email:
+           - Guest → carts doc updated with guestEmail, guestEmailSource:'checkout' ✓
+           - Logged-in user → {skipped:'logged_in'} ✓
+           - guestLinkSentAt not overwritten if already set ✓
+        
+        ✅ TEST 9 - POST /api/admin/emails/run-reminders:
+           - Guest cart 4h old → sent ✓
+           - guestLinkSentAt set ✓
+           - saved_carts doc created with source:'checkout' ✓
+           - Second run → no duplicate send ✓
+           - Cart 1h old → not sent (too recent) ✓
+           - Cart with userId → not sent (not guest flow) ✓
+           - Empty cart → not sent ✓
+        
+        ✅ TEST 10 - Regression: logged-in cart reminders:
+           - Logged-in cart reminder flow still working ✓
+           - POST /api/cron/cart-reminders without bearer → 401 ✓
+           - No regressions ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL SUMMARY - ALL FEATURES WORKING (100% SUCCESS)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ EDITABLE EMAIL TEMPLATES:
+        - All 9 email kinds supported (welcome, order_confirmation, owner_new_order, 
+          order_shipped, back_in_stock, cart_reminder_1, cart_reminder_2, 
+          guest_cart_link, password_reset)
+        - GET templates returns fields[], vars[], defaults{}, values{}, customized
+        - PUT templates stores only changed fields
+        - POST preview (non-persistent) working
+        - GET preview uses customized texts
+        - Real orders use customized texts
+        - DELETE restores defaults
+        - Admin authentication required (401 without)
+        
+        ✅ GUEST CART LINK:
+        - POST /api/cart/save with email validation
+        - saved_carts doc created with 30-day expiry
+        - carts doc updated with guestLinkSentAt
+        - email_logs has guest_cart_link entry
+        - Rate limiting: 2 min between sends
+        - GET /api/cart/restore with token
+        - 302 redirect to /checkout?panier=retrouve
+        - Set-Cookie for session
+        - Qty = max (not summed) for duplicate items
+        - Bad/expired token → 302 to /?panier=expire
+        - POST /api/cart/checkout-email captures guest email
+        - guestEmailSource:'checkout', guestEmailAt set
+        - Logged-in users skipped
+        - POST /api/admin/emails/run-reminders cron logic
+        - Guest carts 3h+ old sent link
+        - saved_carts doc created with source:'checkout'
+        - No duplicate sends
+        - Logged-in cart reminders still working (regression check)
+        
+        ✅ SECURITY:
+        - All admin endpoints require authentication (401 without)
+        - Email validation prevents invalid submissions
+        - Rate limiting prevents spam
+        - Token validation prevents unauthorized access
+        
+        ✅ DATA INTEGRITY:
+        - Only changed fields stored in email_templates
+        - Empty strings fall back to defaults
+        - Over-long subjects truncated to 200 chars
+        - saved_carts expire after 30 days
+        - guestLinkSentAt prevents duplicate sends
+        - Cart restoration merges correctly (max qty, not sum)
+        
+        ZERO CRITICAL ISSUES FOUND. All editable email templates and guest cart link
+        features are production-ready and fully functional.
+        
+        CLEANUP COMPLETED:
+        - Deleted test carts, saved_carts, orders
+        - Restored email_templates to defaults
+        - Unset cartRemindersOptOut on test user
+

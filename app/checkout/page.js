@@ -42,6 +42,29 @@ export default function CheckoutPage() {
     }
   }, [user])
 
+  // Retour depuis le lien « Retrouver mon panier »
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('panier') === 'retrouve') {
+      toast.success('Votre panier est de retour')
+      refresh?.()
+      window.history.replaceState(null, '', '/checkout')
+    }
+  }, [])
+
+  // Visiteur : l'e-mail saisi sert à lui renvoyer UNE fois son panier s'il ne finit pas sa commande
+  useEffect(() => {
+    if (user || !items.length || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return
+    const id = setTimeout(() => {
+      fetch('/api/cart/checkout-email', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }),
+      }).catch(() => {})
+    }, 1200)
+    return () => clearTimeout(id)
+  }, [email, user, items.length])
+
   const applyCoupon = async () => {
     if (!couponCode) return
     const r = await fetch('/api/coupons/verify', {
@@ -224,12 +247,17 @@ export default function CheckoutPage() {
                 required
               />
               {!user && (
-                <p className="text-xs text-ink/50 mt-2">
-                  Déjà client ?{' '}
-                  <Link href="/compte" className="text-emerald hover:underline">
-                    Se connecter
-                  </Link>
-                </p>
+                <>
+                  <p className="text-xs text-ink/50 mt-2">
+                    Déjà client ?{' '}
+                    <Link href="/compte" className="text-emerald hover:underline">
+                      Se connecter
+                    </Link>
+                  </p>
+                  <p className="text-[11px] text-ink/45 mt-1" data-testid="checkout-email-notice">
+                    Si vous ne finalisez pas votre commande, nous vous enverrons une seule fois un lien pour retrouver votre panier.
+                  </p>
+                </>
               )}
             </Section>
 
