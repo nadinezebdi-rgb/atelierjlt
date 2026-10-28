@@ -13,6 +13,10 @@ export default function SalesSwitch() {
 
   const toggle = async () => {
     const next = !s?.salesOpen
+    if (next && !s?.paymentReady) {
+      toast.error('Ouverture impossible pour l’instant : aucun paiement en ligne n’est branché. Sans lui, les commandes seraient validées sans être payées.', { duration: 7000 })
+      return
+    }
     setBusy(true)
     const r = await fetch('/api/admin/shop', {
       method: 'PATCH', credentials: 'include',
@@ -40,15 +44,16 @@ export default function SalesSwitch() {
         </p>
         {locked && (
           <p className="text-xs text-amber-900 mt-1 inline-flex items-center gap-1.5" data-testid="sales-locked">
-            <Lock className="h-3.5 w-3.5" /> L’ouverture sera possible une fois le paiement en ligne branché (compte professionnel nécessaire).
+            <Lock className="h-3.5 w-3.5" /> Interrupteur verrouillé : il s’activera dès que le paiement en ligne sera branché (compte professionnel nécessaire). C’est voulu, pour qu’aucune commande ne soit validée sans paiement.
           </p>
         )}
       </div>
       <button
         type="button" role="switch" aria-checked={!!s.salesOpen} aria-label="Ventes ouvertes"
-        onClick={toggle} disabled={busy || (locked && !s.salesOpen)}
+        onClick={toggle} disabled={busy}
         data-testid="sales-toggle"
-        className={`relative h-7 w-12 rounded-full transition ${s.salesOpen ? 'bg-emerald' : 'bg-ink/20'} disabled:opacity-50 disabled:cursor-not-allowed`}
+        title={locked && !s.salesOpen ? 'Verrouillé : branchez d’abord le paiement en ligne' : ''}
+        className={`relative h-7 w-12 rounded-full transition ${s.salesOpen ? 'bg-emerald' : 'bg-ink/20'} ${locked && !s.salesOpen ? 'cursor-not-allowed opacity-60' : ''} disabled:opacity-50`}
       >
         <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${s.salesOpen ? 'left-[22px]' : 'left-0.5'}`} />
       </button>
