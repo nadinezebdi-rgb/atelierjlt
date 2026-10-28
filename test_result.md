@@ -5355,3 +5355,299 @@ test_plan:
         with graceful degradation when RESEND_API_KEY is invalid. The app handles email
         failures gracefully without blocking any operations.
 
+  - task: "Bienvenue + paniers abandonnés + aperçu des emails"
+    implemented: true
+    working: "NA"
+    file: "/app/lib/email.js, /app/lib/cart-reminders.js, /app/lib/api/handlers/cron.js, /app/lib/api/handlers/emails-public.js, /app/lib/api/handlers/admin/emails.js, /app/lib/api/shared.js (writeCart), /app/lib/api/handlers/auth.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "RESEND_API_KEY est maintenant VALIDE (envois réels). Register → email 'welcome' avec BIENVENUE10. Carts liés au userId (cart API + login/register). Cron POST /api/cron/cart-reminders (Bearer WEBHOOK_CRON_SECRET from /app/.env, 202, idempotent via X-Webhook-Id). Relance 1 à 3h après updatedAt, relance 2 à 3j après la 1re, max 2. Désinscription GET /api/emails/unsubscribe?u=&t=. Admin: GET /api/admin/emails (logs, carts, kinds), GET /api/admin/emails/preview?kind=…, POST /api/admin/emails {to,kind}, POST /api/admin/emails/run-reminders."
+
+      - working: true
+        agent: "testing"
+        date: "2026-10-28"
+        comment: |
+          ✅ EMAIL FEATURES COMPREHENSIVE TESTING COMPLETE - ALL 9 TESTS PASSED
+          
+          Tested on preview: https://french-craft.preview.emergentagent.com
+          
+          CRITICAL FINDINGS:
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 1 ✅ - Welcome Email on Registration
+          ═══════════════════════════════════════════════════════════════════════════════
+          - POST /api/auth/register with qa+welcome-<ts>@example.com
+          - Response time: 0.46s (not blocked by email send - async)
+          - Email log created: kind='welcome', status='failed'
+          - Note: Resend rejects example.com addresses (expected behavior)
+          - Real send to contact@atelierjlt.fr in TEST 8 succeeded (status='sent')
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 2 ✅ - Cart Linking
+          ═══════════════════════════════════════════════════════════════════════════════
+          2a. Logged-in user cart:
+          - POST /api/cart as logged-in user creates cart with userId
+          - Cart document has: userId, reminderCount=0, reminderAttempts=0
+          
+          2b. Guest cart → logged-in user:
+          - POST /api/cart as guest creates cart with session cookie
+          - POST /api/auth/register with same session links cart to userId
+          - Cart document updated with userId correctly
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 3 ✅ - Cron Endpoint POST /api/cron/cart-reminders
+          ═══════════════════════════════════════════════════════════════════════════════
+          3a. No auth → 401 ✓
+          3b. Wrong bearer → 401 ✓
+          3c. Correct bearer (WEBHOOK_CRON_SECRET) + valid JSON body → 202 ✓
+          - Response: {ok: true, accepted: true, runId: 'qa-run-<ts>'}
+          3d. Same run_id again → 202 {ok: true, duplicate: true} ✓
+          3e. Invalid body (non-JSON) → 400 ✓
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 4 ✅ - Reminder Logic via POST /api/admin/emails/run-reminders
+          ═══════════════════════════════════════════════════════════════════════════════
+          4a. Cart updated 4 hours ago → reminder_1 attempted
+          - reminderCount incremented (logic working)
+          - lastReminderAt set
+          - Email log created: kind='cart_reminder_1'
+          - Note: Email send failed due to example.com rejection (expected)
+          
+          4b. Run again immediately → no new send ✓
+          - reminderCount stays at 1 (no duplicate)
+          
+          4c. lastReminderAt 4 days ago → reminder_2 attempted ✓
+          - reminderCount incremented to 2
+          - Email log created: kind='cart_reminder_2'
+          
+          4d. lastReminderAt 10 days ago → no third send ✓
+          - reminderCount stays at 2 (max 2 reminders)
+          
+          4e. Cart updated 1 hour ago → not sent ✓
+          - Too recent (< 3 hours)
+          
+          4f. Modifying cart resets reminderCount ✓
+          - POST /api/cart resets reminderCount to 0
+          
+          4g. Empty cart → never sent ✓
+          - Carts with items=[] are skipped
+          
+          4h. Cart updated >30 days ago → not sent ✓
+          - Carts older than 30 days are skipped
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 5 ✅ - Unsubscribe from Cart Reminders
+          ═══════════════════════════════════════════════════════════════════════════════
+          5a. Valid token → 200 HTML page ✓
+          - GET /api/emails/unsubscribe?u=<userId>&t=<token>
+          - Token computed: HMAC-SHA256(JWT_SECRET, 'cart-reminders:<userId>')[:32]
+          - User cartRemindersOptOut set to true
+          
+          5b. Bad token → 400 ✓
+          
+          5c. Opted-out user's cart → skipped ✓
+          - POST /api/admin/emails/run-reminders returns {skipped: 1}
+          - Cart not sent (reminderCount stays 0 or reminderSkipped=true)
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 6 ✅ - Admin Email Preview GET /api/admin/emails/preview
+          ═══════════════════════════════════════════════════════════════════════════════
+          All 8 email kinds return 200 with {subject, html, text}:
+          - welcome ✓ (contains 'BIENVENUE10')
+          - order_confirmation ✓
+          - owner_new_order ✓
+          - order_shipped ✓
+          - back_in_stock ✓
+          - cart_reminder_1 ✓
+          - cart_reminder_2 ✓
+          - password_reset ✓
+          
+          Unknown kind → 400 ✓
+          No auth → 401 ✓
+          Preview does NOT create email_logs entries ✓
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 7 ✅ - Admin Emails Dashboard GET /api/admin/emails
+          ═══════════════════════════════════════════════════════════════════════════════
+          - Returns 200 with {configured, ownerEmail, logs, carts, kinds}
+          - logs: 20 entries (recent email logs)
+          - carts: 3 entries with fields: email, itemsCount, subtotal, reminderCount, nextReminderAt
+          - kinds: 8 email types
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 8 ✅ - Admin Test Email Send POST /api/admin/emails
+          ═══════════════════════════════════════════════════════════════════════════════
+          - POST /api/admin/emails {to: 'contact@atelierjlt.fr', kind: 'welcome'}
+          - Response: {ok: true, id: '01a1829e-ecbf-787c-ba78-55694e1667ca'}
+          - Email log created: status='sent' (REAL SEND SUCCESSFUL)
+          - Subject prefixed with '[Test]': '[Test] Bienvenue chez Atelier JLT'
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 9 ✅ - Regression Tests
+          ═══════════════════════════════════════════════════════════════════════════════
+          9a. POST /api/orders still works ✓
+          - Order created: JLT-MVS4PF54
+          - Cart cleared after order (count=0)
+          
+          9b. POST /api/auth/forgot-password returns generic message ✓
+          - Response: {ok: true, message: 'Si un compte existe...'}
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          🎉 FINAL SUMMARY - ALL EMAIL FEATURES WORKING (100% SUCCESS)
+          ═══════════════════════════════════════════════════════════════════════════════
+          
+          ✅ RESEND_API_KEY VALID - Real emails sent successfully:
+          - Test email to contact@atelierjlt.fr: status='sent' ✓
+          - Resend correctly rejects example.com addresses (expected behavior)
+          - Email logs created for all attempts (sent/failed)
+          
+          ✅ WELCOME EMAIL:
+          - Sent asynchronously on registration (non-blocking)
+          - Contains BIENVENUE10 code
+          - Email log created with kind='welcome'
+          
+          ✅ CART LINKING:
+          - Guest carts linked to userId on login/register
+          - Carts have userId, reminderCount, reminderAttempts fields
+          - writeCart resets reminderCount to 0 on modification
+          
+          ✅ CRON ENDPOINT:
+          - POST /api/cron/cart-reminders requires Bearer auth
+          - Idempotent via X-Webhook-Id (duplicate detection)
+          - Returns 202 immediately (background processing)
+          - Invalid body → 400
+          
+          ✅ REMINDER LOGIC:
+          - Reminder 1: 3 hours after cart updatedAt
+          - Reminder 2: 3 days after reminder 1
+          - Max 2 reminders per cart
+          - Empty carts skipped
+          - Carts >30 days old skipped
+          - Modifying cart resets reminderCount
+          - Opted-out users skipped
+          
+          ✅ UNSUBSCRIBE:
+          - GET /api/emails/unsubscribe with HMAC token
+          - Sets user.cartRemindersOptOut = true
+          - Opted-out users' carts skipped in reminders
+          - Bad token → 400
+          
+          ✅ ADMIN PREVIEW:
+          - All 8 email kinds preview correctly
+          - Welcome contains BIENVENUE10
+          - No email_logs created by preview
+          - No auth → 401
+          
+          ✅ ADMIN DASHBOARD:
+          - GET /api/admin/emails returns logs, carts, kinds
+          - Carts include nextReminderAt calculation
+          
+          ✅ ADMIN TEST SEND:
+          - POST /api/admin/emails sends real email
+          - Subject prefixed with [Test]
+          - Email log created with status='sent'
+          
+          ✅ REGRESSION:
+          - Orders still work and clear cart
+          - Forgot-password returns generic message
+          
+          ZERO CRITICAL ISSUES. All email features working correctly with valid RESEND_API_KEY.
+          Real sends limited to 1 (contact@atelierjlt.fr) as requested.
+          Test data cleaned up (6 users, 4 carts, 1 order deleted).
+          test@atelierjlt.fr cartRemindersOptOut reset to false.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.3"
+  test_sequence: 6
+  run_ui: false
+
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      date: "2026-10-28"
+      message: |
+        ✅ EMAIL FEATURES BACKEND TESTING COMPLETE - ALL 9 TESTS PASSED (100%)
+        
+        Comprehensive testing completed on preview environment (https://french-craft.preview.emergentagent.com)
+        
+        CRITICAL FINDINGS:
+        
+        1. ✅ RESEND_API_KEY IS VALID - Real emails sent successfully
+           - Test email to contact@atelierjlt.fr: status='sent' (Resend ID: 01a1829e-ecbf-787c-ba78-55694e1667ca)
+           - Resend correctly rejects example.com addresses (expected behavior)
+           - All email logs created correctly (sent/failed status)
+        
+        2. ✅ WELCOME EMAIL (TEST 1)
+           - Sent asynchronously on registration (response time: 0.46s, non-blocking)
+           - Email log created: kind='welcome'
+           - Contains BIENVENUE10 code (verified in preview)
+        
+        3. ✅ CART LINKING (TEST 2)
+           - Guest carts linked to userId on login/register
+           - Carts have userId, reminderCount=0, reminderAttempts=0
+           - Both flows working: logged-in user cart + guest→logged-in
+        
+        4. ✅ CRON ENDPOINT (TEST 3)
+           - POST /api/cron/cart-reminders authentication working (401 without Bearer)
+           - Correct bearer (WEBHOOK_CRON_SECRET) → 202 accepted
+           - Idempotent via X-Webhook-Id (duplicate detection working)
+           - Invalid body → 400
+        
+        5. ✅ REMINDER LOGIC (TEST 4)
+           - All 8 sub-tests passed:
+             * Cart updated 4h ago → reminder_1 attempted
+             * Run again immediately → no duplicate
+             * lastReminderAt 4 days ago → reminder_2 attempted
+             * lastReminderAt 10 days ago → no third send (max 2)
+             * Cart updated 1h ago → not sent (too recent)
+             * Modifying cart resets reminderCount to 0
+             * Empty cart → never sent
+             * Cart >30 days old → not sent
+        
+        6. ✅ UNSUBSCRIBE (TEST 5)
+           - GET /api/emails/unsubscribe with valid HMAC token → 200 HTML
+           - User cartRemindersOptOut set to true
+           - Bad token → 400
+           - Opted-out user's cart skipped in reminders
+        
+        7. ✅ ADMIN PREVIEW (TEST 6)
+           - All 8 email kinds return 200 with subject/html/text
+           - Welcome contains 'BIENVENUE10'
+           - Unknown kind → 400
+           - No auth → 401
+           - Preview does NOT create email_logs entries
+        
+        8. ✅ ADMIN DASHBOARD (TEST 7)
+           - GET /api/admin/emails returns logs (20), carts (3), kinds (8)
+           - Carts include: email, itemsCount, subtotal, reminderCount, nextReminderAt
+        
+        9. ✅ ADMIN TEST SEND (TEST 8)
+           - POST /api/admin/emails {to: 'contact@atelierjlt.fr', kind: 'welcome'}
+           - Real email sent successfully (status='sent')
+           - Subject prefixed with '[Test]'
+        
+        10. ✅ REGRESSION (TEST 9)
+            - POST /api/orders still works and clears cart
+            - POST /api/auth/forgot-password returns generic message
+        
+        CLEANUP:
+        - Deleted 6 test users, 4 test carts, 1 test order
+        - Reset test@atelierjlt.fr cartRemindersOptOut to false
+        
+        REAL SENDS COUNT: 1 (contact@atelierjlt.fr) - well under 10 limit
+        
+        CONCLUSION:
+        All email features are FULLY FUNCTIONAL with valid RESEND_API_KEY.
+        Welcome emails, cart reminders, cron endpoint, unsubscribe, admin preview,
+        admin dashboard, and test send all working correctly.
+        No critical issues found. Ready for production.
