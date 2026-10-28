@@ -20,6 +20,7 @@ import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
 import { availableUnits, lowStockItems, stockMismatch } from '@/lib/stock'
 import PageContentEditor from '@/components/admin/page-content-editor'
 import CategoryPagesEditor from '@/components/admin/category-pages-editor'
+import ProductSlugEditor from '@/components/admin/product-slug-editor'
 import NavbarBlock from '@/components/admin/navbar-block'
 
 /* =========================================================
@@ -371,6 +372,18 @@ function TabProducts() {
     if (r.ok) { toast.success('Créé'); load() }
   }
 
+  const mismatchCount = (products || []).filter((p) => stockMismatch(p)).length
+  const alignStocks = async () => {
+    const list = (products || []).filter((p) => stockMismatch(p))
+    const lines = list.slice(0, 12).map((p) => { const m = stockMismatch(p); return `• ${p.name} : ${m.total} → ${m.sum}` }).join('\n')
+    if (!confirm(`Aligner le stock total sur la somme des couleurs / tailles pour ${list.length} produit${list.length > 1 ? 's' : ''} ?\n\n${lines}${list.length > 12 ? '\n…' : ''}`)) return
+    const r = await fetch('/api/admin/products/align-stock', { method: 'POST', credentials: 'include' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return toast.error('Alignement impossible')
+    toast.success(`${d.fixed?.length || 0} stock${(d.fixed?.length || 0) > 1 ? 's' : ''} aligné${(d.fixed?.length || 0) > 1 ? 's' : ''}`)
+    load()
+  }
+
   if (!products) return <div className="text-ink/50">Chargement…</div>
 
   const CAT_LABELS = PRODUCT_CATEGORY_LABELS
@@ -388,9 +401,16 @@ function TabProducts() {
           <h2 className="font-display text-3xl">Produits <span className="text-ink/40 font-normal text-xl">({filtered.length} / {products.length})</span></h2>
           <p className="text-xs text-ink/60 mt-1">Toute la boutique est ici. Cherchez un produit par son nom pour le trouver vite.</p>
         </div>
-        <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
-          <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {mismatchCount > 0 && (
+            <button onClick={alignStocks} data-testid="align-stocks" className="border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-[11px] uppercase tracking-[0.2em] hover:bg-amber-100 transition">
+              Aligner les stocks ({mismatchCount})
+            </button>
+          )}
+          <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
+            <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
+          </button>
+        </div>
       </div>
 
       {/* Barre de recherche + filtres de catégorie */}
@@ -529,7 +549,7 @@ function TabProducts() {
                 <Trash2 className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </div>
-            {editing === p.slug && <ProductEditor product={p} onSave={save} />}
+            {editing === p.slug && <ProductEditor product={p} onSave={save} onSlugChanged={(ns) => { setEditing(ns); load() }} />}
           </div>
           )
         })}
@@ -540,7 +560,7 @@ function TabProducts() {
 
 const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2026-2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
 
-function ProductEditor({ product, onSave }) {
+function ProductEditor({ product, onSave, onSlugChanged }) {
   const [p, setP] = useState({ ...product })
   const upd = (k, v) => setP({ ...p, [k]: v })
   const editMismatch = stockMismatch(p)
@@ -592,6 +612,7 @@ function ProductEditor({ product, onSave }) {
       <Field label="Photos du produit">
         <ImageUploader images={p.images || []} onChange={(imgs) => upd('images', imgs)} />
       </Field>
+      <ProductSlugEditor product={product} name={p.name} story={p.story} onChanged={onSlugChanged} />
       <button onClick={() => onSave(p)} className="mt-4 bg-ink text-ivory px-6 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
         <Save className="h-4 w-4" strokeWidth={1.5} /> Enregistrer
       </button>

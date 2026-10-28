@@ -8,6 +8,7 @@ import { Mail, ChevronDown, Send, CheckCircle2, AlertCircle, Monitor, Smartphone
 const KIND = {
   order_confirmation: 'Confirmation de commande',
   owner_new_order: 'Nouvelle commande (vous)',
+  owner_low_stock: 'Stock bas (vous)',
   order_shipped: 'Colis expédié',
   back_in_stock: 'Retour en stock',
   password_reset: 'Mot de passe oublié',

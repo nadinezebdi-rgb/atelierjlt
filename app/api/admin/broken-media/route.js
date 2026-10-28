@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db'
 import { loadMedia, saveMedia, mimeFor } from '@/lib/media-storage'
 import { PRODUCTS as BASE_PRODUCTS } from '@/lib/data/products'
 import { loadProducts } from '@/lib/api/shared'
+import { resolveStorageSlug } from '@/lib/catalog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -138,9 +139,10 @@ export async function POST(request) {
 
     // Applique dans le produit : mise à jour de product_overrides.
     const db = await getDb()
-    const baseProduct = BASE_PRODUCTS.find((p) => p.slug === slug)
     const customDoc = await db.collection('products_custom').findOne({ slug })
-    const overrideDoc = await db.collection('product_overrides').findOne({ slug })
+    const storage = customDoc ? slug : await resolveStorageSlug(db, slug)
+    const baseProduct = BASE_PRODUCTS.find((p) => p.slug === storage)
+    const overrideDoc = await db.collection('product_overrides').findOne({ slug: storage })
 
     if (!baseProduct && !customDoc) return NextResponse.json({ error: 'Produit inconnu' }, { status: 404 })
 
@@ -184,8 +186,8 @@ export async function POST(request) {
       if (type === 'variant') mergedOverride.variants = next.variants
       if (type === 'size') mergedOverride.sizes = next.sizes
       await db.collection('product_overrides').updateOne(
-        { slug },
-        { $set: { slug, data: mergedOverride, updatedAt: new Date() } },
+        { slug: storage },
+        { $set: { slug: storage, data: mergedOverride, updatedAt: new Date() } },
         { upsert: true },
       )
     }
