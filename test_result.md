@@ -6057,3 +6057,14 @@ agent_communication:
         - Restored email_templates to defaults
         - Unset cartRemindersOptOut on test user
 
+  - task: "Catalogue : stock des commandes, adresses web, catégories, photos manquantes"
+    implemented: true
+    working: "NA"
+    file: "/app/lib/catalog.js, /app/lib/stock.js (stockMismatch), /app/lib/api/shared.js (loadProducts), /app/lib/api/handlers/orders.js, /app/lib/api/handlers/cart.js, /app/lib/api/handlers/admin/products.js, /app/lib/api/handlers/products.js, /app/app/api/admin/broken-media/route.js, /app/middleware.js, /app/app/produit/[slug]/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/orders vérifie et retire le stock (produit, couleur, taille) → 409 si insuffisant. Cart add → 409 si épuisé (stock 0 n'est plus traité comme 99). Slugs: création admin → slug depuis le nom (sans 'racine'/'empreinte'), renommage auto des slugs 'produit-xxx' au démarrage (previousSlugs + redirection), base renommés panier-racine→panier-crochet-coton, tapis-empreinte→tapis-jute-tresse, bol-racine→bol-gres-emaille (overrides migrés). Catégories normalisées (DECORATION→decoration, racine/empreinte→intemporels). /collections?cat=racine|empreinte → 301 intemporels. broken-media GET ne liste plus les produits supprimés/masqués et lit correctement les produits custom."

@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 const CartContext = createContext(null)
@@ -33,7 +34,11 @@ export function CartProvider({ children }) {
       credentials: 'include',
       body: JSON.stringify({ slug, qty, ...extra }),
     })
-    const d = await r.json()
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      toast.error(d.error || 'Ajout impossible pour le moment')
+      return d
+    }
     setItems(d.items || [])
     setOpen(true)
     return d

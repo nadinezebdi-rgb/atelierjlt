@@ -17,7 +17,7 @@ import HomeSectionsEditor from '@/components/admin/home-sections-editor'
 import TabOrders from '@/components/admin/orders-tab'
 import LegalPagesTab from '@/components/admin/legal-pages-tab'
 import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
-import { availableUnits, lowStockItems } from '@/lib/stock'
+import { availableUnits, lowStockItems, stockMismatch } from '@/lib/stock'
 import PageContentEditor from '@/components/admin/page-content-editor'
 import CategoryPagesEditor from '@/components/admin/category-pages-editor'
 import NavbarBlock from '@/components/admin/navbar-block'
@@ -57,8 +57,8 @@ const DEFAULT_CONTENT = {
   sectionTitle: 'Deux collections, une même main.',
   sectionEyebrow: 'Nos collections',
   collections: [
-    { key: 'racine',    name: 'Racine',    tagline: 'Plaids · Coussins · Paniers · Chemins de table', image: '/api/img/jlt-plaid-01' },
-    { key: 'empreinte', name: 'Empreinte', tagline: 'Tapis · Macramé mural · Suspensions',            image: 'https://images.pexels.com/photos/6208095/pexels-photo-6208095.jpeg?auto=compress&cs=tinysrgb&w=1400' },
+    { key: 'intemporels',  name: 'Les Intemporels',          tagline: 'Plaids · Coussins · Paniers · Tapis · Macramés', image: '/api/img/jlt-plaid-01' },
+    { key: 'pe-2026-2027', name: 'Printemps/Été 2026-2027', tagline: 'Coton · Trapilho · Rafia',                         image: 'https://images.pexels.com/photos/6208095/pexels-photo-6208095.jpeg?auto=compress&cs=tinysrgb&w=1400' },
   ],
   sections: HOMEPAGE_SECTION_DEFAULTS.map((s) => ({ ...s, content: { ...s.content } })),
   mediaLibrary: [],
@@ -322,8 +322,9 @@ function TabProducts() {
       body: JSON.stringify(p),
     })
     if (r.ok) {
-      toast.success('Enregistré'); setEditing(null); load()
       const d = await r.json().catch(() => ({}))
+      toast.success('Enregistré'); setEditing(null); load()
+      if (d.slug && d.slug !== p.slug) toast.message(`Adresse web : /produit/${d.slug}`)
       const sa = d.stockAlerts
       if (sa?.sent) toast.success(`${sa.sent} client${sa.sent > 1 ? 's' : ''} prévenu${sa.sent > 1 ? 's' : ''} du retour en stock`)
       else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : envoi des emails pas encore activé`)
@@ -363,9 +364,8 @@ function TabProducts() {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        slug: 'produit-' + Date.now(),
         name: 'Nouvelle création',
-        category: 'decoration', price: 0, stock: 1,
+        category: 'intemporels', price: 0, stock: 1,
       }),
     })
     if (r.ok) { toast.success('Créé'); load() }
@@ -373,7 +373,7 @@ function TabProducts() {
 
   if (!products) return <div className="text-ink/50">Chargement…</div>
 
-  const CAT_LABELS = { racine: 'Racine', empreinte: 'Empreinte', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+  const CAT_LABELS = PRODUCT_CATEGORY_LABELS
 
   return (
     <div>
@@ -477,6 +477,7 @@ function TabProducts() {
           const units = availableUnits(p)
           const lowItems = lowStockItems(p)
           const waiting = waitingMap[p.slug] || 0
+          const mismatch = stockMismatch(p)
           return (
           <div key={p.slug} className={`border bg-ivory ${selected.has(p.slug) ? 'border-emerald' : 'border-linen'}`} data-testid={`admin-product-${p.slug}`}>
             <div className="flex items-center gap-4 p-3 flex-wrap sm:flex-nowrap">
@@ -500,6 +501,11 @@ function TabProducts() {
                   {lowItems.length > 0 && (
                     <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-terracotta/15 text-terracotta" title={lowItems.map((i) => `${i.name} : ${i.stock}`).join(' · ')}>
                       Stock faible · {lowItems.map((i) => `${i.name} (${i.stock})`).join(', ')}
+                    </span>
+                  )}
+                  {mismatch && (
+                    <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-amber-100 text-amber-800" data-testid={`stock-mismatch-${p.slug}`} title="Le stock total ne correspond pas à la somme des couleurs / tailles">
+                      Stock à vérifier · total {mismatch.total} ≠ {mismatch.by} {mismatch.sum}
                     </span>
                   )}
                   {waiting > 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-cream border border-linen" data-testid={`waiting-${p.slug}`}>🔔 {waiting} en attente</span>}
@@ -532,20 +538,35 @@ function TabProducts() {
   )
 }
 
+const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2026-2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+
 function ProductEditor({ product, onSave }) {
   const [p, setP] = useState({ ...product })
   const upd = (k, v) => setP({ ...p, [k]: v })
+  const editMismatch = stockMismatch(p)
   return (
     <div className="p-4 border-t border-linen bg-cream/30">
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Field label="Nom"><input value={p.name || ''} onChange={(e) => upd('name', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
         <Field label="Prix (€)"><input type="number" value={p.price || 0} onChange={(e) => upd('price', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-        <Field label="Stock"><input type="number" value={p.stock || 0} onChange={(e) => upd('stock', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+        <Field label="Stock total">
+          <input type="number" min={0} value={p.stock ?? 0} onChange={(e) => upd('stock', Math.max(0, Number(e.target.value)))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" data-testid="edit-stock" />
+          {editMismatch && (
+            <div className="mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-900 p-2 leading-relaxed" data-testid="edit-stock-mismatch">
+              Le total ({editMismatch.total}) ne correspond pas aux {editMismatch.by} ({editMismatch.sum}). Le site ne vend jamais plus que le plus petit des deux.{' '}
+              <button type="button" onClick={() => upd('stock', editMismatch.sum)} className="underline font-medium hover:text-emerald" data-testid="edit-stock-align">
+                Mettre {editMismatch.sum}
+              </button>
+            </div>
+          )}
+        </Field>
         <Field label="Collection">
-          <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink">
-            <option value="racine">Racine (plaids, coussins, paniers)</option>
-            <option value="empreinte">Empreinte (tapis, macramé, suspensions)</option>
-            <option value="terre">Terre (poterie, céramique)</option>
+          <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" data-testid="edit-category">
+            <option value="intemporels">Les Intemporels</option>
+            <option value="pe-2026-2027">Printemps/Été 2026-2027</option>
+            {p.category && !['intemporels', 'pe-2026-2027'].includes(p.category) && (
+              <option value={p.category}>{PRODUCT_CATEGORY_LABELS[p.category] || p.category} (n’apparaît dans aucune collection du site)</option>
+            )}
           </select>
         </Field>
         <Field label="Matière"><input value={p.material || ''} onChange={(e) => upd('material', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>

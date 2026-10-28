@@ -1,834 +1,923 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Editable Email Templates and Guest Cart Link Features
-Tests all endpoints related to email customization and guest cart functionality
+Backend test for catalog/stock changes
+Tests stock decrement, insufficient stock, sold out, admin product creation,
+auto-migration, base slug renames, broken-media endpoint, and regressions.
 """
 
 import requests
 import json
 import time
-from datetime import datetime
+from pymongo import MongoClient
 
 # Configuration
 BASE_URL = "https://french-craft.preview.emergentagent.com"
 ADMIN_PASSWORD = "Juliette99*"
-VALID_EMAIL = "contact@atelierjlt.fr"  # Only email that works with Resend
-TEST_EMAIL = "test@atelierjlt.fr"
-TEST_PASSWORD = "MonSecret123"
+TEST_EMAIL = "contact@atelierjlt.fr"  # Use real email to avoid triggering emails to unknown addresses
 
-# Session for maintaining cookies
-session = requests.Session()
-admin_session = requests.Session()
+# MongoDB connection
+MONGO_URL = "mongodb://localhost:27017"
+DB_NAME = "ginette_creations"
 
-def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-
-def test_admin_login():
-    """Login as admin to get admin cookie"""
-    log("=" * 80)
-    log("ADMIN LOGIN")
-    log("=" * 80)
-    try:
-        r = admin_session.post(f"{BASE_URL}/api/auth/admin-login", json={"password": ADMIN_PASSWORD})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        log(f"✅ Admin login successful")
-        return True
-    except Exception as e:
-        log(f"❌ Admin login failed: {e}")
-        return False
-
-# ============================================================================
-# A) EDITABLE EMAIL TEXTS (admin only, 401 without auth)
-# ============================================================================
-
-def test_get_email_templates():
-    """Test 1: GET /api/admin/emails/templates?kind=X for each kind"""
-    log("=" * 80)
-    log("TEST 1: GET /api/admin/emails/templates?kind=X")
-    log("=" * 80)
-    
-    kinds = [
-        'welcome', 'order_confirmation', 'owner_new_order', 'order_shipped',
-        'back_in_stock', 'cart_reminder_1', 'cart_reminder_2', 
-        'guest_cart_link', 'password_reset'
-    ]
-    
-    # Test without auth (should be 401)
-    try:
-        r = requests.get(f"{BASE_URL}/api/admin/emails/templates?kind=welcome")
-        assert r.status_code == 401, f"Expected 401 without auth, got {r.status_code}"
-        log(f"✅ GET templates without auth returns 401")
-    except Exception as e:
-        log(f"❌ Auth check failed: {e}")
-        return False
-    
-    # Test each kind with admin auth
-    for kind in kinds:
+class BackendTester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.admin_session = requests.Session()
+        self.mongo_client = MongoClient(MONGO_URL)
+        self.db = self.mongo_client[DB_NAME]
+        self.test_results = []
+        self.original_plaid_data = None
+        self.created_products = []
+        self.created_orders = []
+        
+    def log(self, test_name, passed, message=""):
+        status = "✅ PASSED" if passed else "❌ FAILED"
+        result = f"{status}: {test_name}"
+        if message:
+            result += f" - {message}"
+        print(result)
+        self.test_results.append({"test": test_name, "passed": passed, "message": message})
+        
+    def admin_login(self):
+        """Login as admin"""
         try:
-            r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind={kind}")
-            assert r.status_code == 200, f"Expected 200 for {kind}, got {r.status_code}"
-            data = r.json()
-            
-            # Verify structure
-            assert 'kind' in data and data['kind'] == kind, f"Missing or wrong kind"
-            assert 'fields' in data and isinstance(data['fields'], list), f"Missing fields array"
-            assert 'vars' in data and isinstance(data['vars'], list), f"Missing vars array"
-            assert 'defaults' in data and isinstance(data['defaults'], dict), f"Missing defaults"
-            assert 'values' in data and isinstance(data['values'], dict), f"Missing values"
-            assert 'customized' in data and isinstance(data['customized'], bool), f"Missing customized flag"
-            
-            log(f"✅ GET templates kind={kind}: {len(data['fields'])} fields, {len(data['vars'])} vars, customized={data['customized']}")
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/auth/admin-login",
+                json={"password": ADMIN_PASSWORD},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                self.log("Admin login", True, "Admin authenticated successfully")
+                return True
+            else:
+                self.log("Admin login", False, f"Status {resp.status_code}")
+                return False
         except Exception as e:
-            log(f"❌ GET templates kind={kind} failed: {e}")
+            self.log("Admin login", False, str(e))
             return False
     
-    # Test unknown kind (should be 400)
-    try:
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=unknown_kind")
-        assert r.status_code == 400, f"Expected 400 for unknown kind, got {r.status_code}"
-        log(f"✅ GET templates with unknown kind returns 400")
-    except Exception as e:
-        log(f"❌ Unknown kind check failed: {e}")
-        return False
-    
-    return True
-
-def test_put_email_templates():
-    """Test 2: PUT /api/admin/emails/templates with customization"""
-    log("=" * 80)
-    log("TEST 2: PUT /api/admin/emails/templates (customization)")
-    log("=" * 80)
-    
-    # Test without auth (should be 401)
-    try:
-        r = requests.put(f"{BASE_URL}/api/admin/emails/templates", 
-                        json={"kind": "order_confirmation", "values": {"subject": "Test"}})
-        assert r.status_code == 401, f"Expected 401 without auth, got {r.status_code}"
-        log(f"✅ PUT templates without auth returns 401")
-    except Exception as e:
-        log(f"❌ Auth check failed: {e}")
-        return False
-    
-    # Customize order_confirmation
-    try:
-        custom_values = {
-            "subject": "Commande {commande} bien reçue",
-            "intro": "Merci {prenom} !\nDeuxième ligne <b>x</b>"
-        }
-        r = admin_session.put(f"{BASE_URL}/api/admin/emails/templates", 
-                             json={"kind": "order_confirmation", "values": custom_values})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data.get('ok') == True, f"Expected ok:true"
-        assert data.get('customized') == True, f"Expected customized:true"
-        log(f"✅ PUT templates order_confirmation: customized={data['customized']}")
-    except Exception as e:
-        log(f"❌ PUT templates failed: {e}")
-        return False
-    
-    # Verify customization persisted
-    try:
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=order_confirmation")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data['customized'] == True, f"Expected customized:true after PUT"
-        assert data['values']['subject'] == "Commande {commande} bien reçue", f"Subject not saved"
-        assert "Merci {prenom} !" in data['values']['intro'], f"Intro not saved"
-        log(f"✅ Customization persisted correctly")
-    except Exception as e:
-        log(f"❌ Verification failed: {e}")
-        return False
-    
-    # Test empty string falls back to default
-    try:
-        r = admin_session.put(f"{BASE_URL}/api/admin/emails/templates", 
-                             json={"kind": "order_confirmation", "values": {"subject": ""}})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        # Empty string should not be stored (falls back to default)
-        log(f"✅ Empty string handled correctly")
-    except Exception as e:
-        log(f"❌ Empty string test failed: {e}")
-        return False
-    
-    # Test over-long subject truncated to 200
-    try:
-        long_subject = "A" * 300
-        r = admin_session.put(f"{BASE_URL}/api/admin/emails/templates", 
-                             json={"kind": "order_confirmation", "values": {"subject": long_subject}})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
+    def test_1_stock_decrement_on_order(self):
+        """Test 1: Stock decrement on order - plaid-sylvestre with variants"""
+        print("\n" + "="*80)
+        print("TEST 1: Stock decrement on order")
+        print("="*80)
         
-        # Verify truncation
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=order_confirmation")
-        data = r.json()
-        assert len(data['values']['subject']) <= 200, f"Subject not truncated to 200 chars"
-        log(f"✅ Over-long subject truncated to {len(data['values']['subject'])} chars")
-    except Exception as e:
-        log(f"❌ Truncation test failed: {e}")
-        return False
-    
-    return True
-
-def test_post_email_preview():
-    """Test 3: POST /api/admin/emails/preview (does NOT persist)"""
-    log("=" * 80)
-    log("TEST 3: POST /api/admin/emails/preview (non-persistent)")
-    log("=" * 80)
-    
-    try:
-        # Get current state
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=welcome")
-        before = r.json()
-        
-        # Preview with custom texts (should NOT persist)
-        preview_texts = {
-            "subject": "Hey {prenom}",
-            "intro": "This is a preview test"
-        }
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/preview", 
-                              json={"kind": "welcome", "texts": preview_texts})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data['subject'] == "Hey Camille", f"Preview subject wrong: {data['subject']}"
-        assert "This is a preview test" in data['html'], f"Preview HTML doesn't contain custom text"
-        log(f"✅ POST preview returned custom subject: {data['subject']}")
-        
-        # Verify it did NOT persist
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=welcome")
-        after = r.json()
-        assert after['values'] == before['values'], f"Preview texts were persisted (should not be)"
-        log(f"✅ Preview texts did NOT persist (correct)")
-        
-    except Exception as e:
-        log(f"❌ Preview test failed: {e}")
-        return False
-    
-    return True
-
-def test_get_email_preview():
-    """Test 3b: GET /api/admin/emails/preview?kind=X"""
-    log("=" * 80)
-    log("TEST 3b: GET /api/admin/emails/preview?kind=X")
-    log("=" * 80)
-    
-    try:
-        # Re-customize order_confirmation for this test (was deleted in test 2)
-        custom_values = {
-            "subject": "Commande {commande} bien reçue",
-            "intro": "Merci {prenom} !\nDeuxième ligne <b>x</b>"
-        }
-        r = admin_session.put(f"{BASE_URL}/api/admin/emails/templates", 
-                             json={"kind": "order_confirmation", "values": custom_values})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        log(f"✅ Re-customized order_confirmation for preview test")
-        
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/preview?kind=order_confirmation")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        
-        # Should use customized texts
-        assert 'subject' in data, f"Missing subject"
-        assert 'html' in data, f"Missing html"
-        assert 'Commande JLT-APERCU bien reçue' in data['subject'], f"Subject doesn't use custom text: {data['subject']}"
-        assert 'Merci Camille !' in data['html'], f"HTML doesn't contain custom intro"
-        assert '&lt;b&gt;x&lt;/b&gt;' in data['html'], f"HTML not escaped: {data['html'][:500]}"
-        log(f"✅ GET preview uses customized texts: subject='{data['subject']}'")
-        log(f"✅ HTML escaping working: <b>x</b> → &lt;b&gt;x&lt;/b&gt;")
-        
-    except Exception as e:
-        log(f"❌ GET preview test failed: {e}")
-        return False
-    
-    return True
-
-def test_real_order_uses_custom_texts():
-    """Test 4: Real order uses customized texts"""
-    log("=" * 80)
-    log("TEST 4: Real order uses customized texts")
-    log("=" * 80)
-    
-    # Create a new session for order
-    order_session = requests.Session()
-    
-    try:
-        # Add product to cart
-        r = order_session.post(f"{BASE_URL}/api/cart", json={"slug": "plaid-sylvestre", "qty": 1})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        log(f"✅ Added product to cart")
-        
-        # Create order with valid email
-        order_data = {
-            "address": {
-                "firstName": "Test",
-                "lastName": "User",
-                "email": VALID_EMAIL,  # Use valid email for real send
-                "address": "123 Test St",
-                "zip": "75001",
-                "city": "Paris",
-                "country": "France",
-                "phone": "0123456789",
-                "shippingMethod": "standard"
+        try:
+            # Get plaid-sylvestre product and record original stock
+            resp = self.admin_session.get(f"{BASE_URL}/api/products/plaid-sylvestre", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 1 - Get product", False, f"Status {resp.status_code}")
+                return
+            
+            product = resp.json().get("product", {})
+            self.original_plaid_data = {
+                "stock": product.get("stock"),
+                "variants": product.get("variants", [])
             }
-        }
-        r = order_session.post(f"{BASE_URL}/api/orders", json=order_data)
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        response = r.json()
-        order = response.get('order', {})
-        order_number = order.get('orderNumber')
-        log(f"✅ Order created: {order_number}")
-        
-        # Check email logs for this order
-        time.sleep(2)  # Wait for email to be logged
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        
-        # Find the order_confirmation email for this order
-        order_email = None
-        for log_entry in data.get('logs', []):
-            if log_entry.get('kind') == 'order_confirmation' and order_number in str(log_entry.get('subject', '')):
-                order_email = log_entry
-                break
-        
-        if order_email:
-            # Check if custom subject was used
-            expected_subject = f"Commande {order_number} bien reçue"
-            actual_subject = order_email.get('subject', '')
-            assert expected_subject in actual_subject, f"Custom subject not used: {actual_subject}"
-            log(f"✅ Order confirmation email uses custom subject: '{actual_subject}'")
-        else:
-            log(f"⚠️  Order confirmation email not found in logs (may have failed to send)")
-        
-        # Cleanup: delete test order
-        order_id = order.get('_id')
-        if order_id:
-            from pymongo import MongoClient
-            client = MongoClient("mongodb://localhost:27017")
-            db = client['ginette_creations']
-            db.orders.delete_one({"_id": order_id})
-            log(f"✅ Cleanup: deleted test order {order_number}")
-        
-    except Exception as e:
-        log(f"❌ Real order test failed: {e}")
-        return False
+            
+            # Find a variant with stock > 0
+            variant_with_stock = None
+            for v in self.original_plaid_data["variants"]:
+                if v.get("stock", 0) > 0:
+                    variant_with_stock = v
+                    break
+            
+            if not variant_with_stock:
+                self.log("Test 1 - Find variant", False, "No variant with stock > 0")
+                return
+            
+            variant_name = variant_with_stock["name"]
+            original_variant_stock = variant_with_stock["stock"]
+            original_product_stock = self.original_plaid_data["stock"]
+            
+            self.log("Test 1 - Get product", True, 
+                    f"Product stock: {original_product_stock}, Variant '{variant_name}' stock: {original_variant_stock}")
+            
+            # Add 1 of this variant to cart
+            resp = self.session.post(
+                f"{BASE_URL}/api/cart",
+                json={"slug": "plaid-sylvestre", "qty": 1, "variant": variant_name},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 1 - Add to cart", False, f"Status {resp.status_code}")
+                return
+            
+            cart_data = resp.json()
+            self.log("Test 1 - Add to cart", True, f"Cart count: {cart_data.get('count')}")
+            
+            # Create order
+            order_data = {
+                "address": {
+                    "firstName": "QA",
+                    "lastName": "T",
+                    "name": "QA T",
+                    "email": TEST_EMAIL,
+                    "address": "1 rue",
+                    "city": "Paris",
+                    "zip": "75001",
+                    "country": "France",
+                    "shippingMethod": "standard"
+                }
+            }
+            
+            resp = self.session.post(
+                f"{BASE_URL}/api/orders",
+                json=order_data,
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 1 - Create order", False, f"Status {resp.status_code}: {resp.text}")
+                return
+            
+            order_resp = resp.json()
+            order_id = order_resp.get("order", {}).get("_id")
+            if order_id:
+                self.created_orders.append(order_id)
+            
+            self.log("Test 1 - Create order", True, f"Order created: {order_resp.get('order', {}).get('orderNumber')}")
+            
+            # Verify stock decreased
+            time.sleep(1)  # Give DB time to update
+            resp = self.admin_session.get(f"{BASE_URL}/api/products/plaid-sylvestre", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 1 - Verify stock", False, f"Status {resp.status_code}")
+                return
+            
+            updated_product = resp.json().get("product", {})
+            new_product_stock = updated_product.get("stock")
+            new_variants = updated_product.get("variants", [])
+            
+            # Find the variant we ordered
+            new_variant_stock = None
+            for v in new_variants:
+                if v["name"] == variant_name:
+                    new_variant_stock = v.get("stock")
+                    break
+            
+            # Check if stock decreased by 1
+            product_stock_decreased = (new_product_stock == original_product_stock - 1)
+            variant_stock_decreased = (new_variant_stock == original_variant_stock - 1)
+            
+            if product_stock_decreased and variant_stock_decreased:
+                self.log("Test 1 - Stock decrement", True, 
+                        f"Product stock: {original_product_stock} → {new_product_stock}, "
+                        f"Variant '{variant_name}' stock: {original_variant_stock} → {new_variant_stock}")
+            else:
+                self.log("Test 1 - Stock decrement", False,
+                        f"Product stock: {original_product_stock} → {new_product_stock} (expected {original_product_stock - 1}), "
+                        f"Variant stock: {original_variant_stock} → {new_variant_stock} (expected {original_variant_stock - 1})")
+            
+        except Exception as e:
+            self.log("Test 1 - Exception", False, str(e))
     
-    return True
-
-def test_delete_email_templates():
-    """Test 5: DELETE /api/admin/emails/templates?kind=X"""
-    log("=" * 80)
-    log("TEST 5: DELETE /api/admin/emails/templates?kind=X")
-    log("=" * 80)
+    def test_2_insufficient_stock(self):
+        """Test 2: Insufficient stock handling"""
+        print("\n" + "="*80)
+        print("TEST 2: Insufficient stock handling")
+        print("="*80)
+        
+        try:
+            # Get plaid-sylvestre full product data
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/products", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 2 - Get products", False, f"Status {resp.status_code}")
+                return
+            
+            products = resp.json().get("products", [])
+            plaid = None
+            for p in products:
+                if p.get("slug") == "plaid-sylvestre":
+                    plaid = p
+                    break
+            
+            if not plaid:
+                self.log("Test 2 - Find product", False, "plaid-sylvestre not found")
+                return
+            
+            # Find a variant and set its stock to 1
+            variants = plaid.get("variants", [])
+            if not variants:
+                self.log("Test 2 - Find variant", False, "No variants found")
+                return
+            
+            test_variant = variants[0]
+            test_variant_name = test_variant["name"]
+            
+            # Update variant stock to 1
+            for v in variants:
+                if v["name"] == test_variant_name:
+                    v["stock"] = 1
+            
+            plaid["variants"] = variants
+            
+            resp = self.admin_session.patch(
+                f"{BASE_URL}/api/admin/products?slug=plaid-sylvestre",
+                json=plaid,
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 2 - Set stock to 1", False, f"Status {resp.status_code}")
+                return
+            
+            self.log("Test 2 - Set stock to 1", True, f"Variant '{test_variant_name}' stock set to 1")
+            
+            # Add 1 to cart
+            resp = self.session.post(
+                f"{BASE_URL}/api/cart",
+                json={"slug": "plaid-sylvestre", "qty": 1, "variant": test_variant_name},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 2 - Add to cart", False, f"Status {resp.status_code}")
+                return
+            
+            self.log("Test 2 - Add to cart", True, "Added 1 item to cart")
+            
+            # Directly modify cart in MongoDB to qty 3
+            cart_doc = self.db.carts.find_one({"items.slug": "plaid-sylvestre"})
+            if not cart_doc:
+                self.log("Test 2 - Find cart", False, "Cart not found in MongoDB")
+                return
+            
+            for item in cart_doc["items"]:
+                if item["slug"] == "plaid-sylvestre" and item.get("variant") == test_variant_name:
+                    item["qty"] = 3
+            
+            self.db.carts.update_one(
+                {"_id": cart_doc["_id"]},
+                {"$set": {"items": cart_doc["items"]}}
+            )
+            
+            self.log("Test 2 - Modify cart", True, "Cart qty modified to 3 in MongoDB")
+            
+            # Try to create order - should fail with 409
+            order_data = {
+                "address": {
+                    "firstName": "QA",
+                    "lastName": "T",
+                    "name": "QA T",
+                    "email": TEST_EMAIL,
+                    "address": "1 rue",
+                    "city": "Paris",
+                    "zip": "75001",
+                    "country": "France",
+                    "shippingMethod": "standard"
+                }
+            }
+            
+            resp = self.session.post(
+                f"{BASE_URL}/api/orders",
+                json=order_data,
+                timeout=10
+            )
+            
+            if resp.status_code == 409:
+                error_data = resp.json()
+                error_msg = error_data.get("error", "")
+                problems = error_data.get("problems", [])
+                
+                # Check for French error message
+                has_french_error = bool(error_msg)
+                has_problems = len(problems) > 0
+                
+                self.log("Test 2 - Insufficient stock", True,
+                        f"Got 409 with French error: '{error_msg}', problems: {len(problems)}")
+                
+                # Verify stock unchanged
+                resp = self.admin_session.get(f"{BASE_URL}/api/products/plaid-sylvestre", timeout=10)
+                if resp.status_code == 200:
+                    product = resp.json().get("product", {})
+                    variants = product.get("variants", [])
+                    for v in variants:
+                        if v["name"] == test_variant_name:
+                            if v.get("stock") == 1:
+                                self.log("Test 2 - Stock unchanged", True, f"Stock still 1 after failed order")
+                            else:
+                                self.log("Test 2 - Stock unchanged", False, f"Stock is {v.get('stock')}, expected 1")
+                            break
+            else:
+                self.log("Test 2 - Insufficient stock", False, 
+                        f"Expected 409, got {resp.status_code}")
+            
+        except Exception as e:
+            self.log("Test 2 - Exception", False, str(e))
     
-    try:
-        # Delete customization
-        r = admin_session.delete(f"{BASE_URL}/api/admin/emails/templates?kind=order_confirmation")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data.get('ok') == True, f"Expected ok:true"
-        log(f"✅ DELETE templates order_confirmation successful")
+    def test_3_sold_out(self):
+        """Test 3: Sold out handling"""
+        print("\n" + "="*80)
+        print("TEST 3: Sold out handling")
+        print("="*80)
         
-        # Verify it's back to defaults
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails/templates?kind=order_confirmation")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data['customized'] == False, f"Expected customized:false after DELETE"
-        assert data['values']['subject'] == data['defaults']['subject'], f"Not back to default"
-        log(f"✅ Templates back to defaults after DELETE")
-        
-        # Verify GET /api/admin/emails includes customized array
-        r = admin_session.get(f"{BASE_URL}/api/admin/emails")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert 'customized' in data and isinstance(data['customized'], list), f"Missing customized array"
-        assert 'order_confirmation' not in data['customized'], f"order_confirmation still in customized list"
-        log(f"✅ GET /api/admin/emails includes customized array: {data['customized']}")
-        
-    except Exception as e:
-        log(f"❌ DELETE templates test failed: {e}")
-        return False
+        try:
+            # Get plaid-sylvestre
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/products", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 3 - Get products", False, f"Status {resp.status_code}")
+                return
+            
+            products = resp.json().get("products", [])
+            plaid = None
+            for p in products:
+                if p.get("slug") == "plaid-sylvestre":
+                    plaid = p
+                    break
+            
+            if not plaid:
+                self.log("Test 3 - Find product", False, "plaid-sylvestre not found")
+                return
+            
+            # Set a variant stock to 0
+            variants = plaid.get("variants", [])
+            if not variants:
+                self.log("Test 3 - Find variant", False, "No variants found")
+                return
+            
+            test_variant = variants[0]
+            test_variant_name = test_variant["name"]
+            
+            for v in variants:
+                if v["name"] == test_variant_name:
+                    v["stock"] = 0
+            
+            plaid["variants"] = variants
+            
+            resp = self.admin_session.patch(
+                f"{BASE_URL}/api/admin/products?slug=plaid-sylvestre",
+                json=plaid,
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 3 - Set stock to 0", False, f"Status {resp.status_code}")
+                return
+            
+            self.log("Test 3 - Set stock to 0", True, f"Variant '{test_variant_name}' stock set to 0")
+            
+            # Try to add to cart - should fail with 409
+            resp = self.session.post(
+                f"{BASE_URL}/api/cart",
+                json={"slug": "plaid-sylvestre", "qty": 1, "variant": test_variant_name},
+                timeout=10
+            )
+            
+            if resp.status_code == 409:
+                error_data = resp.json()
+                error_msg = error_data.get("error", "")
+                
+                # Check for French error message about "épuisée"
+                if "épuisé" in error_msg.lower():
+                    self.log("Test 3 - Sold out", True, f"Got 409 with French error: '{error_msg}'")
+                else:
+                    self.log("Test 3 - Sold out", False, f"Error message doesn't contain 'épuisé': '{error_msg}'")
+            else:
+                self.log("Test 3 - Sold out", False, f"Expected 409, got {resp.status_code}")
+            
+        except Exception as e:
+            self.log("Test 3 - Exception", False, str(e))
     
-    return True
-
-# ============================================================================
-# B) GUEST CART LINK
-# ============================================================================
-
-def test_guest_cart_save():
-    """Test 6: Guest cart save with email validation"""
-    log("=" * 80)
-    log("TEST 6: POST /api/cart/save (guest cart link)")
-    log("=" * 80)
+    def test_4_admin_create_products(self):
+        """Test 4: Admin product creation with slug generation and rename"""
+        print("\n" + "="*80)
+        print("TEST 4: Admin product creation")
+        print("="*80)
+        
+        try:
+            # Test 4a: Create "Grand panier de rangement" with category DECORATION
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/admin/products",
+                json={"name": "Grand panier de rangement", "category": "DECORATION"},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 4a - Create product", False, f"Status {resp.status_code}")
+                return
+            
+            data = resp.json()
+            slug1 = data.get("slug")
+            
+            if slug1 == "grand-panier-de-rangement":
+                self.log("Test 4a - Slug generation", True, f"Slug: {slug1}")
+                self.created_products.append(slug1)
+            else:
+                self.log("Test 4a - Slug generation", False, f"Expected 'grand-panier-de-rangement', got '{slug1}'")
+                return
+            
+            # Verify category is stored as 'decoration' (lowercase)
+            resp = self.admin_session.get(f"{BASE_URL}/api/products/{slug1}", timeout=10)
+            if resp.status_code == 200:
+                product = resp.json().get("product", {})
+                category = product.get("category")
+                if category == "decoration":
+                    self.log("Test 4a - Category normalization", True, f"Category stored as 'decoration'")
+                else:
+                    self.log("Test 4a - Category normalization", False, f"Category is '{category}', expected 'decoration'")
+            
+            # Test 4b: Create same name again - should get -2 suffix
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/admin/products",
+                json={"name": "Grand panier de rangement", "category": "DECORATION"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                slug2 = data.get("slug")
+                if slug2 == "grand-panier-de-rangement-2":
+                    self.log("Test 4b - Duplicate slug", True, f"Slug: {slug2}")
+                    self.created_products.append(slug2)
+                else:
+                    self.log("Test 4b - Duplicate slug", False, f"Expected 'grand-panier-de-rangement-2', got '{slug2}'")
+            
+            # Test 4c: Create "Tapis Empreinte" - should remove legacy word
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/admin/products",
+                json={"name": "Tapis Empreinte"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                slug3 = data.get("slug")
+                # Should be 'tapis' or 'tapis-2' if 'tapis' is taken
+                if slug3 in ["tapis", "tapis-2"]:
+                    self.log("Test 4c - Legacy word removal", True, f"Slug: {slug3} (legacy 'empreinte' removed)")
+                    self.created_products.append(slug3)
+                else:
+                    self.log("Test 4c - Legacy word removal", False, f"Expected 'tapis' or 'tapis-2', got '{slug3}'")
+            
+            # Test 4d: Create "Nouvelle création" then rename to "Coussin lune"
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/admin/products",
+                json={"name": "Nouvelle création"},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 4d - Create nouvelle-creation", False, f"Status {resp.status_code}")
+                return
+            
+            data = resp.json()
+            old_slug = data.get("slug")
+            self.log("Test 4d - Create nouvelle-creation", True, f"Slug: {old_slug}")
+            self.created_products.append(old_slug)
+            
+            # Rename to "Coussin lune"
+            resp = self.admin_session.patch(
+                f"{BASE_URL}/api/admin/products?slug={old_slug}",
+                json={"name": "Coussin lune"},
+                timeout=10
+            )
+            if resp.status_code != 200:
+                self.log("Test 4d - Rename product", False, f"Status {resp.status_code}")
+                return
+            
+            data = resp.json()
+            new_slug = data.get("slug")
+            
+            if new_slug == "coussin-lune":
+                self.log("Test 4d - Rename slug", True, f"New slug: {new_slug}")
+                
+                # Verify product is reachable at new slug
+                resp = self.admin_session.get(f"{BASE_URL}/api/products/{new_slug}", timeout=10)
+                if resp.status_code == 200:
+                    self.log("Test 4d - New slug accessible", True, f"GET /api/products/{new_slug} returns 200")
+                else:
+                    self.log("Test 4d - New slug accessible", False, f"Status {resp.status_code}")
+                
+                # Verify old slug redirects
+                resp = self.admin_session.get(f"{BASE_URL}/api/products/{old_slug}", timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    redirect = data.get("redirect")
+                    if redirect == new_slug:
+                        self.log("Test 4d - Old slug redirect", True, f"Old slug redirects to '{redirect}'")
+                    else:
+                        self.log("Test 4d - Old slug redirect", False, f"Redirect is '{redirect}', expected '{new_slug}'")
+                else:
+                    self.log("Test 4d - Old slug redirect", False, f"Status {resp.status_code}")
+                
+                # Update created_products list
+                if old_slug in self.created_products:
+                    self.created_products.remove(old_slug)
+                self.created_products.append(new_slug)
+            else:
+                self.log("Test 4d - Rename slug", False, f"Expected 'coussin-lune', got '{new_slug}'")
+            
+        except Exception as e:
+            self.log("Test 4 - Exception", False, str(e))
     
-    guest_session = requests.Session()
+    def test_5_auto_migration(self):
+        """Test 5: Auto-migration of legacy slugs"""
+        print("\n" + "="*80)
+        print("TEST 5: Auto-migration")
+        print("="*80)
+        
+        try:
+            # Insert a product with legacy slug in products_custom
+            legacy_slug = "produit-1790005978336"
+            test_doc = {
+                "_id": "qa-x",
+                "slug": legacy_slug,
+                "name": "Tapis Bohème",
+                "category": "decoration",
+                "price": 10,
+                "stock": 1,
+                "images": []
+            }
+            
+            self.db.products_custom.insert_one(test_doc)
+            self.log("Test 5 - Insert legacy product", True, f"Inserted product with slug '{legacy_slug}'")
+            
+            # Insert a cart with this slug
+            cart_doc = {
+                "_id": "test-cart-migration",
+                "items": [{"slug": legacy_slug, "qty": 1, "price": 10}]
+            }
+            self.db.carts.insert_one(cart_doc)
+            self.log("Test 5 - Insert cart", True, "Inserted cart with legacy slug")
+            
+            # Restart nextjs to trigger migration
+            import subprocess
+            result = subprocess.run(
+                ["sudo", "supervisorctl", "restart", "nextjs"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                self.log("Test 5 - Restart nextjs", True, "Nextjs restarted")
+                time.sleep(15)  # Wait for migration to run
+            else:
+                self.log("Test 5 - Restart nextjs", False, f"Failed: {result.stderr}")
+                return
+            
+            # Check if slug was migrated
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/products", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 5 - Get products", False, f"Status {resp.status_code}")
+                return
+            
+            products = resp.json().get("products", [])
+            migrated_product = None
+            for p in products:
+                if p.get("_id") == "qa-x":
+                    migrated_product = p
+                    break
+            
+            if migrated_product:
+                new_slug = migrated_product.get("slug")
+                previous_slugs = migrated_product.get("previousSlugs", [])
+                
+                if new_slug == "tapis-boheme":
+                    self.log("Test 5 - Slug migrated", True, f"Slug changed to 'tapis-boheme'")
+                else:
+                    self.log("Test 5 - Slug migrated", False, f"Slug is '{new_slug}', expected 'tapis-boheme'")
+                
+                if legacy_slug in previous_slugs:
+                    self.log("Test 5 - Previous slugs", True, f"Old slug in previousSlugs")
+                else:
+                    self.log("Test 5 - Previous slugs", False, f"Old slug not in previousSlugs: {previous_slugs}")
+                
+                # Check if cart was updated
+                cart = self.db.carts.find_one({"_id": "test-cart-migration"})
+                if cart:
+                    cart_slug = cart.get("items", [{}])[0].get("slug")
+                    if cart_slug == "tapis-boheme":
+                        self.log("Test 5 - Cart updated", True, "Cart item slug updated to 'tapis-boheme'")
+                    else:
+                        self.log("Test 5 - Cart updated", False, f"Cart slug is '{cart_slug}', expected 'tapis-boheme'")
+            else:
+                self.log("Test 5 - Find migrated product", False, "Product not found after migration")
+            
+        except Exception as e:
+            self.log("Test 5 - Exception", False, str(e))
     
-    try:
-        # Test with bad email (should be 400)
-        r = guest_session.post(f"{BASE_URL}/api/cart/save", json={"email": "bad"})
-        assert r.status_code == 400, f"Expected 400 for bad email, got {r.status_code}"
-        assert "invalide" in r.json().get('error', '').lower(), f"Wrong error message"
-        log(f"✅ Bad email returns 400: {r.json()['error']}")
+    def test_6_base_slug_renames(self):
+        """Test 6: Base slug renames and category redirects"""
+        print("\n" + "="*80)
+        print("TEST 6: Base slug renames")
+        print("="*80)
         
-        # Test with empty cart (should be 400)
-        r = guest_session.post(f"{BASE_URL}/api/cart/save", json={"email": VALID_EMAIL})
-        assert r.status_code == 400, f"Expected 400 for empty cart, got {r.status_code}"
-        assert "vide" in r.json().get('error', '').lower(), f"Wrong error message"
-        log(f"✅ Empty cart returns 400: {r.json()['error']}")
+        try:
+            # Test 6a: panier-racine → panier-crochet-coton
+            resp = self.admin_session.get(f"{BASE_URL}/api/products/panier-racine", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                redirect = data.get("redirect")
+                if redirect == "panier-crochet-coton":
+                    self.log("Test 6a - panier-racine redirect", True, f"Redirects to '{redirect}'")
+                else:
+                    self.log("Test 6a - panier-racine redirect", False, f"Redirect is '{redirect}', expected 'panier-crochet-coton'")
+            else:
+                self.log("Test 6a - panier-racine redirect", False, f"Status {resp.status_code}")
+            
+            # Test 6b: tapis-empreinte → tapis-jute-tresse
+            resp = self.admin_session.get(f"{BASE_URL}/api/products/tapis-empreinte", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                redirect = data.get("redirect")
+                if redirect == "tapis-jute-tresse":
+                    self.log("Test 6b - tapis-empreinte redirect", True, f"Redirects to '{redirect}'")
+                else:
+                    self.log("Test 6b - tapis-empreinte redirect", False, f"Redirect is '{redirect}', expected 'tapis-jute-tresse'")
+            else:
+                self.log("Test 6b - tapis-empreinte redirect", False, f"Status {resp.status_code}")
+            
+            # Test 6c: GET /collections?cat=empreinte should redirect to cat=intemporels
+            resp = self.admin_session.get(f"{BASE_URL}/collections?cat=empreinte", allow_redirects=False, timeout=10)
+            if resp.status_code == 301:
+                location = resp.headers.get("Location", "")
+                if "cat=intemporels" in location:
+                    self.log("Test 6c - Category redirect", True, f"301 redirect to {location}")
+                else:
+                    self.log("Test 6c - Category redirect", False, f"Location is '{location}', expected cat=intemporels")
+            else:
+                self.log("Test 6c - Category redirect", False, f"Status {resp.status_code}, expected 301")
+            
+            # Test 6d: GET /api/products?cat=racine should return same as cat=intemporels
+            resp1 = self.admin_session.get(f"{BASE_URL}/api/products?cat=racine", timeout=10)
+            resp2 = self.admin_session.get(f"{BASE_URL}/api/products?cat=intemporels", timeout=10)
+            
+            if resp1.status_code == 200 and resp2.status_code == 200:
+                products1 = resp1.json().get("products", [])
+                products2 = resp2.json().get("products", [])
+                
+                if len(products1) == len(products2) and len(products1) > 0:
+                    self.log("Test 6d - API category normalization", True, 
+                            f"cat=racine returns {len(products1)} products, same as cat=intemporels")
+                else:
+                    self.log("Test 6d - API category normalization", False,
+                            f"cat=racine returns {len(products1)}, cat=intemporels returns {len(products2)}")
+            else:
+                self.log("Test 6d - API category normalization", False, 
+                        f"Status: racine={resp1.status_code}, intemporels={resp2.status_code}")
+            
+            # Test 6e: All products should have no 'racine' or 'empreinte' in category/collection
+            resp = self.admin_session.get(f"{BASE_URL}/api/products", timeout=10)
+            if resp.status_code == 200:
+                products = resp.json().get("products", [])
+                has_legacy = False
+                for p in products:
+                    cat = p.get("category", "")
+                    coll = p.get("collection", "")
+                    if cat in ["racine", "empreinte"] or coll in ["racine", "empreinte"]:
+                        has_legacy = True
+                        break
+                
+                if not has_legacy:
+                    self.log("Test 6e - No legacy categories", True, "No products with racine/empreinte")
+                else:
+                    self.log("Test 6e - No legacy categories", False, "Found products with racine/empreinte")
+            else:
+                self.log("Test 6e - No legacy categories", False, f"Status {resp.status_code}")
+            
+        except Exception as e:
+            self.log("Test 6 - Exception", False, str(e))
+    
+    def test_7_broken_media(self):
+        """Test 7: GET /api/admin/broken-media"""
+        print("\n" + "="*80)
+        print("TEST 7: Broken media endpoint")
+        print("="*80)
         
-        # Add product to cart
-        r = guest_session.post(f"{BASE_URL}/api/cart", json={"slug": "plaid-sylvestre", "qty": 1})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        log(f"✅ Added product to guest cart")
+        try:
+            # Test 7a: GET /api/admin/broken-media should return 200
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/broken-media", timeout=10)
+            if resp.status_code != 200:
+                self.log("Test 7a - Get broken media", False, f"Status {resp.status_code}")
+                return
+            
+            data = resp.json()
+            products = data.get("products", [])
+            self.log("Test 7a - Get broken media", True, f"Found {len(products)} products with broken media")
+            
+            # Test 7b: Create a deleted product with broken images - should NOT appear
+            deleted_doc = {
+                "slug": "coussin-noyau",
+                "deleted": True,
+                "data": {
+                    "name": "Coussins - Mérinos",
+                    "images": ["/api/img/upload-779a32dc"]
+                }
+            }
+            self.db.product_overrides.insert_one(deleted_doc)
+            self.log("Test 7b - Insert deleted product", True, "Inserted deleted product override")
+            
+            # Get broken media again
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/broken-media", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                products = data.get("products", [])
+                
+                # Check if deleted product appears
+                found_deleted = False
+                for p in products:
+                    if p.get("slug") == "coussin-noyau":
+                        found_deleted = True
+                        break
+                
+                if not found_deleted:
+                    self.log("Test 7b - Deleted product excluded", True, "Deleted product does not appear in broken media")
+                else:
+                    self.log("Test 7b - Deleted product excluded", False, "Deleted product appears in broken media")
+            else:
+                self.log("Test 7b - Get broken media", False, f"Status {resp.status_code}")
+            
+            # Test 7c: Create a custom product with broken images - should appear
+            custom_doc = {
+                "_id": "qa-broken-test",
+                "slug": "qa-broken-product",
+                "name": "QA Broken Product",
+                "category": "intemporels",
+                "price": 100,
+                "stock": 1,
+                "images": ["/api/img/upload-doesnotexist"]
+            }
+            self.db.products_custom.insert_one(custom_doc)
+            self.log("Test 7c - Insert custom product", True, "Inserted custom product with broken image")
+            
+            # Get broken media again
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/broken-media", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                products = data.get("products", [])
+                
+                # Check if custom product appears
+                found_custom = False
+                for p in products:
+                    if p.get("slug") == "qa-broken-product":
+                        found_custom = True
+                        product_name = p.get("name")
+                        if product_name == "QA Broken Product":
+                            self.log("Test 7c - Custom product appears", True, f"Custom product appears with name '{product_name}'")
+                        else:
+                            self.log("Test 7c - Custom product appears", False, f"Name is '{product_name}', expected 'QA Broken Product'")
+                        break
+                
+                if not found_custom:
+                    self.log("Test 7c - Custom product appears", False, "Custom product does not appear in broken media")
+            else:
+                self.log("Test 7c - Get broken media", False, f"Status {resp.status_code}")
+            
+        except Exception as e:
+            self.log("Test 7 - Exception", False, str(e))
+    
+    def test_8_regression(self):
+        """Test 8: Regression tests"""
+        print("\n" + "="*80)
+        print("TEST 8: Regression tests")
+        print("="*80)
         
-        # Save cart with valid email (should be 200)
-        r = guest_session.post(f"{BASE_URL}/api/cart/save", json={"email": VALID_EMAIL})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data.get('ok') == True, f"Expected ok:true"
-        log(f"✅ Cart saved successfully with email {VALID_EMAIL}")
+        try:
+            # Test 8a: GET /api/admin/products works
+            resp = self.admin_session.get(f"{BASE_URL}/api/admin/products", timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                products = data.get("products", [])
+                self.log("Test 8a - GET /api/admin/products", True, f"Returns {len(products)} products")
+            else:
+                self.log("Test 8a - GET /api/admin/products", False, f"Status {resp.status_code}")
+            
+            # Test 8b: POST /api/admin/products/bulk works
+            resp = self.admin_session.post(
+                f"{BASE_URL}/api/admin/products/bulk",
+                json={"slugs": ["plaid-sylvestre"], "set": {"isNew": True}},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                updated = data.get("updated", 0)
+                self.log("Test 8b - POST /api/admin/products/bulk", True, f"Updated {updated} products")
+                
+                # Reset isNew to false
+                resp = self.admin_session.post(
+                    f"{BASE_URL}/api/admin/products/bulk",
+                    json={"slugs": ["plaid-sylvestre"], "set": {"isNew": False}},
+                    timeout=10
+                )
+            else:
+                self.log("Test 8b - POST /api/admin/products/bulk", False, f"Status {resp.status_code}")
+            
+        except Exception as e:
+            self.log("Test 8 - Exception", False, str(e))
+    
+    def cleanup(self):
+        """Cleanup test data"""
+        print("\n" + "="*80)
+        print("CLEANUP")
+        print("="*80)
         
-        # Verify saved_carts doc created
-        from pymongo import MongoClient
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
-        saved_cart = db.saved_carts.find_one({"email": VALID_EMAIL})
-        assert saved_cart is not None, f"saved_carts doc not created"
-        assert len(saved_cart['items']) > 0, f"saved_carts has no items"
-        assert 'expiresAt' in saved_cart, f"saved_carts missing expiresAt"
-        token = saved_cart['_id']
-        log(f"✅ saved_carts doc created with token: {token[:16]}...")
+        try:
+            # Delete created custom products
+            for slug in self.created_products:
+                self.db.products_custom.delete_one({"slug": slug})
+                print(f"Deleted custom product: {slug}")
+            
+            # Delete QA test products
+            self.db.products_custom.delete_one({"_id": "qa-x"})
+            self.db.products_custom.delete_one({"_id": "qa-broken-test"})
+            print("Deleted QA test products")
+            
+            # Delete test carts
+            self.db.carts.delete_many({"_id": {"$regex": "^test-"}})
+            print("Deleted test carts")
+            
+            # Delete test orders (limit to 3 as per review request)
+            if self.created_orders:
+                for order_id in self.created_orders[:3]:
+                    self.db.orders.delete_one({"_id": order_id})
+                print(f"Deleted {len(self.created_orders[:3])} test orders")
+            
+            # Delete test product_overrides
+            self.db.product_overrides.delete_one({"slug": "coussin-noyau", "deleted": True})
+            print("Deleted test product_overrides")
+            
+            # Restore plaid-sylvestre stock if we have original data
+            if self.original_plaid_data:
+                # Get current plaid data
+                resp = self.admin_session.get(f"{BASE_URL}/api/admin/products", timeout=10)
+                if resp.status_code == 200:
+                    products = resp.json().get("products", [])
+                    plaid = None
+                    for p in products:
+                        if p.get("slug") == "plaid-sylvestre":
+                            plaid = p
+                            break
+                    
+                    if plaid:
+                        # Restore original stock and variants
+                        plaid["stock"] = self.original_plaid_data["stock"]
+                        plaid["variants"] = self.original_plaid_data["variants"]
+                        
+                        resp = self.admin_session.patch(
+                            f"{BASE_URL}/api/admin/products?slug=plaid-sylvestre",
+                            json=plaid,
+                            timeout=10
+                        )
+                        if resp.status_code == 200:
+                            print("Restored plaid-sylvestre stock to original values")
+                        else:
+                            print(f"Failed to restore plaid-sylvestre stock: {resp.status_code}")
+            
+            self.log("Cleanup", True, "All test data cleaned up")
+            
+        except Exception as e:
+            self.log("Cleanup", False, str(e))
+    
+    def run_all_tests(self):
+        """Run all tests"""
+        print("\n" + "="*80)
+        print("CATALOG/STOCK CHANGES BACKEND TESTING")
+        print("="*80)
+        print(f"Base URL: {BASE_URL}")
+        print(f"Test Email: {TEST_EMAIL}")
+        print("="*80)
         
-        # Verify carts doc has guestLinkSentAt
-        carts = list(db.carts.find({"guestEmail": VALID_EMAIL}))
-        assert len(carts) > 0, f"carts doc not found"
-        cart = carts[0]
-        assert 'guestLinkSentAt' in cart, f"carts missing guestLinkSentAt"
-        log(f"✅ carts doc has guestLinkSentAt: {cart['guestLinkSentAt']}")
+        # Login as admin
+        if not self.admin_login():
+            print("\n❌ Admin login failed. Cannot proceed with tests.")
+            return
         
-        # Verify email_logs has guest_cart_link
-        email_log = db.email_logs.find_one({"kind": "guest_cart_link", "to": VALID_EMAIL})
-        assert email_log is not None, f"email_logs missing guest_cart_link"
-        log(f"✅ email_logs has guest_cart_link entry")
-        
-        # Test second call within 2 min (should be 429)
-        r = guest_session.post(f"{BASE_URL}/api/cart/save", json={"email": VALID_EMAIL})
-        assert r.status_code == 429, f"Expected 429 for rate limit, got {r.status_code}"
-        log(f"✅ Second call within 2 min returns 429: {r.json()['error']}")
+        # Run tests
+        self.test_1_stock_decrement_on_order()
+        self.test_2_insufficient_stock()
+        self.test_3_sold_out()
+        self.test_4_admin_create_products()
+        self.test_5_auto_migration()
+        self.test_6_base_slug_renames()
+        self.test_7_broken_media()
+        self.test_8_regression()
         
         # Cleanup
-        db.saved_carts.delete_many({"email": VALID_EMAIL})
-        db.carts.delete_many({"guestEmail": VALID_EMAIL})
-        db.email_logs.delete_many({"kind": "guest_cart_link", "to": VALID_EMAIL})
-        log(f"✅ Cleanup: deleted test data")
+        self.cleanup()
         
-        return token  # Return token for next test
+        # Summary
+        print("\n" + "="*80)
+        print("TEST SUMMARY")
+        print("="*80)
         
-    except Exception as e:
-        log(f"❌ Guest cart save test failed: {e}")
-        return False
-
-def test_cart_restore(token):
-    """Test 7: GET /api/cart/restore?t=<token>"""
-    log("=" * 80)
-    log("TEST 7: GET /api/cart/restore?t=<token>")
-    log("=" * 80)
-    
-    if not token or token == False:
-        log(f"⚠️  Skipping test 7: no token from test 6")
-        return True
-    
-    try:
-        # Create saved cart for testing
-        from pymongo import MongoClient
-        import datetime
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
+        passed = sum(1 for r in self.test_results if r["passed"])
+        total = len(self.test_results)
         
-        test_token = "test_restore_token_123"
-        db.saved_carts.insert_one({
-            "_id": test_token,
-            "email": "test@example.com",
-            "items": [{"slug": "plaid-sylvestre", "name": "Plaid Sylvestre", "price": 340, "qty": 1, "variant": None, "size": None, "image": None}],
-            "source": "cart",
-            "createdAt": datetime.datetime.now(),
-            "expiresAt": datetime.datetime.now() + datetime.timedelta(days=30)
-        })
-        log(f"✅ Created test saved_cart with token: {test_token}")
+        print(f"\nTotal tests: {total}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {total - passed}")
+        print(f"Success rate: {passed/total*100:.1f}%")
         
-        # Test restore with NEW cookie jar (should redirect and set cookie)
-        restore_session = requests.Session()
-        r = restore_session.get(f"{BASE_URL}/api/cart/restore?t={test_token}", allow_redirects=False)
-        assert r.status_code == 302, f"Expected 302 redirect, got {r.status_code}"
-        assert "/checkout?panier=retrouve" in r.headers.get('Location', ''), f"Wrong redirect location"
-        assert 'Set-Cookie' in r.headers, f"No Set-Cookie header"
-        log(f"✅ Restore returns 302 to {r.headers['Location']}")
-        log(f"✅ Set-Cookie header present")
+        print("\nDetailed results:")
+        for r in self.test_results:
+            status = "✅" if r["passed"] else "❌"
+            print(f"{status} {r['test']}")
+            if r["message"]:
+                print(f"   {r['message']}")
         
-        # Follow redirect and check cart
-        r = restore_session.get(f"{BASE_URL}/api/cart")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        cart = r.json()
-        assert cart['count'] > 0, f"Cart is empty after restore"
-        assert any(item['slug'] == 'plaid-sylvestre' for item in cart['items']), f"Restored item not in cart"
-        log(f"✅ Cart restored successfully: {cart['count']} items")
-        
-        # Test restoring into a jar that already has the same item (qty = max, not summed)
-        r = restore_session.post(f"{BASE_URL}/api/cart", json={"slug": "plaid-sylvestre", "qty": 2})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        before_qty = r.json()['items'][0]['qty']
-        log(f"✅ Cart before second restore: qty={before_qty}")
-        
-        r = restore_session.get(f"{BASE_URL}/api/cart/restore?t={test_token}", allow_redirects=False)
-        assert r.status_code == 302, f"Expected 302, got {r.status_code}"
-        
-        r = restore_session.get(f"{BASE_URL}/api/cart")
-        after_qty = r.json()['items'][0]['qty']
-        assert after_qty == max(before_qty, 1), f"Qty should be max({before_qty}, 1), got {after_qty}"
-        log(f"✅ Second restore: qty = max (not summed): {after_qty}")
-        
-        # Test bad/expired token (should redirect to /?panier=expire)
-        r = requests.get(f"{BASE_URL}/api/cart/restore?t=badtoken123", allow_redirects=False)
-        assert r.status_code == 302, f"Expected 302, got {r.status_code}"
-        assert "/?panier=expire" in r.headers.get('Location', ''), f"Wrong redirect for bad token"
-        log(f"✅ Bad token redirects to /?panier=expire")
-        
-        # Cleanup
-        db.saved_carts.delete_one({"_id": test_token})
-        log(f"✅ Cleanup: deleted test saved_cart")
-        
-    except Exception as e:
-        log(f"❌ Cart restore test failed: {e}")
-        return False
-    
-    return True
-
-def test_checkout_email():
-    """Test 8: POST /api/cart/checkout-email"""
-    log("=" * 80)
-    log("TEST 8: POST /api/cart/checkout-email")
-    log("=" * 80)
-    
-    try:
-        # Test as guest with items
-        guest_session = requests.Session()
-        r = guest_session.post(f"{BASE_URL}/api/cart", json={"slug": "plaid-sylvestre", "qty": 1})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        
-        r = guest_session.post(f"{BASE_URL}/api/cart/checkout-email", json={"email": "visiteur@example.com"})
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert data.get('ok') == True, f"Expected ok:true"
-        log(f"✅ Guest checkout-email successful")
-        
-        # Verify carts doc has guestEmail, guestEmailSource, guestEmailAt
-        from pymongo import MongoClient
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
-        cart = db.carts.find_one({"guestEmail": "visiteur@example.com"})
-        assert cart is not None, f"carts doc not found"
-        assert cart.get('guestEmailSource') == 'checkout', f"Wrong guestEmailSource"
-        assert 'guestEmailAt' in cart, f"Missing guestEmailAt"
-        log(f"✅ carts doc has guestEmail, guestEmailSource='checkout', guestEmailAt")
-        
-        # Test as logged-in client (should skip)
-        logged_in_session = requests.Session()
-        r = logged_in_session.post(f"{BASE_URL}/api/auth/login", json={"email": TEST_EMAIL, "password": TEST_PASSWORD})
-        if r.status_code == 200:
-            r = logged_in_session.post(f"{BASE_URL}/api/cart/checkout-email", json={"email": "logged@example.com"})
-            assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-            data = r.json()
-            assert data.get('ok') == True, f"Expected ok:true"
-            assert data.get('skipped') == 'logged_in', f"Expected skipped:logged_in"
-            log(f"✅ Logged-in user: {data}")
-        else:
-            log(f"⚠️  Could not test logged-in scenario (login failed)")
-        
-        # Test that guestLinkSentAt is not overwritten if already set
-        db.carts.update_one({"guestEmail": "visiteur@example.com"}, {"$set": {"guestLinkSentAt": "2024-01-01"}})
-        r = guest_session.post(f"{BASE_URL}/api/cart/checkout-email", json={"email": "visiteur@example.com"})
-        cart = db.carts.find_one({"guestEmail": "visiteur@example.com"})
-        assert cart.get('guestLinkSentAt') == "2024-01-01", f"guestLinkSentAt was overwritten"
-        log(f"✅ guestLinkSentAt not overwritten when already set")
-        
-        # Cleanup
-        db.carts.delete_many({"guestEmail": "visiteur@example.com"})
-        log(f"✅ Cleanup: deleted test carts")
-        
-    except Exception as e:
-        log(f"❌ Checkout email test failed: {e}")
-        return False
-    
-    return True
-
-def test_run_reminders():
-    """Test 9: Cron logic via POST /api/admin/emails/run-reminders"""
-    log("=" * 80)
-    log("TEST 9: POST /api/admin/emails/run-reminders (cron logic)")
-    log("=" * 80)
-    
-    try:
-        from pymongo import MongoClient
-        import datetime
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
-        
-        # Create guest checkout cart with guestEmail, set guestEmailAt to now-4h
-        test_cart_id = "test_cron_cart_123"
-        four_hours_ago = datetime.datetime.now() - datetime.timedelta(hours=4)
-        db.carts.insert_one({
-            "_id": test_cart_id,
-            "items": [{"slug": "plaid-sylvestre", "name": "Plaid Sylvestre", "price": 340, "qty": 1}],
-            "guestEmail": VALID_EMAIL,
-            "guestEmailAt": four_hours_ago,
-            "guestEmailSource": "checkout",
-            "createdAt": four_hours_ago
-        })
-        log(f"✅ Created test cart with guestEmailAt 4h ago")
-        
-        # Run reminders
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        assert 'guestSent' in data, f"Missing guestSent in response"
-        assert data['guestSent'] >= 1, f"Expected guestSent >= 1, got {data['guestSent']}"
-        log(f"✅ run-reminders: guestSent={data['guestSent']}, guestSkipped={data.get('guestSkipped', 0)}")
-        
-        # Verify guestLinkSentAt is set
-        cart = db.carts.find_one({"_id": test_cart_id})
-        assert 'guestLinkSentAt' in cart, f"guestLinkSentAt not set after run-reminders"
-        log(f"✅ guestLinkSentAt set after run-reminders")
-        
-        # Verify saved_carts doc created with source='checkout'
-        saved_cart = db.saved_carts.find_one({"email": VALID_EMAIL, "source": "checkout"})
-        assert saved_cart is not None, f"saved_carts doc not created"
-        log(f"✅ saved_carts doc created with source='checkout'")
-        
-        # Run again (should not send second time)
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        # guestSent should be 0 this time (already sent)
-        log(f"✅ Second run: guestSent={data['guestSent']} (should be 0 or low)")
-        
-        # Test guestEmailAt now-1h (should NOT be sent, too recent)
-        test_cart_id_2 = "test_cron_cart_456"
-        one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
-        db.carts.insert_one({
-            "_id": test_cart_id_2,
-            "items": [{"slug": "plaid-sylvestre", "name": "Plaid Sylvestre", "price": 340, "qty": 1}],
-            "guestEmail": "recent@example.com",
-            "guestEmailAt": one_hour_ago,
-            "guestEmailSource": "checkout",
-            "createdAt": one_hour_ago
-        })
-        
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        data = r.json()
-        # Should not send to recent cart
-        log(f"✅ Cart with guestEmailAt 1h ago not sent (too recent)")
-        
-        # Test cart with userId set (should not be part of guest flow)
-        test_cart_id_3 = "test_cron_cart_789"
-        db.carts.insert_one({
-            "_id": test_cart_id_3,
-            "items": [{"slug": "plaid-sylvestre", "name": "Plaid Sylvestre", "price": 340, "qty": 1}],
-            "userId": "some_user_id",
-            "guestEmail": "user@example.com",
-            "guestEmailAt": four_hours_ago,
-            "guestEmailSource": "checkout",
-            "createdAt": four_hours_ago
-        })
-        
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        data = r.json()
-        log(f"✅ Cart with userId not sent (not guest flow)")
-        
-        # Test empty cart (should not be sent)
-        test_cart_id_4 = "test_cron_cart_empty"
-        db.carts.insert_one({
-            "_id": test_cart_id_4,
-            "items": [],
-            "guestEmail": "empty@example.com",
-            "guestEmailAt": four_hours_ago,
-            "guestEmailSource": "checkout",
-            "createdAt": four_hours_ago
-        })
-        
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        data = r.json()
-        log(f"✅ Empty cart not sent")
-        
-        # Cleanup
-        db.carts.delete_many({"_id": {"$in": [test_cart_id, test_cart_id_2, test_cart_id_3, test_cart_id_4]}})
-        db.saved_carts.delete_many({"email": {"$in": [VALID_EMAIL, "recent@example.com", "user@example.com", "empty@example.com"]}})
-        log(f"✅ Cleanup: deleted test carts and saved_carts")
-        
-    except Exception as e:
-        log(f"❌ Run reminders test failed: {e}")
-        return False
-    
-    return True
-
-def test_logged_in_cart_reminders():
-    """Test 10: Regression - logged-in cart reminders still work"""
-    log("=" * 80)
-    log("TEST 10: Regression - logged-in cart reminders (cart_reminder_1 after 3h)")
-    log("=" * 80)
-    
-    try:
-        from pymongo import MongoClient
-        import datetime
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
-        
-        # Find or create test user
-        user = db.users.find_one({"email": TEST_EMAIL})
-        if not user:
-            log(f"⚠️  Test user {TEST_EMAIL} not found, skipping regression test")
-            return True
-        
-        user_id = user['_id']
-        
-        # Create cart for logged-in user with lastActivityAt 3h ago
-        test_cart_id = "test_logged_in_cart_123"
-        three_hours_ago = datetime.datetime.now() - datetime.timedelta(hours=3, minutes=5)
-        db.carts.insert_one({
-            "_id": test_cart_id,
-            "userId": user_id,
-            "items": [{"slug": "plaid-sylvestre", "name": "Plaid Sylvestre", "price": 340, "qty": 1}],
-            "lastActivityAt": three_hours_ago,
-            "createdAt": three_hours_ago
-        })
-        log(f"✅ Created test cart for logged-in user with lastActivityAt 3h ago")
-        
-        # Run reminders
-        r = admin_session.post(f"{BASE_URL}/api/admin/emails/run-reminders")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}"
-        data = r.json()
-        log(f"✅ run-reminders: sent1={data.get('sent1', 0)}, sent2={data.get('sent2', 0)}")
-        
-        # Verify reminder1SentAt is set
-        cart = db.carts.find_one({"_id": test_cart_id})
-        if cart and 'reminder1SentAt' in cart:
-            log(f"✅ reminder1SentAt set for logged-in user cart")
-        else:
-            log(f"⚠️  reminder1SentAt not set (may be due to email config or other conditions)")
-        
-        # Verify POST /api/cron/cart-reminders still requires auth (401 without bearer)
-        r = requests.post(f"{BASE_URL}/api/cron/cart-reminders")
-        if r.status_code == 401:
-            log(f"✅ POST /api/cron/cart-reminders returns 401 without bearer token")
-        else:
-            log(f"⚠️  POST /api/cron/cart-reminders returned {r.status_code} (expected 401)")
-        
-        # Cleanup
-        db.carts.delete_one({"_id": test_cart_id})
-        log(f"✅ Cleanup: deleted test cart")
-        
-    except Exception as e:
-        log(f"❌ Logged-in cart reminders test failed: {e}")
-        return False
-    
-    return True
-
-def cleanup_test_data():
-    """Cleanup all test data created during testing"""
-    log("=" * 80)
-    log("CLEANUP: Removing test data")
-    log("=" * 80)
-    
-    try:
-        from pymongo import MongoClient
-        client = MongoClient("mongodb://localhost:27017")
-        db = client['ginette_creations']
-        
-        # Remove test carts
-        result = db.carts.delete_many({"guestEmail": {"$regex": "example.com"}})
-        log(f"✅ Deleted {result.deleted_count} test carts")
-        
-        # Remove test saved_carts
-        result = db.saved_carts.delete_many({"email": {"$regex": "example.com"}})
-        log(f"✅ Deleted {result.deleted_count} test saved_carts")
-        
-        # Remove test orders
-        result = db.orders.delete_many({"address.email": VALID_EMAIL, "orderNumber": {"$regex": "^JLT-"}})
-        log(f"✅ Deleted {result.deleted_count} test orders")
-        
-        # Remove test email_templates (restore to defaults)
-        result = db.email_templates.delete_many({})
-        log(f"✅ Deleted {result.deleted_count} email_templates (restored to defaults)")
-        
-        # Unset cartRemindersOptOut on test user
-        result = db.users.update_one({"email": TEST_EMAIL}, {"$unset": {"cartRemindersOptOut": ""}})
-        if result.modified_count > 0:
-            log(f"✅ Unset cartRemindersOptOut on test user")
-        
-        log(f"✅ Cleanup complete")
-        
-    except Exception as e:
-        log(f"⚠️  Cleanup failed: {e}")
-
-# ============================================================================
-# MAIN TEST RUNNER
-# ============================================================================
-
-def main():
-    log("=" * 80)
-    log("BACKEND API TESTING - EDITABLE EMAIL TEMPLATES & GUEST CART LINK")
-    log("=" * 80)
-    log(f"Base URL: {BASE_URL}")
-    log(f"Admin Password: {ADMIN_PASSWORD}")
-    log(f"Valid Email (for real sends): {VALID_EMAIL}")
-    log("")
-    
-    results = {}
-    
-    # Admin login
-    if not test_admin_login():
-        log("❌ FATAL: Admin login failed, cannot continue")
-        return
-    
-    # A) Editable Email Texts
-    results['A1_get_templates'] = test_get_email_templates()
-    results['A2_put_templates'] = test_put_email_templates()
-    results['A3_post_preview'] = test_post_email_preview()
-    results['A3b_get_preview'] = test_get_email_preview()
-    results['A4_real_order'] = test_real_order_uses_custom_texts()
-    results['A5_delete_templates'] = test_delete_email_templates()
-    
-    # B) Guest Cart Link
-    token = test_guest_cart_save()
-    results['B6_guest_cart_save'] = token != False
-    results['B7_cart_restore'] = test_cart_restore(token)
-    results['B8_checkout_email'] = test_checkout_email()
-    results['B9_run_reminders'] = test_run_reminders()
-    results['B10_logged_in_regression'] = test_logged_in_cart_reminders()
-    
-    # Cleanup
-    cleanup_test_data()
-    
-    # Summary
-    log("")
-    log("=" * 80)
-    log("TEST SUMMARY")
-    log("=" * 80)
-    passed = sum(1 for v in results.values() if v)
-    total = len(results)
-    log(f"Passed: {passed}/{total}")
-    log("")
-    
-    for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
-        log(f"{status} - {test_name}")
-    
-    log("")
-    if passed == total:
-        log("🎉 ALL TESTS PASSED!")
-    else:
-        log(f"⚠️  {total - passed} TEST(S) FAILED")
-    
-    return passed == total
+        print("\n" + "="*80)
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    tester = BackendTester()
+    try:
+        tester.run_all_tests()
+    except KeyboardInterrupt:
+        print("\n\nTest interrupted by user")
+        tester.cleanup()
+    except Exception as e:
+        print(f"\n\nUnexpected error: {e}")
+        tester.cleanup()

@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/auth'
 import { getDb } from '@/lib/db'
 import { loadMedia, saveMedia, mimeFor } from '@/lib/media-storage'
 import { PRODUCTS as BASE_PRODUCTS } from '@/lib/data/products'
+import { loadProducts } from '@/lib/api/shared'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,18 +22,9 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   if (!isAdmin(request)) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
-  const db = await getDb()
-  const [overrides, custom] = await Promise.all([
-    db.collection('product_overrides').find({}).toArray(),
-    db.collection('products_custom').find({}).toArray(),
-  ])
-  const overrideMap = new Map(overrides.map((o) => [o.slug, o.data]))
-  const merged = BASE_PRODUCTS.map((p) => {
-    const o = overrideMap.get(p.slug)
-    return o ? { ...p, ...o } : p
-  })
-  const customs = custom.map((c) => ({ ...c.data, slug: c.slug }))
-  const all = [...merged, ...customs]
+  // Uniquement les produits réellement en vente (comme la liste Produits) :
+  // un produit supprimé ou masqué n'a pas besoin de ses photos.
+  const all = await loadProducts()
 
   // Extrait toutes les URLs médias
   const products = []
@@ -152,12 +144,11 @@ export async function POST(request) {
 
     if (!baseProduct && !customDoc) return NextResponse.json({ error: 'Produit inconnu' }, { status: 404 })
 
-    const collection = customDoc ? 'products_custom' : 'product_overrides'
-    const key = customDoc ? 'data' : 'data'
-    const currentBase = customDoc ? customDoc.data : (baseProduct || {})
+    // Les produits créés dans l'admin stockent leurs champs à la racine du document
+    const { _id: _cid, ...customFields } = customDoc || {}
     const overrideData = overrideDoc?.data || {}
     // On travaille sur une copie "vue actuelle" (merge base + override)
-    const current = customDoc ? currentBase : { ...currentBase, ...overrideData }
+    const current = customDoc ? customFields : { ...(baseProduct || {}), ...overrideData }
     const next = structuredClone(current)
 
     const [type, arg] = slot.split(':')
@@ -181,7 +172,11 @@ export async function POST(request) {
 
     // Sauvegarde
     if (customDoc) {
-      await db.collection('products_custom').updateOne({ slug }, { $set: { data: next, updatedAt: new Date() } })
+      const set = { updatedAt: new Date() }
+      if (type === 'images') set.images = next.images
+      if (type === 'variant') set.variants = next.variants
+      if (type === 'size') set.sizes = next.sizes
+      await db.collection('products_custom').updateOne({ slug }, { $set: set })
     } else {
       // Store as override — merge with existing override data
       const mergedOverride = { ...overrideData }

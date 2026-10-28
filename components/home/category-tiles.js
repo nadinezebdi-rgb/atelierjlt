@@ -5,20 +5,20 @@ import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
 
 /**
- * Grille des collections — Racine · Empreinte.
+ * Grille des collections — Les Intemporels · Printemps/Été 2026-2027.
  * Chaque vignette : grande image portrait, label émeraude en-dessous.
  */
 const tiles = [
   {
-    name: 'Racine',
-    tagline: 'Plaids · Coussins · Paniers · Chemins de table',
-    href: '/collections?cat=racine',
+    name: 'Les Intemporels',
+    tagline: 'Plaids · Coussins · Paniers · Tapis · Macramés',
+    href: '/collections?cat=intemporels',
     image: IMAGES.heroPlaid,
   },
   {
-    name: 'Empreinte',
-    tagline: 'Tapis · Macramé mural · Suspensions',
-    href: '/collections?cat=empreinte',
+    name: 'Printemps/Été 2026-2027',
+    tagline: 'Coton · Trapilho · Rafia',
+    href: '/collections?cat=pe-2026-2027',
     image: IMAGES.macrameMur,
   },
 ]

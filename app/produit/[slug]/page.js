@@ -29,6 +29,7 @@ export default function ProductPage() {
     fetch(`/api/products/${slug}`)
       .then((r) => r.json())
       .then((d) => {
+        if (d?.redirect) { window.location.replace(`/produit/${d.redirect}`); return }
         setData(d)
         // Sélectionne le variant par défaut, en préférant une couleur en stock
         if (d?.product?.variants?.length) {
