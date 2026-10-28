@@ -246,20 +246,38 @@ function Stat({ label, value }) {
 
 function TabDashboard() {
   const [s, setS] = useState(null)
-  useEffect(() => {
-    fetch('/api/admin/stats', { credentials: 'include' }).then((r) => r.json()).then(setS)
-  }, [])
+  const load = () => fetch('/api/admin/stats', { credentials: 'include' }).then((r) => r.json()).then(setS)
+  useEffect(() => { load() }, [])
+  const archive = async () => {
+    if (!confirm(`Retirer les ${s.unpaidCount} commande${s.unpaidCount > 1 ? 's' : ''} d’essai non payée${s.unpaidCount > 1 ? 's' : ''} ?\n\nElles disparaissent de la liste des commandes (une copie est conservée en archive).`)) return
+    const r = await fetch('/api/admin/stats/archive-unpaid', { method: 'POST', credentials: 'include' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return toast.error('Opération impossible')
+    toast.success(`${d.archived} commande${d.archived > 1 ? 's' : ''} d’essai retirée${d.archived > 1 ? 's' : ''}`)
+    load()
+  }
   if (!s) return <div className="text-ink/50">Chargement…</div>
   return (
     <div>
       <h2 className="font-display text-3xl mb-6">Tableau de bord</h2>
       <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Stat label="Chiffre d'affaires" value={formatPrice(s.revenue || 0)} />
-        <Stat label="Commandes" value={s.orderCount} />
+        <Stat label="Commandes payées" value={s.orderCount} />
         <Stat label="Produits" value={s.productCount} />
         <Stat label="Clients" value={s.userCount} />
         <Stat label="Newsletter" value={s.newsletterCount} />
       </div>
+      <p className="text-xs text-ink/55 mt-3">Seules les commandes réellement payées comptent dans le chiffre d’affaires.</p>
+      {s.unpaidCount > 0 && (
+        <div className="mt-4 border border-amber-300 bg-amber-50 p-4 flex flex-wrap items-center gap-3 text-sm" data-testid="unpaid-orders">
+          <span className="flex-1 min-w-[240px] text-amber-900">
+            {s.unpaidCount} commande{s.unpaidCount > 1 ? 's' : ''} d’essai non payée{s.unpaidCount > 1 ? 's' : ''} {s.unpaidCount > 1 ? 'restent' : 'reste'} dans la liste des commandes (elles ne sont pas comptées ci-dessus).
+          </span>
+          <button onClick={archive} data-testid="archive-unpaid" className="border border-amber-400 px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-amber-900 hover:bg-amber-100">
+            Retirer les commandes d’essai
+          </button>
+        </div>
+      )}
     </div>
   )
 }
