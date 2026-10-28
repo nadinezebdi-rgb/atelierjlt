@@ -18,7 +18,7 @@ export default function renderSection(s, { ignoreEnabled = false } = {}) {
   const c = s.content || {}
   switch (s.type) {
     case 'category-tiles':
-      return <CategoryTiles key={s.id} />
+      return null // collections retirées du site
     case 'editorial-banner':
       return (
         <EditorialBanner
@@ -77,7 +77,7 @@ export default function renderSection(s, { ignoreEnabled = false } = {}) {
       )
     }
     case 'collections-themes':
-      return <CollectionsThemes key={s.id} />
+      return null // collections retirées du site
     case 'newsletter':
       return (
         <Newsletter

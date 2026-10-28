@@ -39,7 +39,7 @@ function useNavConfig() {
 export default function Header({ transparent = false }) {
   const [scrolled, setScrolled] = useState(false)
   const [mobile, setMobile] = useState(false)
-  const { count, setOpen } = useCart()
+  const { count, setOpen, salesOpen } = useCart()
   const { user } = useAuth()
   const router = useRouter()
   const { items: nav, options: navOpt } = useNavConfig()
@@ -142,7 +142,7 @@ export default function Header({ transparent = false }) {
             <button
               onClick={() => setOpen(true)}
               aria-label="Panier"
-              className={cn('relative items-center gap-2 hover:opacity-60 transition', navOpt.showCart ? 'flex' : 'hidden')}
+              className={cn('relative items-center gap-2 hover:opacity-60 transition', navOpt.showCart && salesOpen === true ? 'flex' : 'hidden')}
             >
               <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.5} />
               <span className="hidden md:inline text-[11px] uppercase tracking-[0.22em] tabular-nums">

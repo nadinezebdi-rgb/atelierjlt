@@ -49,9 +49,8 @@ function CollectionsInner() {
   }
 
   const activeCat = cats.find((c) => c.slug === cat)
-  const activeCol = COLLECTIONS.find((c) => c.slug === collection)
-  const title = activeCat?.name || activeCol?.name || 'Tous nos produits'
-  const subtitle = (activeCat ? activeCat.tagline : '') || activeCol?.story || (activeCat ? '' : 'Une sélection complète de la maison.')
+  const title = activeCat?.name || 'Tous nos produits'
+  const subtitle = (activeCat ? activeCat.tagline : '') || (activeCat ? '' : 'Toutes les créations de la maison, faites main.')
 
   return (
     <div className="min-h-screen bg-ivory">
@@ -106,14 +105,7 @@ function CollectionsInner() {
         {showFilters && (
           <div className="container py-6 border-b border-linen bg-cream/40">
             <div className="grid md:grid-cols-3 gap-6">
-              <div>
-                <label className="text-[10px] uppercase tracking-[0.28em] text-ink/60">Collection</label>
-                <select value={collection} onChange={(e) => set('collection', e.target.value)} className="mt-2 w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none">
-                  <option value="">Toutes</option>
-                  {COLLECTIONS.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="md:col-span-2">
+              <div className="md:col-span-3">
                 <label className="text-[10px] uppercase tracking-[0.28em] text-ink/60">Recherche</label>
                 <div className="flex items-center border-b border-ink/20 mt-2">
                   <Search className="h-4 w-4 text-ink/40" strokeWidth={1.5} />

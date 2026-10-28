@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { isSoldOut } from '@/lib/stock'
 
 export default function ProductCard({ product, index = 0 }) {
-  const { add } = useCart()
+  const { add, salesOpen } = useCart()
   const soldOut = isSoldOut(product)
 
   const handleAdd = async (e) => {
@@ -58,7 +58,11 @@ export default function ProductCard({ product, index = 0 }) {
           </button>
           {/* Quick add — ou alerte si épuisé */}
           <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500">
-            {soldOut ? (
+            {salesOpen !== true ? (
+              <span className="block w-full bg-ivory text-ink py-3 text-center text-[10px] uppercase tracking-[0.28em]">
+                Bientôt disponible
+              </span>
+            ) : soldOut ? (
               <span className="block w-full bg-ivory text-ink py-3 text-center text-[10px] uppercase tracking-[0.28em]">
                 M’alerter du retour
               </span>

@@ -13,7 +13,7 @@ import { useAuth } from '@/components/site/auth-provider'
 import { formatPrice } from '@/lib/utils'
 
 export default function CheckoutPage() {
-  const { items, subtotal, refresh, update, remove } = useCart()
+  const { items, subtotal, refresh, update, remove, salesOpen } = useCart()
   const { user } = useAuth()
   const router = useRouter()
 
@@ -195,6 +195,27 @@ export default function CheckoutPage() {
               Voir mes commandes
             </Link>
           </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Ventes fermées : aucune commande possible tant que le paiement en ligne n'est pas branché
+  if (salesOpen === false) {
+    return (
+      <div className="min-h-screen bg-ivory flex flex-col">
+        <Header />
+        <main className="flex-1 container max-w-xl py-24 text-center" data-testid="checkout-closed">
+          <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Boutique en ligne</span>
+          <h1 className="font-display text-4xl font-bold mt-3">Les ventes ouvrent bientôt.</h1>
+          <p className="text-ink/60 mt-4">Les commandes en ligne ne sont pas encore possibles. Laissez votre e-mail sur la fiche d’une pièce pour être prévenu(e) de l’ouverture.</p>
+          <Link
+            href="/collections"
+            className="inline-flex items-center justify-center h-12 px-8 mt-10 bg-ink text-ivory text-[11px] uppercase tracking-[0.28em] hover:bg-emerald transition rounded-sm"
+          >
+            Découvrir les créations
+          </Link>
         </main>
         <Footer />
       </div>

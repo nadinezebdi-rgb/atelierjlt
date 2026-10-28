@@ -13,6 +13,7 @@ import { Printer, ChevronDown, Package, Undo2 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { CARRIERS } from '@/lib/tracking'
 import EmailsPanel from '@/components/admin/emails-panel'
+import SalesSwitch from '@/components/admin/sales-switch'
 
 export const ORDER_STATUSES = [
   ['received', 'Reçue'],
@@ -101,6 +102,7 @@ export default function TabOrders() {
         </button>
       </div>
 
+      <SalesSwitch />
       <EmailsPanel />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">

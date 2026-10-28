@@ -13,6 +13,7 @@ import { formatPrice } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Minus, Plus, Heart, Truck, Shield, Sparkles, ChevronDown } from 'lucide-react'
 import BackInStockAlert from '@/components/product/back-in-stock-alert'
+import SalesSoonNotice from '@/components/site/sales-soon-notice'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -22,7 +23,7 @@ export default function ProductPage() {
   const [openInfo, setOpenInfo] = useState('desc')
   const [variantIdx, setVariantIdx] = useState(0)
   const [sizeIdx, setSizeIdx] = useState(0)
-  const { add } = useCart()
+  const { add, salesOpen } = useCart()
 
   useEffect(() => {
     if (!slug) return
@@ -137,7 +138,7 @@ export default function ProductPage() {
         <div className="container py-4 text-[11px] uppercase tracking-[0.22em] text-ink/50">
           <Link href="/" className="hover:text-ink">Accueil</Link>
           <span className="mx-2">/</span>
-          <Link href={`/collections?cat=${p.category}`} className="hover:text-ink">{p.category}</Link>
+          <Link href="/produits" className="hover:text-ink">Produits</Link>
           <span className="mx-2">/</span>
           <span className="text-ink">{p.name}</span>
         </div>
@@ -278,8 +279,10 @@ export default function ProductPage() {
               <MetaRow k="Origine" v="Fabrication française" />
             </div>
 
-            {/* Qty + CTA — ou alerte retour en stock si épuisé */}
-            {effectiveStock === 0 ? (
+            {/* Ventes fermées → « Bientôt disponible » ; sinon Qty + CTA, ou alerte retour en stock si épuisé */}
+            {salesOpen !== true ? (
+              <SalesSoonNotice slug={p.slug} />
+            ) : effectiveStock === 0 ? (
               <BackInStockAlert
                 slug={p.slug}
                 variant={selectedVariant?.name || null}

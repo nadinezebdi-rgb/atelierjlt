@@ -24,7 +24,7 @@ import { isSoldOut } from '@/lib/stock'
 export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false, pickedSlugs = [] }) {
   const [products, setProducts] = useState([])
   const scrollRef = useRef(null)
-  const { add } = useCart()
+  const { add, salesOpen } = useCart()
 
   useEffect(() => {
     let cancelled = false
@@ -183,12 +183,16 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
                   </div>
                 </div>
               </Link>
+              {salesOpen === true ? (
               <button
                 onClick={() => handleAdd(p)}
                 className="mt-3 group/btn inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-ink/80 hover:text-emerald transition-colors"
               >
                 <Plus className="h-3 w-3" strokeWidth={1.5} /> Ajouter au panier
               </button>
+              ) : (
+                <span className="mt-3 inline-block text-[10px] uppercase tracking-[0.28em] text-ink/50">Bientôt disponible</span>
+              )}
             </motion.div>
           ))}
         </div>

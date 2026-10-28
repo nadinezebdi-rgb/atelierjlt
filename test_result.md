@@ -6368,3 +6368,255 @@ agent_communication:
       - working: "NA"
         agent: "main"
         comment: "POST /api/admin/products/align-stock (stock = somme couleurs sinon tailles). POST /api/admin/products/slug {slug,newSlug,dryRun?} → 409 si pris/legacy/trop court. Produits d'origine : alias publicSlug dans product_overrides (clé interne inchangée), anciens slugs → previousPublicSlugs + redirection. Custom : renameCustomSlug. Commande → e-mail owner_low_stock (contact@atelierjlt.fr) si une couleur/taille/produit passe à ≤1 à cause de la commande. Fiche produit : generateMetadata titre/description/canonical."
+
+  - task: "Shop closure feature - Sales closed without payment integration"
+    implemented: true
+    working: true
+    file: "/app/lib/shop-settings.js, /app/lib/api/handlers/shop.js, /app/lib/api/handlers/admin/shop.js, /app/lib/api/handlers/cart.js, /app/lib/api/handlers/orders.js, /app/lib/api/handlers/gift-cards.js, /app/lib/cart-reminders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        date: "2026-10-28"
+        comment: |
+          ✅ VERIFIED on preview (https://french-craft.preview.emergentagent.com):
+          
+          COMPREHENSIVE SHOP CLOSURE TESTING - ALL 9 TESTS PASSED (100%)
+          
+          TEST 1 ✅ - Shop Status:
+          - GET /api/shop/status returns {salesOpen: false}
+          - Status correctly reflects that sales are closed
+          
+          TEST 2 ✅ - Cart Operations (Sales Closed):
+          - POST /api/cart → 403 with salesClosed:true and French error message
+          - PATCH /api/cart → 403 with salesClosed:true
+          - POST /api/cart/save → 403 with salesClosed:true
+          - POST /api/cart/checkout-email → 403 with salesClosed:true
+          - GET /api/cart still returns 200 (read-only access works)
+          - DELETE /api/cart still returns 200 (removal works)
+          
+          TEST 3 ✅ - Orders (Sales Closed):
+          - POST /api/orders → 403 with salesClosed:true
+          - NO order document created in database (verified: 10→10)
+          - NO email_logs entry created (verified: 38→38)
+          - NO stock changes applied
+          - Cart with items inserted directly into MongoDB for testing
+          
+          TEST 4 ✅ - Gift Cards (Sales Closed):
+          - POST /api/gift-cards {amount:50} → 403 with salesClosed:true
+          - NO gift_cards document created (verified: 1→1)
+          - POST /api/gift-cards/verify still works (404 for unknown code)
+          
+          TEST 5 ✅ - Cart Restore (Sales Closed):
+          - GET /api/cart/restore?t=anything → 302 redirect to site root (/)
+          - No follow-through when sales are closed
+          
+          TEST 6 ✅ - Shop Notify (Waitlist):
+          - POST /api/shop/notify {email:'bad'} → 400 with error message
+          - POST /api/shop/notify {email:'qa+notify@example.com', slug:'plaid-sylvestre'} → 200
+          - sales_waitlist document created with email and slugs array
+          - Second call with different slug adds to slugs array (both slugs present)
+          - Upsert logic working correctly (one doc per email)
+          
+          TEST 7 ✅ - Admin Shop Endpoints:
+          - GET /api/admin/shop → 200 with {salesOpen:false, paymentReady:false, waitlist:0}
+          - PATCH /api/admin/shop {salesOpen:true} → 409 (cannot open without payment)
+          - Error message: "Impossible d'ouvrir les ventes : aucun paiement en ligne n'est encore branché."
+          - PATCH /api/admin/shop {salesOpen:false} → 200 with ok:true
+          - GET /api/admin/shop without admin auth → 401 Unauthorized
+          
+          TEST 8 ✅ - Admin Email Reminders (Sales Closed):
+          - POST /api/admin/emails/run-reminders → 200 with {salesClosed:true, sent:0}
+          - No cart reminder emails sent when sales are closed
+          - Configured flag is true (email system is configured)
+          
+          TEST 9 ✅ - Regression Tests:
+          - GET /api/products → 200 with 11 products
+          - GET /api/products/plaid-sylvestre → 200 with product details
+          - POST /api/auth/login → 200 (authentication still works)
+          - GET /api/admin/products → 200 with 11 products (admin access works)
+          
+          CLEANUP:
+          - Deleted test sales_waitlist documents
+          - Deleted test carts
+          
+          ARCHITECTURE NOTES:
+          - PAYMENT_INTEGRATED hardcoded to false in /app/lib/shop-settings.js
+          - salesOpen() returns true only if both salesOpenWanted (DB) AND paymentReady() are true
+          - Since PAYMENT_INTEGRATED = false, paymentReady() always returns false
+          - This ensures shop remains closed until payment integration is complete
+          - SALES_CLOSED_MESSAGE: "Les ventes en ligne ouvrent bientôt. Laissez votre e-mail sur la fiche d'une pièce pour être prévenu(e) de l'ouverture."
+          
+          SECURITY VERIFICATION:
+          - All sales-related endpoints correctly blocked (403)
+          - Read-only operations (GET /api/cart, DELETE /api/cart) still work
+          - Admin endpoints require authentication (401 without)
+          - Cannot open sales without payment integration (409)
+          
+          CONCLUSION:
+          The shop closure feature is FULLY FUNCTIONAL and production-ready.
+          All sales operations are correctly blocked when payment is not integrated.
+          Waitlist functionality allows customers to be notified when sales open.
+          Admin can view status but cannot open sales without payment integration.
+          No regressions found in existing functionality.
+
+    - agent: "testing"
+      date: "2026-10-28"
+      message: |
+        ✅ SHOP CLOSURE FEATURE BACKEND TESTING COMPLETE - ALL 9 TESTS PASSED (100%)
+        
+        Tested on preview: https://french-craft.preview.emergentagent.com
+        Admin password: Juliette99*
+        Client test credentials: test@atelierjlt.fr / MonSecret123
+        
+        COMPREHENSIVE TEST COVERAGE (9 major test suites):
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 1 ✅ - SHOP STATUS (GET /api/shop/status)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - Returns {salesOpen: false} ✓
+        - Status code: 200 ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 2 ✅ - CART OPERATIONS (SALES CLOSED)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/cart {slug:'plaid-sylvestre', qty:1} → 403 with salesClosed:true ✓
+        - PATCH /api/cart → 403 with salesClosed:true ✓
+        - POST /api/cart/save → 403 with salesClosed:true ✓
+        - POST /api/cart/checkout-email → 403 with salesClosed:true ✓
+        - All blocked operations return French error message ✓
+        - GET /api/cart still returns 200 (read-only access) ✓
+        - DELETE /api/cart?slug=... still returns 200 (removal works) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 3 ✅ - ORDERS (SALES CLOSED)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - Created test cart with items directly in MongoDB ✓
+        - POST /api/orders → 403 with salesClosed:true ✓
+        - NO order document created (verified count: 10→10) ✓
+        - NO stock changes applied ✓
+        - NO email_logs entry created (verified count: 38→38) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 4 ✅ - GIFT CARDS (SALES CLOSED)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/gift-cards {amount:50} → 403 with salesClosed:true ✓
+        - NO gift_cards document created (verified count: 1→1) ✓
+        - POST /api/gift-cards/verify still works (404 for unknown) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 5 ✅ - CART RESTORE (SALES CLOSED)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - GET /api/cart/restore?t=anything → 302 redirect to site root (/) ✓
+        - No follow-through when sales are closed ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 6 ✅ - SHOP NOTIFY (WAITLIST)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/shop/notify {email:'bad'} → 400 with error ✓
+        - POST /api/shop/notify {email:'qa+notify@example.com', slug:'plaid-sylvestre'} → 200 ✓
+        - sales_waitlist document created with email and slugs array ✓
+        - Second call with different slug adds to slugs array ✓
+        - Both slugs present in single document (upsert working) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 7 ✅ - ADMIN SHOP ENDPOINTS
+        ═══════════════════════════════════════════════════════════════════════════════
+        - GET /api/admin/shop → 200 with {salesOpen:false, paymentReady:false, waitlist:0} ✓
+        - PATCH /api/admin/shop {salesOpen:true} → 409 (cannot open without payment) ✓
+        - Error: "Impossible d'ouvrir les ventes : aucun paiement en ligne n'est encore branché." ✓
+        - PATCH /api/admin/shop {salesOpen:false} → 200 with ok:true ✓
+        - GET /api/admin/shop without admin → 401 Unauthorized ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 8 ✅ - ADMIN EMAIL REMINDERS (SALES CLOSED)
+        ═══════════════════════════════════════════════════════════════════════════════
+        - POST /api/admin/emails/run-reminders → 200 ✓
+        - Response: {salesClosed:true, sent:0, failed:0, skipped:0, configured:true} ✓
+        - No cart reminder emails sent when sales are closed ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        TEST 9 ✅ - REGRESSION TESTS
+        ═══════════════════════════════════════════════════════════════════════════════
+        - GET /api/products → 200 with 11 products ✓
+        - GET /api/products/plaid-sylvestre → 200 with product details ✓
+        - POST /api/auth/login → 200 (authentication works) ✓
+        - GET /api/admin/products → 200 with 11 products (admin access works) ✓
+        
+        ═══════════════════════════════════════════════════════════════════════════════
+        🎉 FINAL SUMMARY - ALL FEATURES WORKING (100% SUCCESS)
+        ═══════════════════════════════════════════════════════════════════════════════
+        
+        ✅ SHOP CLOSURE MECHANISM:
+        - PAYMENT_INTEGRATED hardcoded to false in shop-settings.js
+        - salesOpen() requires both salesOpenWanted (DB) AND paymentReady() to be true
+        - Since paymentReady() always returns false, shop remains closed
+        - All sales operations correctly blocked with 403 + salesClosed:true
+        
+        ✅ BLOCKED OPERATIONS (403):
+        - POST /api/cart (add items)
+        - PATCH /api/cart (update quantities)
+        - POST /api/cart/save (guest cart link)
+        - POST /api/cart/checkout-email (capture guest email)
+        - POST /api/orders (create order)
+        - POST /api/gift-cards (purchase gift card)
+        
+        ✅ ALLOWED OPERATIONS (200):
+        - GET /api/cart (read cart)
+        - DELETE /api/cart (remove items)
+        - POST /api/gift-cards/verify (verify gift card code)
+        - GET /api/products (browse products)
+        - POST /api/auth/login (authentication)
+        
+        ✅ WAITLIST FUNCTIONALITY:
+        - POST /api/shop/notify with email validation
+        - Creates sales_waitlist documents
+        - Upsert logic: one doc per email, slugs array for multiple products
+        - Admin can view waitlist count via GET /api/admin/shop
+        
+        ✅ ADMIN CONTROLS:
+        - GET /api/admin/shop shows status and waitlist count
+        - PATCH /api/admin/shop {salesOpen:true} → 409 (blocked without payment)
+        - PATCH /api/admin/shop {salesOpen:false} → 200 (can close)
+        - All admin endpoints require authentication (401 without)
+        
+        ✅ CART REMINDERS:
+        - POST /api/admin/emails/run-reminders returns salesClosed:true
+        - No emails sent when sales are closed (sent:0)
+        - Configured flag indicates email system is ready
+        
+        ✅ SECURITY:
+        - All sales operations blocked at API level
+        - No database writes for blocked operations (verified)
+        - No stock changes when orders are blocked
+        - No emails sent for blocked operations
+        - Admin authentication required for admin endpoints
+        
+        ✅ DATA INTEGRITY:
+        - No orders created when sales are closed
+        - No gift cards created when sales are closed
+        - No stock changes applied
+        - No email logs created for blocked operations
+        - Cart restore redirects to home when sales are closed
+        
+        ZERO CRITICAL ISSUES FOUND. The shop closure feature is FULLY FUNCTIONAL
+        and production-ready. All sales operations are correctly blocked until
+        payment integration is complete. Waitlist functionality allows customers
+        to be notified when sales open.
+        
+        CLEANUP COMPLETED:
+        - Deleted test sales_waitlist documents
+        - Deleted test carts
+  - task: "Ventes fermées tant que le paiement n'est pas branché"
+    implemented: true
+    working: "NA"
+    file: "/app/lib/shop-settings.js, /app/lib/api/handlers/shop.js, /app/lib/api/handlers/admin/shop.js, orders.js, cart.js, gift-cards.js, cart-reminders.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "PAYMENT_INTEGRATED=false → salesOpen toujours false. POST /api/orders, POST/PATCH /api/cart (+save, checkout-email), POST /api/gift-cards → 403 salesClosed. GET /api/cart/restore → redirige vers /. GET /api/shop/status {salesOpen}. POST /api/shop/notify {email,slug} → sales_waitlist (upsert). Admin GET/PATCH /api/admin/shop : ouverture refusée (409) sans paiement. Relances panier suspendues."

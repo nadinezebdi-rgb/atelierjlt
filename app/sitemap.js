@@ -1,8 +1,11 @@
-import { PRODUCTS, CATEGORIES } from '@/lib/data/products'
+import { CATEGORIES } from '@/lib/data/products'
+import { loadProducts } from '@/lib/api/shared'
+
+export const dynamic = 'force-dynamic'
 
 const BASE = 'https://atelierjlt.fr'
 
-export default function sitemap() {
+export default async function sitemap() {
   const now = new Date()
   const staticPages = [
     '',
@@ -24,23 +27,21 @@ export default function sitemap() {
   }))
 
   const categoryPages = CATEGORIES.map((c) => ({
-    url: `${BASE}/collections?cat=${c.slug}`,
+    url: `${BASE}/produits?cat=${c.slug}`,
     lastModified: now,
     changeFrequency: 'weekly',
     priority: 0.6,
   }))
 
-  // Toute la collection Terre a été retirée + les anciennes catégories
-  // racine/empreinte ont été fusionnées dans « intemporels ». On n'exporte
-  // dans le sitemap que les slugs toujours actifs.
-  const productPages = PRODUCTS
-    .filter((p) => ['intemporels', 'pe-2026-2027'].includes(p.category))
-    .map((p) => ({
-      url: `${BASE}/produit/${p.slug}`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    }))
+  // Produits réellement en vente (catalogue + créations ajoutées dans l'admin)
+  let products = []
+  try { products = await loadProducts() } catch { products = [] }
+  const productPages = products.map((p) => ({
+    url: `${BASE}/produit/${p.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }))
 
   return [...staticPages, ...categoryPages, ...productPages]
 }
