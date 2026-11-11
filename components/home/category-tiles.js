@@ -12,13 +12,13 @@ const tiles = [
   {
     name: 'Les Intemporels',
     tagline: 'Plaids · Coussins · Paniers · Tapis · Macramés',
-    href: '/collections?cat=intemporels',
+    href: '/produits?cat=intemporels',
     image: IMAGES.heroPlaid,
   },
   {
     name: 'Printemps/Été 2026-2027',
     tagline: 'Coton · Trapilho · Rafia',
-    href: '/collections?cat=pe-2026-2027',
+    href: '/collection/printemps-ete-2027',
     image: IMAGES.macrameMur,
   },
 ]

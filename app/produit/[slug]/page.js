@@ -139,6 +139,8 @@ export default function ProductPage() {
           <Link href="/" className="hover:text-ink">Accueil</Link>
           <span className="mx-2">/</span>
           <Link href="/produits" className="hover:text-ink">Produits</Link>
+          {p.category === 'intemporels' && (<><span className="mx-2">/</span><Link href="/produits?cat=intemporels" className="hover:text-ink">Les Intemporels</Link></>)}
+          {p.category === 'pe-2026-2027' && (<><span className="mx-2">/</span><Link href="/collection/printemps-ete-2027" className="hover:text-ink">Printemps/Été 2027</Link></>)}
           <span className="mx-2">/</span>
           <span className="text-ink">{p.name}</span>
         </div>

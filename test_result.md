@@ -6631,3 +6631,146 @@ agent_communication:
       - working: true
         agent: "main"
         comment: "GET /api/shop/shipping ; admin GET/PATCH /api/admin/shop/shipping (relayEnabled, relayPrice, mrBrand) vérifiés. Widget MR testé dans le navigateur (BDTEST). Flux commande relais non testable de bout en bout tant que les ventes sont fermées (403)."
+
+# ---- Session : retour des collections (Printemps/Été 2027 + Les Intemporels) ----
+backend:
+  - task: "Collections restaurées : filtre API, page PE 2027, redirections, navbar"
+    implemented: true
+    working: true
+    file: "middleware.js, lib/api/handlers/products.js, lib/navbar.js, lib/api/handlers/site-pages.js, app/collection/printemps-ete-2027/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/products?cat=intemporels filtre par category ; ?cat=pe-2026-2027 ne renvoie que les produits PE (jamais les intemporels). Page /collection/printemps-ete-2027 (palette/ambiances + seulement produits PE). 307 : /collection/printemps-ete-2026-2027 et /produits?cat=pe-2026-2027 -> /collection/printemps-ete-2027 ; racine/empreinte -> intemporels. Navbar : lien principal 'Printemps/Été 2027' + 'Les Intemporels' sous Produits, injectés une fois dans un menu déjà enregistré (flag collectionsV2 posé à la sauvegarde admin)."
+      - working: true
+        agent: "testing"
+        comment: |
+          ✅ COMPREHENSIVE VERIFICATION COMPLETE - ALL CRITICAL TESTS PASSED
+          
+          Tested on preview: https://french-craft.preview.emergentagent.com
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 1 ✅ - CATEGORY FILTERS (5/5 critical checks passed)
+          ═══════════════════════════════════════════════════════════════════════════════
+          1. GET /api/products?cat=intemporels → 200 with 11 products, ALL category='intemporels' ✓
+          2. GET /api/products?cat=pe-2026-2027 → 200 with 0 products (currently empty), NO intemporels ✓
+          3. GET /api/products?cat=nouveautes → 200, filters by isNew=true (0 products currently) ✓
+          4. GET /api/products?cat=editions-limitees → 200, filters by isLimited=true (0 products currently) ✓
+          5. GET /api/products?cat=racine → 200 with 11 products, normalizes to 'intemporels' ✓
+          
+          Note: nouveautes and editions-limitees return 0 products because no products are currently
+          marked with isNew=true or isLimited=true. The filters themselves work correctly.
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 2 ✅ - ADMIN PRODUCT ASSIGNMENT TO PE COLLECTION (4/4 checks passed)
+          ═══════════════════════════════════════════════════════════════════════════════
+          1. PATCH /api/admin/products?slug=plaid-sylvestre with {category:'pe-2026-2027'} → 200 ✓
+          2. GET /api/products?cat=pe-2026-2027 returns the reassigned product (count: 1) ✓
+          3. GET /collection/printemps-ete-2027 HTML contains product name 'Plaid Sylvestre' ✓
+          4. RESTORE product to category:'intemporels' → 200, product restored successfully ✓
+          
+          Product assignment flow working correctly: admin can assign products to PE collection,
+          they appear in the filter and on the collection page, and can be restored.
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 3 ✅ - REDIRECTS (6/6 checks passed)
+          ═══════════════════════════════════════════════════════════════════════════════
+          1. /collection/printemps-ete-2026-2027 → 307 to /collection/printemps-ete-2027 ✓
+          2. /produits?cat=pe-2026-2027 → 307 to /collection/printemps-ete-2027 ✓
+          3. /produits?cat=intemporels → 200 (no redirect) ✓
+          4. /collections?cat=empreinte → 307 to /collections?cat=intemporels ✓
+          5. /collection/unknown → 307 to /produits ✓
+          6. /collection/printemps-ete-2027 → 200, HTML contains 'Cinq couleurs' palette text ✓
+          
+          All redirects working correctly with proper 307 status codes (temporary redirects).
+          Legacy collection names (racine, empreinte) correctly normalize to intemporels.
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          TEST 4 ✅ - NAVBAR API AND MIGRATION (4/4 checks passed)
+          ═══════════════════════════════════════════════════════════════════════════════
+          1. GET /api/site-pages/navbar → has 'Printemps/Été 2027' top-level item ✓
+          2. GET /api/site-pages/navbar → has 'Les Intemporels' child under Produits ✓
+          3. Migration test: navbar WITHOUT PE and without collectionsV2 flag → GET injects PE + Intemporels ✓
+          4. After admin PATCH with collectionsV2=true → GET does NOT re-inject (respects admin choice) ✓
+          
+          Navbar migration logic working correctly:
+          - Old saved navbars (without collectionsV2 flag) get PE and Intemporels injected once
+          - After admin saves navbar, collectionsV2 flag is set to true
+          - Subsequent GETs respect admin's choice and don't re-inject
+          - Original navbar restored successfully after test
+          
+          ═══════════════════════════════════════════════════════════════════════════════
+          🎉 FINAL SUMMARY - ALL FEATURES WORKING (100% SUCCESS)
+          ═══════════════════════════════════════════════════════════════════════════════
+          
+          ✅ CATEGORY FILTERS:
+          - intemporels filter returns 11 products, all with category='intemporels'
+          - pe-2026-2027 filter returns only PE products, never intemporels
+          - nouveautes and editions-limitees filters work correctly (currently 0 products)
+          - Legacy collection names (racine, empreinte) normalize to intemporels
+          
+          ✅ ADMIN PRODUCT ASSIGNMENT:
+          - Admin can assign products to PE collection via PATCH /api/admin/products
+          - Assigned products appear in /api/products?cat=pe-2026-2027 filter
+          - Assigned products appear in /collection/printemps-ete-2027 HTML page
+          - Products can be restored to original category
+          
+          ✅ REDIRECTS:
+          - All legacy collection URLs redirect correctly (307 status)
+          - /collection/printemps-ete-2026-2027 → /collection/printemps-ete-2027
+          - /produits?cat=pe-2026-2027 → /collection/printemps-ete-2027
+          - /collections?cat=empreinte → /collections?cat=intemporels
+          - Unknown collection URLs redirect to /produits
+          - PE collection page loads correctly with palette text
+          
+          ✅ NAVBAR API:
+          - GET /api/site-pages/navbar returns PE top-level item
+          - GET /api/site-pages/navbar returns Intemporels child under Produits
+          - Migration logic injects PE + Intemporels for old navbars (without collectionsV2)
+          - After admin PATCH, collectionsV2 flag prevents re-injection
+          
+          ZERO CRITICAL ISSUES FOUND. The collections restoration feature is FULLY FUNCTIONAL
+          and production-ready. All category filters, redirects, navbar API, and admin
+          product assignment flows are working correctly.
+test_plan:
+  current_focus: []
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "testing"
+      date: "2026-01-15"
+      message: |
+        ✅ COLLECTIONS RESTORED FEATURE FULLY VERIFIED - ALL TESTS PASSED
+        
+        Comprehensive backend testing completed for the restored collections feature
+        (Printemps/Été 2027 + Les Intemporels). All 4 test suites passed successfully:
+        
+        1. ✅ Category Filters (5/5 checks)
+           - intemporels filter: 11 products, all correct category
+           - pe-2026-2027 filter: works correctly, excludes intemporels
+           - nouveautes/editions-limitees: filters work (0 products currently)
+           - racine normalizes to intemporels correctly
+        
+        2. ✅ Admin Product Assignment (4/4 checks)
+           - Admin can assign products to PE collection
+           - Products appear in filter and HTML page
+           - Products can be restored to original category
+           - Tested with Plaid Sylvestre, restored successfully
+        
+        3. ✅ Redirects (6/6 checks)
+           - All legacy URLs redirect correctly (307 status)
+           - PE collection page loads with palette text
+           - Unknown collections redirect to /produits
+        
+        4. ✅ Navbar API and Migration (4/4 checks)
+           - PE top-level item and Intemporels child present
+           - Migration logic injects items for old navbars
+           - collectionsV2 flag prevents re-injection after admin save
+           - Original navbar restored after test
+        
+        ZERO CRITICAL ISSUES. Feature is production-ready.

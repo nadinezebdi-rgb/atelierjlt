@@ -45,7 +45,7 @@ const CAROUSEL_TEMPLATES = [
     type: 'product-carousel',
     overrides: {
       label: 'Pour le salon',
-      content: { eyebrow: 'Le salon', title: "L'atmosphère du salon.", description: 'Tapis, macramés et plaids pour une pièce chaleureuse.', viewAllHref: '/collections?cat=intemporels', selectionMode: 'auto', filter: 'intemporels', limit: 8, hideBadges: false, pickedProducts: [] },
+      content: { eyebrow: 'Le salon', title: "L'atmosphère du salon.", description: 'Tapis, macramés et plaids pour une pièce chaleureuse.', viewAllHref: '/produits?cat=intemporels', selectionMode: 'auto', filter: 'intemporels', limit: 8, hideBadges: false, pickedProducts: [] },
     },
   },
   {
@@ -63,7 +63,7 @@ const CAROUSEL_TEMPLATES = [
     type: 'product-carousel',
     overrides: {
       label: 'Collection PE 26-27',
-      content: { eyebrow: 'Printemps / Été 2026-2027', title: 'La collection de la saison.', description: 'Pastels, lin et douceur florale pour la nouvelle saison.', viewAllHref: '/collection/printemps-ete-2026-2027', selectionMode: 'auto', filter: 'pe-2026-2027', limit: 6, hideBadges: false, pickedProducts: [] },
+      content: { eyebrow: 'Printemps / Été 2026-2027', title: 'La collection de la saison.', description: 'Pastels, lin et douceur florale pour la nouvelle saison.', viewAllHref: '/collection/printemps-ete-2027', selectionMode: 'auto', filter: 'pe-2026-2027', limit: 6, hideBadges: false, pickedProducts: [] },
     },
   },
 ]

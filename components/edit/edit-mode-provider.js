@@ -557,7 +557,7 @@ function HelpOverlay({ onClose }) {
 const EDITABLE_PAGES = [
   { href: '/',       label: "Page d'accueil",             current: true },
   { href: '/a-propos', label: 'À propos' },
-  { href: '/collection/printemps-ete-2026-2027', label: 'Collection Printemps / Été' },
+  { href: '/collection/printemps-ete-2027', label: 'Collection Printemps / Été' },
   { href: '/contact', label: 'Contact' },
 ]
 

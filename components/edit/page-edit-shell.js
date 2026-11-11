@@ -33,7 +33,7 @@ import { toast } from 'sonner'
 const EDITABLE_PAGES = [
   { href: '/',       key: 'home',             label: "Page d'accueil" },
   { href: '/a-propos', key: 'about',          label: 'À propos' },
-  { href: '/collection/printemps-ete-2026-2027', key: 'collectionPE2027', label: 'Collection Printemps / Été' },
+  { href: '/collection/printemps-ete-2027', key: 'collectionPE2027', label: 'Collection Printemps / Été' },
   { href: '/contact', key: 'contact',         label: 'Contact' },
 ]
 

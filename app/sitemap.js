@@ -10,7 +10,7 @@ export default async function sitemap() {
   const staticPages = [
     '',
     '/produits',
-    '/collection/printemps-ete-2026-2027',
+    '/collection/printemps-ete-2027',
     '/a-propos',
     '/journal',
     '/contact',

@@ -7,6 +7,7 @@ import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import ProductCard from '@/components/site/product-card'
 import { CATEGORIES, COLLECTIONS } from '@/lib/data/products'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 
@@ -81,6 +82,10 @@ function CollectionsInner() {
                 className={`text-[11px] uppercase tracking-[0.22em] whitespace-nowrap py-1 border-b ${cat === c.slug ? 'border-ink' : 'border-transparent text-ink/50 hover:text-ink'}`}
               >{c.name}</button>
             ))}
+            <Link
+              href="/collection/printemps-ete-2027"
+              className="text-[11px] uppercase tracking-[0.22em] whitespace-nowrap py-1 border-b border-transparent text-ink/50 hover:text-ink"
+            >Printemps/Été 2027</Link>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <select

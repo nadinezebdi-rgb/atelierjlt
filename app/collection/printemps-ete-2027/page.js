@@ -2,13 +2,14 @@ import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import { getDb } from '@/lib/db'
+import { loadProducts as loadCatalog } from '@/lib/api/shared'
 import PESeasonalPage from '@/components/collection/pe-seasonal-page'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export const metadata = {
-  title: 'Collection Printemps / Été 2026-2027 — Atelier JLT',
+  title: 'Collection Printemps / Été 2027 — Atelier JLT',
   description:
     'Doux, chaleureux, bien chez soi. Pastels et touches flash en coton, trapilho et rafia. Plaids, coussins, tapis et paniers de la nouvelle saison Atelier JLT.',
 }
@@ -32,15 +33,12 @@ async function loadContent() {
   }
 }
 
+// Seules les pièces rangées dans la collection « Printemps/Été » (champ Collection
+// de la fiche produit dans l'admin) — jamais Les Intemporels.
 async function loadProducts() {
   try {
-    const res = await fetch(
-      (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000') +
-        '/api/products?cat=pe-2026-2027',
-      { cache: 'no-store' }
-    )
-    const data = await res.json()
-    return Array.isArray(data?.products) ? data.products : []
+    const all = await loadCatalog()
+    return JSON.parse(JSON.stringify(all.filter((p) => p.category === 'pe-2026-2027')))
   } catch {
     return []
   }

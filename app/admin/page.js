@@ -453,7 +453,7 @@ function TabProducts() {
             </button>
           )}
         </div>
-        <div className="hidden">
+        <div className="flex gap-1 p-1 bg-ivory border border-ink/15 rounded-sm overflow-x-auto">
           {['all', ...cats].map((c) => (
             <button
               key={c}
@@ -531,7 +531,7 @@ function TabProducts() {
               <img src={p.images?.[0]} alt="" className="w-16 h-16 object-cover bg-cream" />
               <div className="flex-1 min-w-0">
                 <div className="font-display text-lg leading-tight">{p.name}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">/produit/{p.slug}</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{CAT_LABELS[p.category] || p.category || '—'} · /produit/{p.slug}</div>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {p.isNew && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-emerald/10 text-emerald">Nouveau</span>}
                   {p.isLimited && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-brique/10 text-brique">Édition limitée</span>}
@@ -576,7 +576,7 @@ function TabProducts() {
   )
 }
 
-const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2026-2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
 
 function ProductEditor({ product, onSave, onSlugChanged }) {
   const [p, setP] = useState({ ...product })
@@ -597,6 +597,15 @@ function ProductEditor({ product, onSave, onSlugChanged }) {
               </button>
             </div>
           )}
+        </Field>
+        <Field label="Collection">
+          <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" data-testid="edit-category">
+            <option value="intemporels">Les Intemporels</option>
+            <option value="pe-2026-2027">Printemps/Été 2027</option>
+            {p.category && !['intemporels', 'pe-2026-2027'].includes(p.category) && (
+              <option value={p.category}>{PRODUCT_CATEGORY_LABELS[p.category] || p.category} (dans aucune collection)</option>
+            )}
+          </select>
         </Field>
         <Field label="Matière"><input value={p.material || ''} onChange={(e) => upd('material', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
         <Field label="Couleur"><input value={p.color || ''} onChange={(e) => upd('color', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -1336,7 +1345,7 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-navbar', 'Menu de navigation'], ['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Nouveautés / Éditions limitées'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-navbar', 'Menu de navigation'], ['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été 2027'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Intemporels / Nouveautés / Éditions limitées'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
@@ -1362,6 +1371,7 @@ function TabContent({ onDirtyChange }) {
         <div className="space-y-4">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-ink/60">Pages du site</h3>
           <PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} />
+          <PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} />
           <PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} />
           <CategoryPagesEditor />
         </div>

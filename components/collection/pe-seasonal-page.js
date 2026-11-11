@@ -286,7 +286,7 @@ export default function PESeasonalPage({ content: initialContent, products }) {
             Les Intemporels de la maison.
           </h2>
           <Link
-            href="/collections?cat=intemporels"
+            href="/produits?cat=intemporels"
             className="inline-flex items-center gap-3 px-8 py-4 text-[11px] uppercase tracking-[0.32em] bg-ink text-ivory hover:bg-emerald transition-colors duration-500 rounded-sm"
           >
             Découvrir <ArrowRight className="h-3 w-3" strokeWidth={1.5} />

@@ -15,11 +15,11 @@ const themes = [
     tagline: 'Les basiques faits main, toute l’année — plaids, coussins, paniers, tapis, macramés et suspensions.',
     image: IMAGES.heroPlaid,
     links: [
-      { label: 'Plaids',            href: '/collections?cat=intemporels&q=plaid' },
-      { label: 'Coussins',          href: '/collections?cat=intemporels&q=coussin' },
-      { label: 'Paniers',           href: '/collections?cat=intemporels&q=panier' },
-      { label: 'Tapis',             href: '/collections?cat=intemporels&q=tapis' },
-      { label: 'Macramé mural',     href: '/collections?cat=intemporels&q=macram' },
+      { label: 'Plaids',            href: '/produits?cat=intemporels&q=plaid' },
+      { label: 'Coussins',          href: '/produits?cat=intemporels&q=coussin' },
+      { label: 'Paniers',           href: '/produits?cat=intemporels&q=panier' },
+      { label: 'Tapis',             href: '/produits?cat=intemporels&q=tapis' },
+      { label: 'Macramé mural',     href: '/produits?cat=intemporels&q=macram' },
     ],
   },
   {
@@ -27,7 +27,7 @@ const themes = [
     tagline: 'Doux · Chaleureux · Bien chez soi. Pastels et touches flash en coton, trapilho et rafia.',
     image: IMAGES.macrameMur,
     links: [
-      { label: 'Toute la collection', href: '/collections?cat=pe-2026-2027' },
+      { label: 'Toute la collection', href: '/collection/printemps-ete-2027' },
     ],
   },
 ]
