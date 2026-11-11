@@ -288,6 +288,7 @@ function TabProducts() {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
+  const [createOpen, setCreateOpen] = useState(false)
   const [waitingMap, setWaitingMap] = useState({})
 
   const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
@@ -378,16 +379,23 @@ function TabProducts() {
     }
   }
 
-  const create = async () => {
+  // Nouveau produit : on choisit d'abord sa collection, puis la fiche s'ouvre
+  const create = async (category = 'intemporels') => {
     const r = await fetch('/api/admin/products', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Nouvelle création',
-        category: 'intemporels', price: 0, stock: 1,
+        category, collection: category, price: 0, stock: 1,
       }),
     })
-    if (r.ok) { toast.success('Créé'); load() }
+    const d = await r.json().catch(() => ({}))
+    if (r.ok) {
+      toast.success(category === 'pe-2026-2027' ? 'Créé dans « Printemps/Été 2027 »' : 'Créé dans « Les Intemporels »')
+      setSearch(''); setCatFilter('all'); setCreateOpen(false)
+      await load()
+      if (d.slug) setEditing(d.slug)
+    } else toast.error(d.error || 'Création impossible')
   }
 
   const mismatchCount = (products || []).filter((p) => stockMismatch(p)).length
@@ -425,9 +433,24 @@ function TabProducts() {
               Aligner les stocks ({mismatchCount})
             </button>
           )}
-          <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
-            <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
-          </button>
+          <div className="relative">
+            <button onClick={() => setCreateOpen((v) => !v)} data-testid="new-product" className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
+              <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
+            </button>
+            {createOpen && (
+              <div className="absolute right-0 top-full mt-2 z-30 w-72 bg-ivory border border-ink/15 shadow-lg p-3" data-testid="new-product-menu">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-ink/60 mb-2 px-1">Dans quelle collection ?</p>
+                <button onClick={() => create('pe-2026-2027')} data-testid="new-product-pe" className="w-full text-left px-3 py-3 hover:bg-cream border-b border-linen">
+                  <span className="block text-sm">Printemps/Été 2027</span>
+                  <span className="block text-xs text-ink/55">La nouvelle collection de la saison</span>
+                </button>
+                <button onClick={() => create('intemporels')} data-testid="new-product-intemporels" className="w-full text-left px-3 py-3 hover:bg-cream">
+                  <span className="block text-sm">Les Intemporels</span>
+                  <span className="block text-xs text-ink/55">Les basiques toute l’année</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
