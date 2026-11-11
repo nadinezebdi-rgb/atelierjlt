@@ -14,6 +14,7 @@ import { formatPrice } from '@/lib/utils'
 import { CARRIERS } from '@/lib/tracking'
 import EmailsPanel from '@/components/admin/emails-panel'
 import SalesSwitch from '@/components/admin/sales-switch'
+import RelaySettingsPanel from '@/components/admin/relay-settings-panel'
 
 export const ORDER_STATUSES = [
   ['received', 'Reçue'],
@@ -103,6 +104,7 @@ export default function TabOrders() {
       </div>
 
       <SalesSwitch />
+      <RelaySettingsPanel />
       <EmailsPanel />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -216,7 +218,14 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = 
             {a.country && <div>{a.country}</div>}
             {a.phone && <div className="mt-1 text-ink/60">Tél. {a.phone}</div>}
             {a.email && <div className="text-ink/60">{a.email}</div>}
-            <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-ink/50">Envoi {a.shippingMethod === 'express' ? 'Express' : 'Standard'}</div>
+            <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-ink/50">Envoi {a.shippingMethod === 'express' ? 'Express' : a.shippingMethod === 'relay' ? 'Point relais Mondial Relay' : 'Standard'}</div>
+            {a.shippingMethod === 'relay' && a.relay && (
+              <div className="mt-2 border border-emerald/30 bg-emerald/5 p-2 text-xs" data-testid="order-relay">
+                <div className="font-medium">{a.relay.name} <span className="text-ink/50">· n° {a.relay.id}</span></div>
+                <div>{a.relay.address}</div>
+                <div>{a.relay.zip} {a.relay.city}</div>
+              </div>
+            )}
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Articles</div>

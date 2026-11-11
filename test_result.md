@@ -6620,3 +6620,14 @@ agent_communication:
       - working: "NA"
         agent: "main"
         comment: "PAYMENT_INTEGRATED=false → salesOpen toujours false. POST /api/orders, POST/PATCH /api/cart (+save, checkout-email), POST /api/gift-cards → 403 salesClosed. GET /api/cart/restore → redirige vers /. GET /api/shop/status {salesOpen}. POST /api/shop/notify {email,slug} → sales_waitlist (upsert). Admin GET/PATCH /api/admin/shop : ouverture refusée (409) sans paiement. Relances panier suspendues."
+  - task: "Point relais Mondial Relay (activable dans l'admin)"
+    implemented: true
+    working: true
+    file: "/app/lib/shipping-settings.js, /app/components/checkout/mondial-relay-picker.js, /app/components/admin/relay-settings-panel.js, orders.js, shop.js, admin/shop.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/shop/shipping ; admin GET/PATCH /api/admin/shop/shipping (relayEnabled, relayPrice, mrBrand) vérifiés. Widget MR testé dans le navigateur (BDTEST). Flux commande relais non testable de bout en bout tant que les ventes sont fermées (403)."

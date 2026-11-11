@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import MondialRelayPicker from '@/components/checkout/mondial-relay-picker'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet, Minus, Plus, Trash2 } from 'lucide-react'
+import { MapPin, Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet, Minus, Plus, Trash2 } from 'lucide-react'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import { useCart } from '@/components/site/cart-provider'
@@ -22,7 +23,12 @@ export default function CheckoutPage() {
     firstName: '', lastName: '', address: '', apt: '', city: '', zip: '',
     country: 'France', phone: '',
   })
-  const [shippingMethod, setShippingMethod] = useState('standard') // standard | express
+  const [shippingMethod, setShippingMethod] = useState('standard') // standard | express | relay
+  const [ship, setShip] = useState({ standardPrice: 8.9, expressPrice: 14.9, relayEnabled: false, relayPrice: 4.9, mrBrand: 'BDTEST  ' })
+  const [relay, setRelay] = useState(null)
+  useEffect(() => {
+    fetch('/api/shop/shipping').then((r) => r.json()).then((d) => d && setShip(d)).catch(() => {})
+  }, [])
   const [paymentMethod, setPaymentMethod] = useState('card') // card | apple | paypal
   const [couponCode, setCouponCode] = useState('')
   const [coupon, setCoupon] = useState(null)
@@ -95,13 +101,13 @@ export default function CheckoutPage() {
   const giftApplied = gift ? Math.min(gift.balance, afterDiscount) : 0
   const shippingCost = useMemo(() => {
     if (items.length === 0) return 0
-    return shippingMethod === 'express' ? 14.9 : 8.9
-  }, [items.length, subtotal, shippingMethod])
+    return shippingMethod === 'express' ? ship.expressPrice : shippingMethod === 'relay' && ship.relayEnabled ? ship.relayPrice : ship.standardPrice
+  }, [items.length, subtotal, shippingMethod, ship])
   const total = Math.max(0, afterDiscount - giftApplied) + shippingCost
 
   const canPlace = email.includes('@')
     && addr.firstName && addr.lastName && addr.address && addr.city && addr.zip
-    && items.length > 0 && !placing
+    && items.length > 0 && !placing && (shippingMethod !== 'relay' || !!relay)
 
   const placeOrder = async () => {
     if (!canPlace) return
@@ -112,6 +118,7 @@ export default function CheckoutPage() {
         name: `${addr.firstName} ${addr.lastName}`.trim(),
         email,
         shippingMethod,
+        ...(shippingMethod === 'relay' ? { relay } : {}),
       }
       const r = await fetch('/api/orders', {
         method: 'POST', credentials: 'include',
@@ -308,7 +315,7 @@ export default function CheckoutPage() {
                 icon={Truck}
                 title="Livraison soignée"
                 description="Emballage de l'atelier · 3 à 5 jours ouvrés"
-                price={formatPrice(8.9)}
+                price={formatPrice(ship.standardPrice)}
               />
               <ShippingOption
                 selected={shippingMethod === 'express'}
@@ -316,8 +323,23 @@ export default function CheckoutPage() {
                 icon={Zap}
                 title="Express"
                 description="Livraison en 24-48 h · Chronopost"
-                price={formatPrice(14.9)}
+                price={formatPrice(ship.expressPrice)}
               />
+              {ship.relayEnabled && (
+                <>
+                  <ShippingOption
+                    selected={shippingMethod === 'relay'}
+                    onSelect={() => setShippingMethod('relay')}
+                    icon={MapPin}
+                    title="Point relais Mondial Relay"
+                    description="Retrait chez un commerçant près de chez vous · 3 à 5 jours ouvrés"
+                    price={formatPrice(ship.relayPrice)}
+                  />
+                  {shippingMethod === 'relay' && (
+                    <MondialRelayPicker brand={ship.mrBrand} postCode={addr.zip} value={relay} onChange={setRelay} />
+                  )}
+                </>
+              )}
             </Section>
 
             {/* Payment */}
