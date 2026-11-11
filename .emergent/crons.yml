@@ -1,0 +1,8 @@
+crons:
+  - name: cart-reminders
+    description: "Relance par e-mail les paniers abandonnés des clients connectés (3 h puis 3 jours)"
+    cron: "*/15 * * * *"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/cart-reminders"
+    method: POST
+    enabled: true

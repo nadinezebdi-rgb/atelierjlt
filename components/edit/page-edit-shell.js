@@ -24,12 +24,23 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Save, X, Pencil, Check, AlertTriangle, Loader2, Sparkles, Plus, Trash2,
+  Compass, ChevronDown, Home,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-export default function PageEditShell({ pageKey, initialContent, fields, onChange }) {
+// Pages éditables disponibles depuis le menu de navigation du mode édition.
+// L'entrée courante est désactivée. L'ordre reflète la navigation du site.
+const EDITABLE_PAGES = [
+  { href: '/',       key: 'home',             label: "Page d'accueil" },
+  { href: '/a-propos', key: 'about',          label: 'À propos' },
+  { href: '/collection/printemps-ete-2027', key: 'collectionPE2027', label: 'Collection Printemps / Été' },
+  { href: '/contact', key: 'contact',         label: 'Contact' },
+]
+
+export default function PageEditShell({ pageKey, label, initialContent, fields, onChange }) {
   const [editMode, setEditMode] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const [content, setContent] = useState(initialContent || {})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -109,10 +120,29 @@ export default function PageEditShell({ pageKey, initialContent, fields, onChang
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="h-4 w-4 text-emerald flex-none" strokeWidth={1.8} />
             <span className="text-[11px] md:text-xs uppercase tracking-[0.28em] text-ivory/90 truncate">
-              Mode édition — {pageKey}
+              Mode édition — {label || pageKey.replace(/[-_]/g, ' ')}
             </span>
           </div>
           <div className="flex-1" />
+          <div className="relative">
+            <button
+              onClick={() => setNavOpen((v) => !v)}
+              data-nav-toggle
+              className="h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 bg-ink text-ivory border border-ivory/30 hover:border-ivory"
+              aria-label="Changer de page"
+            >
+              <Compass className="h-4 w-4" strokeWidth={1.5} />
+              <span className="hidden sm:inline">Pages</span>
+              <ChevronDown className="h-3 w-3" strokeWidth={2} />
+            </button>
+            {navOpen && (
+              <PageNavMenu
+                currentKey={pageKey}
+                dirty={dirty}
+                onClose={() => setNavOpen(false)}
+              />
+            )}
+          </div>
           <button
             onClick={() => setPanelOpen(true)}
             className="h-11 px-3 md:px-4 text-[11px] uppercase tracking-[0.22em] rounded-sm transition flex items-center gap-2 bg-ivory text-ink"
@@ -176,7 +206,7 @@ export default function PageEditShell({ pageKey, initialContent, fields, onChang
             <div className="sticky top-0 bg-ivory z-10 px-5 py-4 border-b border-linen flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[10px] uppercase tracking-[0.28em] text-emerald mb-1">Page</div>
-                <div className="text-sm text-ink capitalize truncate">{pageKey.replace(/-/g, ' ')}</div>
+                <div className="text-sm text-ink truncate">{label || pageKey.replace(/[-_]/g, ' ')}</div>
               </div>
               <button
                 onClick={() => setPanelOpen(false)}
@@ -223,13 +253,83 @@ export default function PageEditShell({ pageKey, initialContent, fields, onChang
   )
 }
 
+/* ---------------------------- Page nav menu ---------------------------- */
+
+function PageNavMenu({ currentKey, dirty, onClose }) {
+  // Détecte le clic en dehors du menu pour le fermer.
+  // Léger délai pour éviter que le clic qui ouvre le menu le referme immédiatement.
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('[data-nav-menu]') && !e.target.closest('[data-nav-toggle]')) {
+        onClose()
+      }
+    }
+    const t = setTimeout(() => window.addEventListener('click', handler), 50)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('click', handler)
+    }
+  }, [onClose])
+
+  const navigateTo = (href) => {
+    if (dirty && !confirm('Modifications non enregistrées. Changer de page sans sauvegarder ?')) return
+    const url = new URL(href, window.location.origin)
+    url.searchParams.set('edit', '1')
+    window.location.href = url.toString()
+  }
+
+  return (
+    <div
+      data-nav-menu
+      className="absolute right-0 top-[calc(100%+6px)] w-72 bg-ivory text-ink shadow-2xl rounded-sm border border-linen z-[280] overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-linen bg-cream/50">
+        <div className="text-[9px] uppercase tracking-[0.28em] text-emerald">Pages éditables</div>
+        <div className="text-sm font-medium mt-0.5">Changer de page</div>
+      </div>
+      <ul className="py-2">
+        {EDITABLE_PAGES.map((p) => {
+          const isCurrent = p.key === currentKey
+          return (
+            <li key={p.key}>
+              <button
+                onClick={() => !isCurrent && navigateTo(p.href)}
+                disabled={isCurrent}
+                className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
+                  isCurrent
+                    ? 'bg-emerald/5 text-emerald cursor-default'
+                    : 'hover:bg-cream/50 text-ink'
+                }`}
+              >
+                <Home className={`h-4 w-4 flex-none ${isCurrent ? 'text-emerald' : 'text-ink/40'}`} strokeWidth={1.5} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm leading-tight truncate">{p.label}</div>
+                  <div className={`text-[10px] uppercase tracking-[0.22em] mt-0.5 ${isCurrent ? 'text-emerald/70' : 'text-ink/40'}`}>
+                    {p.href}
+                  </div>
+                </div>
+                {isCurrent && (
+                  <Check className="h-4 w-4 text-emerald flex-none" strokeWidth={2} />
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <div className="px-4 py-3 border-t border-linen text-[10px] uppercase tracking-[0.22em] text-ink/50 text-center">
+        {dirty ? '⚠️ Vous avez des modifs non sauvegardées' : 'Ouvre la page en mode édition'}
+      </div>
+    </div>
+  )
+}
+
 /* ----------------------------- Field renderer ---------------------------- */
 
 const INPUT_CLS =
   'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald transition rounded-sm'
 const LABEL_CLS = 'block text-[10px] uppercase tracking-[0.26em] text-ink/70 mb-2'
 
-function FieldRenderer({ field, value, onChange }) {
+export function FieldRenderer({ field, value, onChange }) {
   const { type, label, placeholder, hint } = field
 
   if (type === 'palette') {

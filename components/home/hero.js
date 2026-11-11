@@ -33,7 +33,7 @@ export default function Hero() {
           className="max-w-2xl text-ivory"
         >
           <span className="text-[10px] md:text-[11px] uppercase tracking-[0.36em] text-ivory/80">
-            Maison française · depuis 2019
+            Depuis 2019
           </span>
           <h1 className="font-display font-bold text-[44px] leading-[1.02] md:text-[76px] md:leading-[0.98] mt-5 text-balance">
             Les objets qui donnent

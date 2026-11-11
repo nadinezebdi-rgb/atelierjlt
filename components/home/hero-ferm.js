@@ -5,6 +5,7 @@ import { useRef } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { IMAGES } from '@/lib/data/products'
+import { cleanImage } from '@/lib/page-content-config'
 
 /**
  * Hero polyvalent avec 2 mises en page :
@@ -46,12 +47,12 @@ export default function HeroFerm({
   parallaxIntensity = 25,    // 0-100
   animateIn = true,          // permet de désactiver les anims dans l'aperçu admin
 }) {
-  const mediaUrl = media || IMAGES.heroBeige
+  const mediaUrl = cleanImage(media)
   const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(mediaUrl) || (mediaUrl.includes('/api/file/') && /\.(mp4|webm|mov)/i.test(mediaUrl))
   const heroLayout = layout || 'full-image'
   const heroEyebrow = eyebrow || 'Nouvelle Collection · Automne-Hiver 2025'
   const heroTitle = title || 'L’art discret\nde la maison.'
-  const heroSubtitle = subtitle || 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.'
+  const heroSubtitle = subtitle || 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.'
   const cta1 = ctaPrimary || { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' }
   const cta2 = ctaSecondary || { label: 'Notre atelier', href: '/atelier' }
   const sig = signature || 'Plaid Sylvestre · Crochet main'
@@ -89,20 +90,19 @@ export default function HeroFerm({
       className="absolute inset-0 w-full h-full object-cover"
       aria-label="Vidéo d'ambiance Atelier JLT"
     />
+  ) : !mediaUrl ? (
+    // Aucune image choisie : fond uni (à remplacer depuis l'admin)
+    <div className="absolute inset-0 bg-gradient-to-br from-cream via-linen to-sable/40" aria-hidden="true" />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={mediaUrl}
-      alt="Atelier JLT — Salon crème avec plaid beige"
+      alt="Atelier JLT — créations faites main"
       className="absolute inset-0 w-full h-full object-cover"
       draggable={false}
       onError={(e) => {
-        // Fallback : si l'image du hero est cassée (upload perdu…),
-        // on repasse sur le visuel par défaut du catalogue.
-        if (e.currentTarget.src !== IMAGES.heroBeige && !e.currentTarget.dataset.fallback) {
-          e.currentTarget.dataset.fallback = '1'
-          e.currentTarget.src = IMAGES.heroBeige
-        }
+        // Image cassée (upload perdu…) : on la masque, le fond uni reste visible
+        e.currentTarget.style.display = 'none'
       }}
     />
   )
@@ -290,7 +290,7 @@ export default function HeroFerm({
           )}
           <div className="mt-10 flex flex-wrap gap-x-8 gap-y-2 text-[11px] uppercase tracking-[0.24em] text-ink/50">
             <span>Fabrication française</span><span>·</span>
-            <span>Livraison offerte dès 150 €</span><span>·</span>
+            <span>Fait main</span><span>·</span>
             <span>Emballage soigné</span>
           </div>
         </div>

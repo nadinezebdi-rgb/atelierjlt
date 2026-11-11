@@ -11,24 +11,23 @@ import { IMAGES } from '@/lib/data/products'
  */
 const themes = [
   {
-    name: 'Racine',
-    tagline: 'Les tissages du foyer — plaids, coussins et paniers noués à la main pour envelopper et adoucir.',
-    image: IMAGES.plaidBeige,
+    name: 'Les Intemporels',
+    tagline: 'Les basiques faits main, toute l’année — plaids, coussins, paniers, tapis, macramés et suspensions.',
+    image: IMAGES.heroPlaid,
     links: [
-      { label: 'Plaids',            href: '/collections?cat=racine' },
-      { label: 'Coussins',          href: '/collections?cat=racine' },
-      { label: 'Paniers',           href: '/collections?cat=racine' },
-      { label: 'Chemins de table',  href: '/collections?cat=racine' },
+      { label: 'Plaids',            href: '/produits?cat=intemporels&q=plaid' },
+      { label: 'Coussins',          href: '/produits?cat=intemporels&q=coussin' },
+      { label: 'Paniers',           href: '/produits?cat=intemporels&q=panier' },
+      { label: 'Tapis',             href: '/produits?cat=intemporels&q=tapis' },
+      { label: 'Macramé mural',     href: '/produits?cat=intemporels&q=macram' },
     ],
   },
   {
-    name: 'Empreinte',
-    tagline: 'Les traces qui habillent les murs — tapis, macramés et suspensions comme des signatures textiles.',
+    name: 'Printemps/Été 2027',
+    tagline: 'Doux · Chaleureux · Bien chez soi. Pastels et touches flash en coton, trapilho et rafia.',
     image: IMAGES.macrameMur,
     links: [
-      { label: 'Tapis',             href: '/collections?cat=empreinte' },
-      { label: 'Macramé mural',     href: '/collections?cat=empreinte' },
-      { label: 'Suspensions',       href: '/collections?cat=empreinte' },
+      { label: 'Toute la collection', href: '/collection/printemps-ete-2027' },
     ],
   },
 ]

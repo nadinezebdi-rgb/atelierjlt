@@ -6,6 +6,8 @@ import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, ArrowRight, Plus } from 'lucide-react'
 import { useCart } from '@/components/site/cart-provider'
 import { toast } from 'sonner'
+import { filterProductsForCarousel } from '@/lib/homepage-sections'
+import { isSoldOut } from '@/lib/stock'
 
 /**
  * Carrousel produits style Ferm Living — défilement horizontal souple,
@@ -19,10 +21,10 @@ import { toast } from 'sonner'
  *  - fallback : liste PRODUCTS pré-importée (optionnelle)
  *  - filter   : (p) => bool  filtre client (nouveautés / featured)
  */
-export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false }) {
+export default function ProductCarousel({ eyebrow, title, description, viewAllHref, endpoint = '/api/products', filter, limit = 8, hideBadges = false, pickedSlugs = [] }) {
   const [products, setProducts] = useState([])
   const scrollRef = useRef(null)
-  const { add } = useCart()
+  const { add, salesOpen } = useCart()
 
   useEffect(() => {
     let cancelled = false
@@ -31,26 +33,19 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
       .then((d) => {
         if (cancelled) return
         let list = d.products || []
-        if (filter === 'new') list = list.filter((p) => p.isNew)
-        else if (filter === 'limited') list = list.filter((p) => p.isLimited)
-        else if (filter === 'bestsellers') list = list.filter((p) => !p.isLimited)
-        else if (filter === 'intemporels') list = list.filter((p) => p.category === 'intemporels')
-        else if (filter === 'pe-2026-2027') list = list.filter((p) => p.category === 'pe-2026-2027')
-        else if (filter === 'classiques') {
-          // Les classiques : plaids, coussins, paniers, tapis, chemins & sets de table.
-          // Exclut macramés muraux et suspensions (qui restent dans les Intemporels mais pas dans ce carrousel).
-          const prefixes = ['plaid-', 'coussin-', 'panier-', 'chemin-de-table-', 'tapis-', 'set-de-table-']
-          list = list.filter(
-            (p) =>
-              p.category === 'intemporels' &&
-              prefixes.some((pref) => (p.slug || '').startsWith(pref))
-          )
+        // Mode vitrine manuelle : garde seulement les slugs sélectionnés, dans l'ordre
+        if (Array.isArray(pickedSlugs) && pickedSlugs.length > 0) {
+          const map = new Map(list.map((p) => [p.slug, p]))
+          list = pickedSlugs.map((s) => map.get(s)).filter(Boolean)
+          setProducts(list.slice(0, limit))
+          return
         }
+        list = filterProductsForCarousel(list, filter)
         setProducts(list.slice(0, limit))
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [endpoint, filter, limit])
+  }, [endpoint, filter, limit, pickedSlugs?.join(',')])
 
   const scroll = (dir) => {
     if (!scrollRef.current) return
@@ -159,6 +154,9 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
                   {!hideBadges && p.isLimited && (
                     <span className="absolute top-3 right-3 bg-brique text-ivory text-[9px] uppercase tracking-[0.3em] px-2 py-1">Édition</span>
                   )}
+                  {isSoldOut(p) && (
+                    <span className="absolute bottom-3 left-3 bg-ink text-ivory text-[9px] uppercase tracking-[0.3em] px-2 py-1">Épuisé</span>
+                  )}
                 </div>
                 <div className="pt-4 flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -166,16 +164,35 @@ export default function ProductCarousel({ eyebrow, title, description, viewAllHr
                          style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}>
                       {p.name}
                     </div>
-                    <div className="text-[13px] text-ink/60 mt-1 tabular-nums">EUR {p.price.toFixed(0)},00</div>
+                    <div className="text-[13px] text-ink/60 mt-1 tabular-nums">EUR {Number(p.price || 0).toFixed(0)},00</div>
+                    {Array.isArray(p.variants) && p.variants.length > 1 && (
+                      <div className="mt-2 flex items-center gap-1.5" aria-label={`${p.variants.length} couleurs disponibles`}>
+                        {p.variants.slice(0, 5).map((v, k) => (
+                          <span
+                            key={k}
+                            title={v.name}
+                            className="h-3 w-3 rounded-full border border-ink/15"
+                            style={{ backgroundColor: v.hex || '#ddd' }}
+                          />
+                        ))}
+                        {p.variants.length > 5 && (
+                          <span className="text-[10px] text-ink/50">+{p.variants.length - 5}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Link>
+              {salesOpen === true ? (
               <button
                 onClick={() => handleAdd(p)}
                 className="mt-3 group/btn inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-ink/80 hover:text-emerald transition-colors"
               >
                 <Plus className="h-3 w-3" strokeWidth={1.5} /> Ajouter au panier
               </button>
+              ) : (
+                <span className="mt-3 inline-block text-[10px] uppercase tracking-[0.28em] text-ink/50">Bientôt disponible</span>
+              )}
             </motion.div>
           ))}
         </div>

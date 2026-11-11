@@ -6,9 +6,11 @@ import { Heart } from 'lucide-react'
 import { useCart } from './cart-provider'
 import { formatPrice } from '@/lib/utils'
 import { toast } from 'sonner'
+import { isSoldOut } from '@/lib/stock'
 
 export default function ProductCard({ product, index = 0 }) {
-  const { add } = useCart()
+  const { add, salesOpen } = useCart()
+  const soldOut = isSoldOut(product)
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -36,6 +38,9 @@ export default function ProductCard({ product, index = 0 }) {
           />
           {/* Badges */}
           <div className="absolute top-4 left-4 flex flex-col gap-1.5">
+            {soldOut && (
+              <span className="bg-ink text-ivory text-[10px] uppercase tracking-[0.22em] px-2.5 py-1" data-testid="badge-soldout">Épuisé</span>
+            )}
             {product.isNew && (
               <span className="bg-ivory/95 text-ink text-[10px] uppercase tracking-[0.22em] px-2.5 py-1">Nouveau</span>
             )}
@@ -51,14 +56,24 @@ export default function ProductCard({ product, index = 0 }) {
           >
             <Heart className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
-          {/* Quick add */}
+          {/* Quick add — ou alerte si épuisé */}
           <div className="absolute inset-x-4 bottom-4 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500">
+            {salesOpen !== true ? (
+              <span className="block w-full bg-ivory text-ink py-3 text-center text-[10px] uppercase tracking-[0.28em]">
+                Bientôt disponible
+              </span>
+            ) : soldOut ? (
+              <span className="block w-full bg-ivory text-ink py-3 text-center text-[10px] uppercase tracking-[0.28em]">
+                M’alerter du retour
+              </span>
+            ) : (
             <button
               onClick={handleAdd}
               className="w-full bg-ivory text-ink py-3 text-[10px] uppercase tracking-[0.28em] hover:bg-ink hover:text-ivory transition-colors"
             >
               Ajout rapide au panier
             </button>
+            )}
           </div>
         </div>
         <div className="pt-4 flex items-start justify-between gap-3">

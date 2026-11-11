@@ -1,3 +1,4 @@
+import { cleanImage } from '@/lib/page-content-config'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
@@ -19,7 +20,7 @@ const FEATURED = {
   href: '/journal/tendances-deco-2026-2027',
   title: 'Tendances déco 2026-2027 : couleurs, matières et crochet',
   cat: 'Tendances',
-  img: IMAGES.heroBeige,
+  img: IMAGES.couvDecli,
   excerpt:
     'Terre cuite, tons minéraux, retour du crochet et accents Luminous Blue pour 2027. Nos idées pour créer un intérieur chaleureux.',
   featured: true,
@@ -47,7 +48,7 @@ export default async function JournalPage() {
       href: `/journal/${p.slug}`,
       title: p.title,
       cat: p.category || 'Journal',
-      img: p.image || IMAGES.interior1,
+      img: cleanImage(p.image) || IMAGES.interior1,
       excerpt: p.excerpt || '',
       featured: false,
     })),

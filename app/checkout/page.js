@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import MondialRelayPicker from '@/components/checkout/mondial-relay-picker'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet } from 'lucide-react'
+import { MapPin, Lock, ShieldCheck, Tag, Gift, Check, ArrowLeft, ChevronRight, Truck, Zap, CreditCard, Apple, Wallet, Minus, Plus, Trash2 } from 'lucide-react'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import { useCart } from '@/components/site/cart-provider'
@@ -13,7 +14,7 @@ import { useAuth } from '@/components/site/auth-provider'
 import { formatPrice } from '@/lib/utils'
 
 export default function CheckoutPage() {
-  const { items, subtotal, refresh } = useCart()
+  const { items, subtotal, refresh, update, remove, salesOpen } = useCart()
   const { user } = useAuth()
   const router = useRouter()
 
@@ -22,7 +23,12 @@ export default function CheckoutPage() {
     firstName: '', lastName: '', address: '', apt: '', city: '', zip: '',
     country: 'France', phone: '',
   })
-  const [shippingMethod, setShippingMethod] = useState('standard') // standard | express
+  const [shippingMethod, setShippingMethod] = useState('standard') // standard | express | relay
+  const [ship, setShip] = useState({ standardPrice: 8.9, expressPrice: 14.9, relayEnabled: false, relayPrice: 4.9, mrBrand: 'BDTEST  ' })
+  const [relay, setRelay] = useState(null)
+  useEffect(() => {
+    fetch('/api/shop/shipping').then((r) => r.json()).then((d) => d && setShip(d)).catch(() => {})
+  }, [])
   const [paymentMethod, setPaymentMethod] = useState('card') // card | apple | paypal
   const [couponCode, setCouponCode] = useState('')
   const [coupon, setCoupon] = useState(null)
@@ -41,6 +47,29 @@ export default function CheckoutPage() {
       }
     }
   }, [user])
+
+  // Retour depuis le lien « Retrouver mon panier »
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const p = new URLSearchParams(window.location.search)
+    if (p.get('panier') === 'retrouve') {
+      toast.success('Votre panier est de retour')
+      refresh?.()
+      window.history.replaceState(null, '', '/checkout')
+    }
+  }, [])
+
+  // Visiteur : l'e-mail saisi sert à lui renvoyer UNE fois son panier s'il ne finit pas sa commande
+  useEffect(() => {
+    if (user || !items.length || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return
+    const id = setTimeout(() => {
+      fetch('/api/cart/checkout-email', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }),
+      }).catch(() => {})
+    }, 1200)
+    return () => clearTimeout(id)
+  }, [email, user, items.length])
 
   const applyCoupon = async () => {
     if (!couponCode) return
@@ -72,14 +101,13 @@ export default function CheckoutPage() {
   const giftApplied = gift ? Math.min(gift.balance, afterDiscount) : 0
   const shippingCost = useMemo(() => {
     if (items.length === 0) return 0
-    if (subtotal >= 150 && shippingMethod === 'standard') return 0
-    return shippingMethod === 'express' ? 14.9 : 8.9
-  }, [items.length, subtotal, shippingMethod])
+    return shippingMethod === 'express' ? ship.expressPrice : shippingMethod === 'relay' && ship.relayEnabled ? ship.relayPrice : ship.standardPrice
+  }, [items.length, subtotal, shippingMethod, ship])
   const total = Math.max(0, afterDiscount - giftApplied) + shippingCost
 
   const canPlace = email.includes('@')
     && addr.firstName && addr.lastName && addr.address && addr.city && addr.zip
-    && items.length > 0 && !placing
+    && items.length > 0 && !placing && (shippingMethod !== 'relay' || !!relay)
 
   const placeOrder = async () => {
     if (!canPlace) return
@@ -90,6 +118,7 @@ export default function CheckoutPage() {
         name: `${addr.firstName} ${addr.lastName}`.trim(),
         email,
         shippingMethod,
+        ...(shippingMethod === 'relay' ? { relay } : {}),
       }
       const r = await fetch('/api/orders', {
         method: 'POST', credentials: 'include',
@@ -179,6 +208,27 @@ export default function CheckoutPage() {
     )
   }
 
+  // Ventes fermées : aucune commande possible tant que le paiement en ligne n'est pas branché
+  if (salesOpen === false) {
+    return (
+      <div className="min-h-screen bg-ivory flex flex-col">
+        <Header />
+        <main className="flex-1 container max-w-xl py-24 text-center" data-testid="checkout-closed">
+          <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Boutique en ligne</span>
+          <h1 className="font-display text-4xl font-bold mt-3">Les ventes ouvrent bientôt.</h1>
+          <p className="text-ink/60 mt-4">Les commandes en ligne ne sont pas encore possibles. Laissez votre e-mail sur la fiche d’une pièce pour être prévenu(e) de l’ouverture.</p>
+          <Link
+            href="/collections"
+            className="inline-flex items-center justify-center h-12 px-8 mt-10 bg-ink text-ivory text-[11px] uppercase tracking-[0.28em] hover:bg-emerald transition rounded-sm"
+          >
+            Découvrir les créations
+          </Link>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   // Empty cart redirect UX
   if (items.length === 0) {
     return (
@@ -225,12 +275,17 @@ export default function CheckoutPage() {
                 required
               />
               {!user && (
-                <p className="text-xs text-ink/50 mt-2">
-                  Déjà client ?{' '}
-                  <Link href="/compte" className="text-emerald hover:underline">
-                    Se connecter
-                  </Link>
-                </p>
+                <>
+                  <p className="text-xs text-ink/50 mt-2">
+                    Déjà client ?{' '}
+                    <Link href="/compte" className="text-emerald hover:underline">
+                      Se connecter
+                    </Link>
+                  </p>
+                  <p className="text-[11px] text-ink/45 mt-1" data-testid="checkout-email-notice">
+                    Si vous ne finalisez pas votre commande, nous vous enverrons une seule fois un lien pour retrouver votre panier.
+                  </p>
+                </>
               )}
             </Section>
 
@@ -260,7 +315,7 @@ export default function CheckoutPage() {
                 icon={Truck}
                 title="Livraison soignée"
                 description="Emballage de l'atelier · 3 à 5 jours ouvrés"
-                price={subtotal >= 150 ? 'Offerte' : formatPrice(8.9)}
+                price={formatPrice(ship.standardPrice)}
               />
               <ShippingOption
                 selected={shippingMethod === 'express'}
@@ -268,8 +323,23 @@ export default function CheckoutPage() {
                 icon={Zap}
                 title="Express"
                 description="Livraison en 24-48 h · Chronopost"
-                price={formatPrice(14.9)}
+                price={formatPrice(ship.expressPrice)}
               />
+              {ship.relayEnabled && (
+                <>
+                  <ShippingOption
+                    selected={shippingMethod === 'relay'}
+                    onSelect={() => setShippingMethod('relay')}
+                    icon={MapPin}
+                    title="Point relais Mondial Relay"
+                    description="Retrait chez un commerçant près de chez vous · 3 à 5 jours ouvrés"
+                    price={formatPrice(ship.relayPrice)}
+                  />
+                  {shippingMethod === 'relay' && (
+                    <MondialRelayPicker brand={ship.mrBrand} postCode={addr.zip} value={relay} onChange={setRelay} />
+                  )}
+                </>
+              )}
             </Section>
 
             {/* Payment */}
@@ -358,6 +428,34 @@ export default function CheckoutPage() {
                       <div className="text-sm font-medium leading-tight truncate">{it.name}</div>
                       <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 mt-0.5">
                         {[it.variant, it.size].filter(Boolean).join(' · ') || it.category}
+                      </div>
+                      <div className="flex items-center gap-1 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => (it.qty <= 1 ? remove(it.slug, { variant: it.variant, size: it.size }) : update(it.slug, it.qty - 1, { variant: it.variant, size: it.size }))}
+                          className="h-8 w-8 flex items-center justify-center border border-linen bg-ivory hover:border-ink/40"
+                          aria-label={it.qty <= 1 ? 'Supprimer' : 'Diminuer la quantité'}
+                        >
+                          <Minus className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                        <span className="w-7 text-center text-xs tabular-nums">{it.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => update(it.slug, it.qty + 1, { variant: it.variant, size: it.size })}
+                          className="h-8 w-8 flex items-center justify-center border border-linen bg-ivory hover:border-ink/40"
+                          aria-label="Augmenter la quantité"
+                        >
+                          <Plus className="h-3 w-3" strokeWidth={1.5} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(it.slug, { variant: it.variant, size: it.size })}
+                          className="ml-2 h-8 px-2 flex items-center gap-1 text-[10px] uppercase tracking-[0.18em] text-ink/50 hover:text-terracotta"
+                          aria-label={`Supprimer ${it.name}`}
+                          data-testid={`checkout-remove-${it.slug}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} /> Supprimer
+                        </button>
                       </div>
                     </div>
                     <div className="text-sm tabular-nums self-center">{formatPrice(it.price * it.qty)}</div>

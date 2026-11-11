@@ -14,6 +14,15 @@ import ImageUploader from '@/components/admin/image-uploader'
 import MediaPickerModal from '@/components/admin/media-picker-modal'
 import MediaLibrary from '@/components/admin/media-library'
 import HomeSectionsEditor from '@/components/admin/home-sections-editor'
+import TabOrders from '@/components/admin/orders-tab'
+import LegalPagesTab from '@/components/admin/legal-pages-tab'
+import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
+import ProductOrderPanel from '@/components/admin/product-order-panel'
+import { availableUnits, lowStockItems, stockMismatch } from '@/lib/stock'
+import PageContentEditor from '@/components/admin/page-content-editor'
+import CategoryPagesEditor from '@/components/admin/category-pages-editor'
+import ProductSlugEditor from '@/components/admin/product-slug-editor'
+import NavbarBlock from '@/components/admin/navbar-block'
 
 /* =========================================================
    ONGLET — CONTENU DU SITE (hero + collections)
@@ -25,11 +34,11 @@ const DEFAULT_CONTENT = {
     overlayIntensity: 30,
     eyebrow: 'Nouvelle Collection · Automne-Hiver 2025',
     title: 'L\u2019art discret\nde la maison.',
-    subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.',
+    subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.',
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
-    ctaSecondary: { label: 'À propos de nous', href: '/a-propos' },
+    ctaSecondary: { label: 'À propos', href: '/a-propos' },
     signature: 'Plaid Sylvestre · Crochet main',
-    image: '/api/img/jlt-hero-beige',
+    image: '',
     showEyebrow: true,
     showTitle: true,
     showSubtitle: true,
@@ -50,14 +59,14 @@ const DEFAULT_CONTENT = {
   sectionTitle: 'Deux collections, une même main.',
   sectionEyebrow: 'Nos collections',
   collections: [
-    { key: 'racine',    name: 'Racine',    tagline: 'Plaids · Coussins · Paniers · Chemins de table', image: '/api/img/jlt-plaid-beige' },
-    { key: 'empreinte', name: 'Empreinte', tagline: 'Tapis · Macramé mural · Suspensions',            image: 'https://images.pexels.com/photos/6208095/pexels-photo-6208095.jpeg?auto=compress&cs=tinysrgb&w=1400' },
+    { key: 'intemporels',  name: 'Les Intemporels',          tagline: 'Plaids · Coussins · Paniers · Tapis · Macramés', image: '/api/img/jlt-plaid-01' },
+    { key: 'pe-2026-2027', name: 'Printemps/Été 2026-2027', tagline: 'Coton · Trapilho · Rafia',                         image: 'https://images.pexels.com/photos/6208095/pexels-photo-6208095.jpeg?auto=compress&cs=tinysrgb&w=1400' },
   ],
   sections: HOMEPAGE_SECTION_DEFAULTS.map((s) => ({ ...s, content: { ...s.content } })),
   mediaLibrary: [],
-  // Page "À propos de nous" — image hero éditable depuis le CMS
+  // Page "À propos" — image hero éditable depuis le CMS
   about: {
-    heroImage: '/api/img/jlt-hero-beige',
+    heroImage: '',
     heroImageAlt: 'Atelier JLT — créations faites main',
   },
 }
@@ -65,10 +74,23 @@ const DEFAULT_CONTENT = {
 const DEFAULT_SETTINGS = {
   brand: {
     name: 'Atelier JLT',
-    tagline: 'Maison française de décoration artisanale',
+    tagline: '',
     email: 'contact@atelierjlt.fr',
     phone: '',
-    address: 'Drôme, France',
+    address: '',
+  },
+  shipping: {
+    labelProvider: 'simple', // simple | colissimo | aggregator
+    senderName: 'Atelier JLT',
+    senderAddress: '',
+    senderAddress2: '',
+    senderZip: '',
+    senderCity: '',
+    senderCountry: '',
+    senderPhone: '',
+    senderEmail: '',
+    returnDelayDays: 14,
+    returnInstructions: "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci d’écrire à contact@atelierjlt.fr avant tout renvoi.",
   },
   social: {
     instagram: 'https://www.instagram.com/atelier.jlt/',
@@ -76,7 +98,7 @@ const DEFAULT_SETTINGS = {
     pinterest: '',
   },
   marquee: {
-    line1: 'Livraison offerte dès 150 €',
+    line1: 'Fait main en France',
     line2: 'Fabrication française',
     line3: 'Emballage soigné',
   },
@@ -134,8 +156,9 @@ export default function AdminPage() {
   const groups = [
     { title: 'Vue générale', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
     { title: 'Site & contenu', items: [
-      { key: 'content', label: 'Éditeur de l’accueil', icon: Layers },
+      { key: 'content', label: 'Éditeur du site', icon: Layers },
       { key: 'blog', label: 'Journal', icon: BookOpen },
+      { key: 'legal', label: 'Menu, footer & pages', icon: FileText },
       { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
     ] },
     { title: 'Boutique', items: [
@@ -150,7 +173,7 @@ export default function AdminPage() {
   ]
   const activeLabel = groups.flatMap((group) => group.items).find((item) => item.key === tab)?.label
   const selectTab = (key) => {
-    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’accueil ne sont pas enregistrées. Quitter sans enregistrer ?')) return
+    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’éditeur du site ne sont pas enregistrées. Quitter sans enregistrer ?')) return
     setTab(key)
     setMobileNavOpen(false)
     if (key !== 'content') setContentDirty(false)
@@ -199,6 +222,7 @@ export default function AdminPage() {
             {tab === 'content' && <TabContent onDirtyChange={setContentDirty} />}
             {tab === 'products' && <TabProducts />}
             {tab === 'blog' && <TabBlog />}
+            {tab === 'legal' && <LegalPagesTab />}
             {tab === 'orders' && <TabOrders />}
             {tab === 'coupons' && <TabCoupons />}
             {tab === 'newsletter' && <TabNewsletter />}
@@ -223,20 +247,38 @@ function Stat({ label, value }) {
 
 function TabDashboard() {
   const [s, setS] = useState(null)
-  useEffect(() => {
-    fetch('/api/admin/stats', { credentials: 'include' }).then((r) => r.json()).then(setS)
-  }, [])
+  const load = () => fetch('/api/admin/stats', { credentials: 'include' }).then((r) => r.json()).then(setS)
+  useEffect(() => { load() }, [])
+  const archive = async () => {
+    if (!confirm(`Retirer les ${s.unpaidCount} commande${s.unpaidCount > 1 ? 's' : ''} d’essai non payée${s.unpaidCount > 1 ? 's' : ''} ?\n\nElles disparaissent de la liste des commandes (une copie est conservée en archive).`)) return
+    const r = await fetch('/api/admin/stats/archive-unpaid', { method: 'POST', credentials: 'include' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return toast.error('Opération impossible')
+    toast.success(`${d.archived} commande${d.archived > 1 ? 's' : ''} d’essai retirée${d.archived > 1 ? 's' : ''}`)
+    load()
+  }
   if (!s) return <div className="text-ink/50">Chargement…</div>
   return (
     <div>
       <h2 className="font-display text-3xl mb-6">Tableau de bord</h2>
       <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Stat label="Chiffre d'affaires" value={formatPrice(s.revenue || 0)} />
-        <Stat label="Commandes" value={s.orderCount} />
+        <Stat label="Commandes payées" value={s.orderCount} />
         <Stat label="Produits" value={s.productCount} />
         <Stat label="Clients" value={s.userCount} />
         <Stat label="Newsletter" value={s.newsletterCount} />
       </div>
+      <p className="text-xs text-ink/55 mt-3">Seules les commandes réellement payées comptent dans le chiffre d’affaires.</p>
+      {s.unpaidCount > 0 && (
+        <div className="mt-4 border border-amber-300 bg-amber-50 p-4 flex flex-wrap items-center gap-3 text-sm" data-testid="unpaid-orders">
+          <span className="flex-1 min-w-[240px] text-amber-900">
+            {s.unpaidCount} commande{s.unpaidCount > 1 ? 's' : ''} d’essai non payée{s.unpaidCount > 1 ? 's' : ''} {s.unpaidCount > 1 ? 'restent' : 'reste'} dans la liste des commandes (elles ne sont pas comptées ci-dessus).
+          </span>
+          <button onClick={archive} data-testid="archive-unpaid" className="border border-amber-400 px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-amber-900 hover:bg-amber-100">
+            Retirer les commandes d’essai
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -246,9 +288,34 @@ function TabProducts() {
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
+  const [selected, setSelected] = useState(() => new Set())
+  const [createOpen, setCreateOpen] = useState(false)
+  const [waitingMap, setWaitingMap] = useState({})
 
   const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    fetch('/api/admin/stock-alerts', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => setWaitingMap(Object.fromEntries((d.summary || []).map((s) => [s.slug, s.count]))))
+      .catch(() => {})
+  }, [])
+
+  // Modification groupée (Nouveau / Édition limitée)
+  const bulk = async (set) => {
+    const slugs = [...selected]
+    const r = await fetch('/api/admin/products/bulk', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs, set }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (r.ok) {
+      toast.success(`${d.updated} produit${d.updated > 1 ? 's' : ''} mis à jour`)
+      setSelected(new Set())
+      load()
+    } else toast.error(d.error || 'Erreur')
+  }
 
   // Produits filtrés par recherche + catégorie — permet à la fille de trouver
   // instantanément « Plaid Sylvestre » sans faire défiler toute la liste.
@@ -275,7 +342,14 @@ function TabProducts() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p),
     })
-    if (r.ok) { toast.success('Enregistré'); setEditing(null); load() }
+    if (r.ok) {
+      const d = await r.json().catch(() => ({}))
+      toast.success('Enregistré'); setEditing(null); load()
+      if (d.slug && d.slug !== p.slug) toast.message(`Adresse web : /produit/${d.slug}`)
+      const sa = d.stockAlerts
+      if (sa?.sent) toast.success(`${sa.sent} client${sa.sent > 1 ? 's' : ''} prévenu${sa.sent > 1 ? 's' : ''} du retour en stock`)
+      else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : envoi des emails pas encore activé`)
+    }
     else toast.error('Erreur')
   }
 
@@ -306,27 +380,49 @@ function TabProducts() {
     }
   }
 
-  const create = async () => {
+  // Nouveau produit : on choisit d'abord sa collection, puis la fiche s'ouvre
+  const create = async (category = 'intemporels') => {
     const r = await fetch('/api/admin/products', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        slug: 'produit-' + Date.now(),
         name: 'Nouvelle création',
-        category: 'decoration', price: 0, stock: 1,
+        category, collection: category, price: 0, stock: 1,
       }),
     })
-    if (r.ok) { toast.success('Créé'); load() }
+    const d = await r.json().catch(() => ({}))
+    if (r.ok) {
+      toast.success(category === 'pe-2026-2027' ? 'Créé dans « Printemps/Été 2027 »' : 'Créé dans « Les Intemporels »')
+      setSearch(''); setCatFilter('all'); setCreateOpen(false)
+      await load()
+      if (d.slug) setEditing(d.slug)
+    } else toast.error(d.error || 'Création impossible')
+  }
+
+  const mismatchCount = (products || []).filter((p) => stockMismatch(p)).length
+  const alignStocks = async () => {
+    const list = (products || []).filter((p) => stockMismatch(p))
+    const lines = list.slice(0, 12).map((p) => { const m = stockMismatch(p); return `• ${p.name} : ${m.total} → ${m.sum}` }).join('\n')
+    if (!confirm(`Aligner le stock total sur la somme des couleurs / tailles pour ${list.length} produit${list.length > 1 ? 's' : ''} ?\n\n${lines}${list.length > 12 ? '\n…' : ''}`)) return
+    const r = await fetch('/api/admin/products/align-stock', { method: 'POST', credentials: 'include' })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return toast.error('Alignement impossible')
+    toast.success(`${d.fixed?.length || 0} stock${(d.fixed?.length || 0) > 1 ? 's' : ''} aligné${(d.fixed?.length || 0) > 1 ? 's' : ''}`)
+    load()
   }
 
   if (!products) return <div className="text-ink/50">Chargement…</div>
 
-  const CAT_LABELS = { racine: 'Racine', empreinte: 'Empreinte', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+  const CAT_LABELS = PRODUCT_CATEGORY_LABELS
 
   return (
     <div>
       {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
       <MissingMediaRecovery />
+
+      <StockAlertsPanel products={products} />
+
+      <div className="mt-8"><ProductOrderPanel products={products} onSaved={load} /></div>
 
       {/* En-tête + action principale */}
       <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">
@@ -334,9 +430,31 @@ function TabProducts() {
           <h2 className="font-display text-3xl">Produits <span className="text-ink/40 font-normal text-xl">({filtered.length} / {products.length})</span></h2>
           <p className="text-xs text-ink/60 mt-1">Toute la boutique est ici. Cherchez un produit par son nom pour le trouver vite.</p>
         </div>
-        <button onClick={create} className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
-          <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {mismatchCount > 0 && (
+            <button onClick={alignStocks} data-testid="align-stocks" className="border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-[11px] uppercase tracking-[0.2em] hover:bg-amber-100 transition">
+              Aligner les stocks ({mismatchCount})
+            </button>
+          )}
+          <div className="relative">
+            <button onClick={() => setCreateOpen((v) => !v)} data-testid="new-product" className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
+              <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
+            </button>
+            {createOpen && (
+              <div className="absolute right-0 top-full mt-2 z-30 w-72 bg-ivory border border-ink/15 shadow-lg p-3" data-testid="new-product-menu">
+                <p className="text-[10px] uppercase tracking-[0.22em] text-ink/60 mb-2 px-1">Dans quelle collection ?</p>
+                <button onClick={() => create('pe-2026-2027')} data-testid="new-product-pe" className="w-full text-left px-3 py-3 hover:bg-cream border-b border-linen">
+                  <span className="block text-sm">Printemps/Été 2027</span>
+                  <span className="block text-xs text-ink/55">La nouvelle collection de la saison</span>
+                </button>
+                <button onClick={() => create('intemporels')} data-testid="new-product-intemporels" className="w-full text-left px-3 py-3 hover:bg-cream">
+                  <span className="block text-sm">Les Intemporels</span>
+                  <span className="block text-xs text-ink/55">Les basiques toute l’année</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Barre de recherche + filtres de catégorie */}
@@ -389,19 +507,79 @@ function TabProducts() {
         </div>
       )}
 
+      {/* Barre d'actions groupées */}
+      {filtered.length > 0 && (
+        <div className={`sticky top-0 z-10 mb-3 border p-3 flex flex-wrap items-center gap-2 ${selected.size ? 'bg-emerald/5 border-emerald' : 'bg-ivory border-linen'}`} data-testid="bulk-bar">
+          <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none mr-2">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-emerald"
+              checked={filtered.length > 0 && filtered.every((p) => selected.has(p.slug))}
+              onChange={(e) => {
+                const next = new Set(selected)
+                filtered.forEach((p) => (e.target.checked ? next.add(p.slug) : next.delete(p.slug)))
+                setSelected(next)
+              }}
+              data-testid="bulk-select-all"
+            />
+            {selected.size ? `${selected.size} sélectionné${selected.size > 1 ? 's' : ''}` : 'Tout sélectionner'}
+          </label>
+          {selected.size > 0 && (
+            <>
+              <button type="button" onClick={() => bulk({ isNew: true })} data-testid="bulk-new-on" className="h-10 px-3 bg-emerald text-ivory text-[10px] uppercase tracking-[0.18em] hover:bg-emeraldDark">Marquer « Nouveau »</button>
+              <button type="button" onClick={() => bulk({ isNew: false })} data-testid="bulk-new-off" className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Nouveau »</button>
+              <button type="button" onClick={() => bulk({ isLimited: true })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Marquer « Édition limitée »</button>
+              <button type="button" onClick={() => bulk({ isLimited: false })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Édition limitée »</button>
+              <button type="button" onClick={() => bulk({ category: 'pe-2026-2027' })} data-testid="bulk-cat-pe" className="h-10 px-3 bg-ink text-ivory text-[10px] uppercase tracking-[0.18em] hover:bg-emerald">Mettre dans « Printemps/Été 2027 »</button>
+              <button type="button" onClick={() => bulk({ category: 'intemporels' })} data-testid="bulk-cat-intemporels" className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Mettre dans « Les Intemporels »</button>
+              <button type="button" onClick={() => setSelected(new Set())} className="h-10 px-3 text-[10px] uppercase tracking-[0.18em] text-ink/55 hover:text-ink">Annuler</button>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {filtered.map((p) => (
-          <div key={p.slug} className="border border-linen bg-ivory">
-            <div className="flex items-center gap-4 p-3">
+        {filtered.map((p) => {
+          const units = availableUnits(p)
+          const lowItems = lowStockItems(p)
+          const waiting = waitingMap[p.slug] || 0
+          const mismatch = stockMismatch(p)
+          return (
+          <div key={p.slug} className={`border bg-ivory ${selected.has(p.slug) ? 'border-emerald' : 'border-linen'}`} data-testid={`admin-product-${p.slug}`}>
+            <div className="flex items-center gap-4 p-3 flex-wrap sm:flex-nowrap">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-emerald flex-none"
+                checked={selected.has(p.slug)}
+                onChange={() => { const n = new Set(selected); n.has(p.slug) ? n.delete(p.slug) : n.add(p.slug); setSelected(n) }}
+                aria-label={`Sélectionner ${p.name}`}
+                data-testid={`select-${p.slug}`}
+              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.images?.[0]} alt="" className="w-16 h-16 object-cover bg-cream" />
               <div className="flex-1 min-w-0">
                 <div className="font-display text-lg leading-tight">{p.name}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{p.category} · {p.slug}</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{CAT_LABELS[p.category] || p.category || '—'} · /produit/{p.slug}</div>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {p.isNew && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-emerald/10 text-emerald">Nouveau</span>}
+                  {p.isLimited && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-brique/10 text-brique">Édition limitée</span>}
+                  {units === 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-ink text-ivory">Épuisé</span>}
+                  {lowItems.length > 0 && (
+                    <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-terracotta/15 text-terracotta" title={lowItems.map((i) => `${i.name} : ${i.stock}`).join(' · ')}>
+                      Stock faible · {lowItems.map((i) => `${i.name} (${i.stock})`).join(', ')}
+                    </span>
+                  )}
+                  {mismatch && (
+                    <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-amber-100 text-amber-800" data-testid={`stock-mismatch-${p.slug}`} title="Le stock total ne correspond pas à la somme des couleurs / tailles">
+                      Stock à vérifier · total {mismatch.total} ≠ {mismatch.by} {mismatch.sum}
+                    </span>
+                  )}
+                  {waiting > 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-cream border border-linen" data-testid={`waiting-${p.slug}`}>🔔 {waiting} en attente</span>}
+                </div>
               </div>
               <div className="text-right">
                 <div className="font-display text-lg tabular-nums">{formatPrice(p.price)}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Stock : {p.stock}</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Stock : {units}</div>
               </div>
               <button onClick={() => setEditing(editing === p.slug ? null : p.slug)} className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-ink transition">
                 {editing === p.slug ? 'Fermer' : 'Modifier'}
@@ -417,28 +595,44 @@ function TabProducts() {
                 <Trash2 className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </div>
-            {editing === p.slug && <ProductEditor product={p} onSave={save} />}
+            {editing === p.slug && <ProductEditor product={p} onSave={save} onSlugChanged={(ns) => { setEditing(ns); load() }} />}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function ProductEditor({ product, onSave }) {
+const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
+
+function ProductEditor({ product, onSave, onSlugChanged }) {
   const [p, setP] = useState({ ...product })
   const upd = (k, v) => setP({ ...p, [k]: v })
+  const editMismatch = stockMismatch(p)
   return (
     <div className="p-4 border-t border-linen bg-cream/30">
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Field label="Nom"><input value={p.name || ''} onChange={(e) => upd('name', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
         <Field label="Prix (€)"><input type="number" value={p.price || 0} onChange={(e) => upd('price', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-        <Field label="Stock"><input type="number" value={p.stock || 0} onChange={(e) => upd('stock', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
+        <Field label="Stock total">
+          <input type="number" min={0} value={p.stock ?? 0} onChange={(e) => upd('stock', Math.max(0, Number(e.target.value)))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" data-testid="edit-stock" />
+          {editMismatch && (
+            <div className="mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-900 p-2 leading-relaxed" data-testid="edit-stock-mismatch">
+              Le total ({editMismatch.total}) ne correspond pas aux {editMismatch.by} ({editMismatch.sum}). Le site ne vend jamais plus que le plus petit des deux.{' '}
+              <button type="button" onClick={() => upd('stock', editMismatch.sum)} className="underline font-medium hover:text-emerald" data-testid="edit-stock-align">
+                Mettre {editMismatch.sum}
+              </button>
+            </div>
+          )}
+        </Field>
         <Field label="Collection">
-          <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink">
-            <option value="racine">Racine (plaids, coussins, paniers)</option>
-            <option value="empreinte">Empreinte (tapis, macramé, suspensions)</option>
-            <option value="terre">Terre (poterie, céramique)</option>
+          <select value={p.category || ''} onChange={(e) => upd('category', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" data-testid="edit-category">
+            <option value="intemporels">Les Intemporels</option>
+            <option value="pe-2026-2027">Printemps/Été 2027</option>
+            {p.category && !['intemporels', 'pe-2026-2027'].includes(p.category) && (
+              <option value={p.category}>{PRODUCT_CATEGORY_LABELS[p.category] || p.category} (dans aucune collection)</option>
+            )}
           </select>
         </Field>
         <Field label="Matière"><input value={p.material || ''} onChange={(e) => upd('material', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -464,6 +658,7 @@ function ProductEditor({ product, onSave }) {
       <Field label="Photos du produit">
         <ImageUploader images={p.images || []} onChange={(imgs) => upd('images', imgs)} />
       </Field>
+      <ProductSlugEditor product={product} name={p.name} story={p.story} onChanged={onSlugChanged} />
       <button onClick={() => onSave(p)} className="mt-4 bg-ink text-ivory px-6 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
         <Save className="h-4 w-4" strokeWidth={1.5} /> Enregistrer
       </button>
@@ -1000,41 +1195,6 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
 }
 
 
-function TabOrders() {
-  const [orders, setOrders] = useState(null)
-  const load = () => fetch('/api/admin/orders', { credentials: 'include' }).then((r) => r.json()).then((d) => setOrders(d.orders))
-  useEffect(() => { load() }, [])
-  const updateStatus = async (id, status) => {
-    await fetch('/api/admin/orders?id=' + id, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
-    toast.success('Statut mis à jour')
-    load()
-  }
-  if (!orders) return <div className="text-ink/50">Chargement…</div>
-  return (
-    <div>
-      <h2 className="font-display text-3xl mb-6">Commandes ({orders.length})</h2>
-      {orders.length === 0 ? <p className="text-ink/60">Aucune commande pour l'instant.</p> : (
-        <div className="space-y-2">
-          {orders.map((o) => (
-            <div key={o._id} className="border border-linen p-4 grid md:grid-cols-[1fr_180px_140px_180px] gap-4 items-center">
-              <div>
-                <div className="font-display text-lg">{o.orderNumber}</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{new Date(o.createdAt).toLocaleString('fr-FR')}</div>
-                <div className="text-sm text-ink/70 mt-1">{o.items?.length || 0} article{(o.items?.length || 0) > 1 ? 's' : ''} · {o.address?.email || 'invité'}</div>
-              </div>
-              <div className="font-display text-xl tabular-nums">{formatPrice(o.total)}</div>
-              <select value={o.status} onChange={(e) => updateStatus(o._id, e.target.value)} className="bg-transparent border border-ink/20 px-3 py-2 text-[11px] uppercase tracking-[0.22em] focus:outline-none focus:border-ink">
-                {['received', 'preparing', 'shipped', 'delivered', 'cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-ink/50">{o.paymentStatus}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function TabCoupons() {
   const [coupons, setCoupons] = useState(null)
   const [form, setForm] = useState({ code: '', type: 'percent', value: 10, label: '', active: true })
@@ -1191,11 +1351,11 @@ function TabContent({ onDirtyChange }) {
     <div>
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="font-display text-3xl">Éditeur de l’accueil</h2>
-          <p className="text-sm text-ink/60 mt-2">Personnalisez les textes, les images et l’ordre des sections de la page d’accueil.</p>
+          <h2 className="font-display text-3xl">Éditeur du site</h2>
+          <p className="text-sm text-ink/60 mt-2">Accueil (bannière, sections), pages À propos, Collection Printemps/Été, Contact, Pages Collections et Médiathèque — tout le contenu du site au même endroit.</p>
           <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <a
             href="/?edit=1"
             target="_blank"
@@ -1213,11 +1373,13 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-about', 'Page À propos'], ['#admin-collection-pe', 'Collection Printemps/Été 2026-2027'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
+        {[['#admin-navbar', 'Menu de navigation'], ['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été 2027'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Intemporels / Nouveautés / Éditions limitées'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
           <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
         ))}
       </nav>
       <div className="space-y-10 max-w-5xl">
+        {/* MENU DE NAVIGATION — enregistré séparément */}
+        <NavbarBlock />
         {/* HERO — Compositeur V2 (WYSIWYG + contraste auto + multi-slides + parallaxe) */}
         <HeroComposer
           hero={c.hero}
@@ -1263,36 +1425,14 @@ function TabContent({ onDirtyChange }) {
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
 
-        {/* ===== PAGE "À PROPOS DE NOUS" — image hero éditable ===== */}
-        <section id="admin-about" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-            <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Page « À propos de nous »</h3>
-            <a href="/a-propos" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
-          </div>
-          <p className="text-sm text-ink/60 mb-6 leading-relaxed">
-            Changez l'image affichée en haut de la page <code className="bg-cream/60 px-1.5 py-0.5 text-xs">/a-propos</code> (bannière principale). Idéalement une photo en format paysage de bonne qualité — vos pelotes de laine, votre plan de travail, un détail d'atelier…
-          </p>
-          <Field label="Photo bannière (hero)">
-            <ImageUploader
-              images={c.about?.heroImage ? [c.about.heroImage] : []}
-              onChange={(arr) => upd('about.heroImage', arr[arr.length - 1] || '')}
-            />
-          </Field>
-          <Field label="Texte alternatif (accessibilité & SEO)">
-            <input
-              value={c.about?.heroImageAlt || ''}
-              onChange={(e) => upd('about.heroImageAlt', e.target.value)}
-              placeholder="Ex. Atelier JLT — pelotes de laine naturelles"
-              className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink"
-            />
-          </Field>
-        </section>
-
-        {/* ===== PAGE COLLECTION "PRINTEMPS / ÉTÉ 2026-2027" — hero, ambiance, palette, matières ===== */}
-        <CollectionPEEditor
-          value={c.collectionPE2027 || {}}
-          onChange={(patch) => upd('collectionPE2027', { ...(c.collectionPE2027 || {}), ...patch })}
-        />
+        {/* ===== PAGES SECONDAIRES — mêmes champs que l'édition visuelle (?edit=1) ===== */}
+        <div className="space-y-4">
+          <h3 className="text-[11px] uppercase tracking-[0.32em] text-ink/60">Pages du site</h3>
+          <PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} />
+          <PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} />
+          <PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} />
+          <CategoryPagesEditor />
+        </div>
 
         <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
 
@@ -1315,6 +1455,8 @@ function TabContent({ onDirtyChange }) {
    ========================================================= */
 
 /* =========================================================
+   Réglages de la boutique
+   ========================================================= */
 function TabSettings() {
   const [s, setS] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -1374,6 +1516,59 @@ function TabSettings() {
           </div>
         </section>
 
+        <section className="border border-linen bg-ivory p-6" data-testid="settings-shipping">
+          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-2">Expédition & bordereaux</h3>
+          <p className="text-xs text-ink/60 mb-5 leading-relaxed">
+            Informations imprimées sur les étiquettes 10 × 15 cm (Commandes → Imprimer). Laissez l’adresse vide si vous ne souhaitez afficher que le nom.
+          </p>
+          <Field label="Type d’étiquette">
+            <div className="grid sm:grid-cols-3 gap-2 mt-1">
+              {[
+                ['simple', 'Étiquette à imprimer', 'Fonctionne tout de suite — affranchissement à La Poste'],
+                ['colissimo', 'Colissimo affranchie', 'À connecter : compte Colissimo Entreprise requis'],
+                ['aggregator', 'Boxtal / Sendcloud', 'À connecter : compte transporteur requis'],
+              ].map(([v, label, hint]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => upd('shipping', 'labelProvider', v)}
+                  className={`text-left p-3 border min-h-[72px] transition ${(s.shipping?.labelProvider || 'simple') === v ? 'border-emerald bg-emerald/5 ring-1 ring-emerald' : 'border-ink/15 hover:border-ink/40'}`}
+                >
+                  <div className="text-sm font-medium">{label}</div>
+                  <div className="text-[11px] text-ink/55 mt-1 leading-snug">{hint}</div>
+                </button>
+              ))}
+            </div>
+          </Field>
+          {(s.shipping?.labelProvider || 'simple') !== 'simple' && (
+            <p className="text-xs text-terracotta mt-3">
+              Ce transporteur n’est pas encore connecté : l’étiquette simple à imprimer sera utilisée en attendant.
+            </p>
+          )}
+          <div className="grid md:grid-cols-2 gap-4 mt-5">
+            {[
+              ['senderName', 'Nom de l’expéditeur'],
+              ['senderPhone', 'Téléphone (facultatif)'],
+              ['senderAddress', 'Adresse (facultatif)'],
+              ['senderAddress2', 'Complément (facultatif)'],
+              ['senderZip', 'Code postal (facultatif)'],
+              ['senderCity', 'Ville (facultatif)'],
+              ['senderCountry', 'Pays (facultatif)'],
+              ['senderEmail', 'Email pour les retours (facultatif)'],
+            ].map(([k, label]) => (
+              <Field key={k} label={label}>
+                <input value={s.shipping?.[k] || ''} onChange={(e) => upd('shipping', k, e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+              </Field>
+            ))}
+            <Field label="Délai de retour (jours)">
+              <input type="number" min={0} value={s.shipping?.returnDelayDays ?? 14} onChange={(e) => upd('shipping', 'returnDelayDays', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
+            </Field>
+          </div>
+          <Field label="Texte du bordereau de retour">
+            <textarea rows={3} value={s.shipping?.returnInstructions || ''} onChange={(e) => upd('shipping', 'returnInstructions', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink text-sm" />
+          </Field>
+        </section>
+
         <section className="border border-linen bg-ivory p-6">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-5">Bandeau haut de site</h3>
           <div className="grid md:grid-cols-3 gap-4">
@@ -1387,110 +1582,3 @@ function TabSettings() {
   )
 }
 
-/* ============================================================================
-   CollectionPEEditor — Admin editor for /collection/printemps-ete-2026-2027
-   Hero (image + textes), ambiance (image + titre + texte), palette (5 couleurs),
-   matières (jusqu'à 6 cartes). Toutes les photos sont réuploadables.
-   ============================================================================ */
-function CollectionPEEditor({ value = {}, onChange }) {
-  const palette = Array.isArray(value.palette) ? value.palette : []
-  const materials = Array.isArray(value.materials) ? value.materials : []
-  const set = (k, v) => onChange({ [k]: v })
-  const updPalette = (i, k, v) => {
-    const next = palette.slice()
-    next[i] = { ...next[i], [k]: v }
-    set('palette', next)
-  }
-  const updMat = (i, k, v) => {
-    const next = materials.slice()
-    next[i] = { ...next[i], [k]: v }
-    set('materials', next)
-  }
-  const addPalette = () => set('palette', [...palette, { name: '', hex: '#CFCFCF' }])
-  const addMaterial = () => set('materials', [...materials, { name: '', image: '' }])
-  const rmPalette = (i) => set('palette', palette.filter((_, j) => j !== i))
-  const rmMaterial = (i) => set('materials', materials.filter((_, j) => j !== i))
-
-  return (
-    <section id="admin-collection-pe" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-        <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Collection « Printemps / Été 2026-2027 »</h3>
-        <a href="/collection/printemps-ete-2026-2027" target="_blank" rel="noopener noreferrer" className="text-[10px] uppercase tracking-[0.24em] text-ink/60 hover:text-emerald flex items-center gap-1.5"><Eye className="h-3 w-3" /> Voir la page</a>
-      </div>
-      <p className="text-sm text-ink/60 mb-6 leading-relaxed">
-        Toute la page de la nouvelle collection se gère ici : la grande bannière du haut, l'ambiance, les 5 couleurs de la palette, et les 4 matières. Les photos par défaut peuvent être remplacées par vos propres photos à tout moment — glissez un fichier dans la zone « Importer ».
-      </p>
-
-      {/* HERO */}
-      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-6">① Grande bannière du haut</h4>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Petit texte (sur-titre)">
-          <input value={value.heroEyebrow || ''} onChange={(e) => set('heroEyebrow', e.target.value)} placeholder="Nouvelle saison" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-        </Field>
-        <Field label="Grand titre">
-          <input value={value.heroTitle || ''} onChange={(e) => set('heroTitle', e.target.value)} placeholder="Printemps / Été 2026-2027" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-        </Field>
-      </div>
-      <Field label="Phrase sous le titre (facultatif)">
-        <input value={value.heroSubtitle || ''} onChange={(e) => set('heroSubtitle', e.target.value)} placeholder="Doux · Chaleureux · Bien chez soi." className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-      </Field>
-      <Field label="Image de la bannière">
-        <ImageUploader
-          images={value.heroImage ? [value.heroImage] : []}
-          onChange={(arr) => set('heroImage', arr[arr.length - 1] || '')}
-        />
-      </Field>
-
-      {/* AMBIANCE */}
-      <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55 mb-3 mt-10">② Bloc Ambiance</h4>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Field label="Petit texte"><input value={value.moodEyebrow || ''} onChange={(e) => set('moodEyebrow', e.target.value)} placeholder="Ambiance" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-        <Field label="Titre (saut de ligne : touche Entrée)">
-          <textarea value={value.moodTitle || ''} onChange={(e) => set('moodTitle', e.target.value)} rows={2} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink resize-none" />
-        </Field>
-      </div>
-      <Field label="Texte de description">
-        <textarea value={value.moodText || ''} onChange={(e) => set('moodText', e.target.value)} rows={4} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-      </Field>
-      <Field label="Image d'ambiance (vertical idéal)">
-        <ImageUploader images={value.moodImage ? [value.moodImage] : []} onChange={(arr) => set('moodImage', arr[arr.length - 1] || '')} />
-      </Field>
-
-      {/* PALETTE */}
-      <div className="flex items-center justify-between mt-10 mb-3">
-        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">③ Palette de couleurs</h4>
-        <button type="button" onClick={addPalette} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
-      </div>
-      <div className="space-y-3">
-        {palette.map((c, i) => (
-          <div key={i} className="flex items-center gap-3 bg-cream/40 border border-linen p-3">
-            <input type="color" value={c.hex || '#cccccc'} onChange={(e) => updPalette(i, 'hex', e.target.value)} className="h-11 w-14 cursor-pointer rounded-sm border border-ink/15" />
-            <input value={c.name || ''} onChange={(e) => updPalette(i, 'name', e.target.value)} placeholder="Nom (ex. Rose poudré)" className="flex-1 bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-            <input value={c.hex || ''} onChange={(e) => updPalette(i, 'hex', e.target.value)} placeholder="#C98498" className="w-28 bg-transparent border-b border-ink/20 py-2 font-mono text-sm focus:outline-none focus:border-ink" />
-            <button type="button" onClick={() => rmPalette(i)} className="text-terracotta hover:opacity-70 h-11 w-11 flex items-center justify-center" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
-          </div>
-        ))}
-      </div>
-
-      {/* MATIÈRES */}
-      <div className="flex items-center justify-between mt-10 mb-3">
-        <h4 className="text-[10px] uppercase tracking-[0.28em] text-ink/55">④ Matières</h4>
-        <button type="button" onClick={addMaterial} className="text-[10px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-emerald hover:text-emerald transition">+ Ajouter</button>
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        {materials.map((m, i) => (
-          <div key={i} className="border border-linen bg-cream/30 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Matière {i + 1}</span>
-              <button type="button" onClick={() => rmMaterial(i)} className="text-terracotta hover:opacity-70" aria-label="Retirer"><Trash2 className="h-4 w-4" strokeWidth={1.5} /></button>
-            </div>
-            <Field label="Nom"><input value={m.name || ''} onChange={(e) => updMat(i, 'name', e.target.value)} placeholder="Ex. Cordons tresse" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Photo">
-              <ImageUploader images={m.image ? [m.image] : []} onChange={(arr) => updMat(i, 'image', arr[arr.length - 1] || '')} />
-            </Field>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}

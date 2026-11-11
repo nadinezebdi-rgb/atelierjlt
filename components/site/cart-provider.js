@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 const CartContext = createContext(null)
@@ -14,6 +15,11 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  // null = inconnu (chargement), false = ventes fermées
+  const [salesOpen, setSalesOpen] = useState(null)
+  useEffect(() => {
+    fetch('/api/shop/status', { cache: 'no-store' }).then((r) => r.json()).then((d) => setSalesOpen(!!d.salesOpen)).catch(() => setSalesOpen(false))
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -33,7 +39,11 @@ export function CartProvider({ children }) {
       credentials: 'include',
       body: JSON.stringify({ slug, qty, ...extra }),
     })
-    const d = await r.json()
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      toast.error(d.error || 'Ajout impossible pour le moment')
+      return d
+    }
     setItems(d.items || [])
     setOpen(true)
     return d
@@ -66,7 +76,7 @@ export function CartProvider({ children }) {
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
 
   return (
-    <CartContext.Provider value={{ items, count, subtotal, open, setOpen, add, update, remove, loading, refresh }}>
+    <CartContext.Provider value={{ items, count, subtotal, open: open && salesOpen === true, setOpen, add, update, remove, loading, refresh, salesOpen }}>
       {children}
     </CartContext.Provider>
   )
