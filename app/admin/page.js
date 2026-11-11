@@ -17,6 +17,7 @@ import HomeSectionsEditor from '@/components/admin/home-sections-editor'
 import TabOrders from '@/components/admin/orders-tab'
 import LegalPagesTab from '@/components/admin/legal-pages-tab'
 import StockAlertsPanel from '@/components/admin/stock-alerts-panel'
+import ProductOrderPanel from '@/components/admin/product-order-panel'
 import { availableUnits, lowStockItems, stockMismatch } from '@/lib/stock'
 import PageContentEditor from '@/components/admin/page-content-editor'
 import CategoryPagesEditor from '@/components/admin/category-pages-editor'
@@ -420,6 +421,8 @@ function TabProducts() {
       <MissingMediaRecovery />
 
       <StockAlertsPanel products={products} />
+
+      <div className="mt-8"><ProductOrderPanel products={products} onSaved={load} /></div>
 
       {/* En-tête + action principale */}
       <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">
