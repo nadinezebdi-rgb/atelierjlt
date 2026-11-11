@@ -9,7 +9,7 @@ import PageEditShell from '@/components/edit/page-edit-shell'
 import { PE_FIELDS as EDIT_FIELDS } from '@/lib/page-content-config'
 
 /**
- * Page de la collection Printemps / Été 2026-2027 — Atelier JLT.
+ * Page de la collection Printemps / Été 2027 — Atelier JLT.
  *
  * Composition :
  *   1. Hero plein cadre (image florale, titre serif, surtitre)
@@ -20,7 +20,7 @@ import { PE_FIELDS as EDIT_FIELDS } from '@/lib/page-content-config'
  *   6. CTA de retour vers "Les Intemporels"
  *
  * Tout le contenu (hero, ambiance, palette, matières) est éditable depuis
- * `/admin → Éditeur du site → Collection Printemps / Été 2026-2027`
+ * `/admin → Éditeur du site → Collection Printemps / Été 2027`
  * ou en mode visuel iPad via `?edit=1`.
  */
 export default function PESeasonalPage({ content: initialContent, products }) {
@@ -267,7 +267,7 @@ export default function PESeasonalPage({ content: initialContent, products }) {
               Les pièces arrivent.
             </h2>
             <p className="text-ink/70 italic leading-relaxed">
-              Les créations de la collection Printemps / Été 2026-2027 vous seront dévoilées très bientôt. Inscrivez-vous à la newsletter pour les découvrir en avant-première.
+              Les créations de la collection Printemps / Été 2027 vous seront dévoilées très bientôt. Inscrivez-vous à la newsletter pour les découvrir en avant-première.
             </p>
           </div>
         </section>

@@ -504,6 +504,8 @@ function TabProducts() {
               <button type="button" onClick={() => bulk({ isNew: false })} data-testid="bulk-new-off" className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Nouveau »</button>
               <button type="button" onClick={() => bulk({ isLimited: true })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Marquer « Édition limitée »</button>
               <button type="button" onClick={() => bulk({ isLimited: false })} className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Retirer « Édition limitée »</button>
+              <button type="button" onClick={() => bulk({ category: 'pe-2026-2027' })} data-testid="bulk-cat-pe" className="h-10 px-3 bg-ink text-ivory text-[10px] uppercase tracking-[0.18em] hover:bg-emerald">Mettre dans « Printemps/Été 2027 »</button>
+              <button type="button" onClick={() => bulk({ category: 'intemporels' })} data-testid="bulk-cat-intemporels" className="h-10 px-3 border border-ink/20 text-[10px] uppercase tracking-[0.18em] hover:border-ink">Mettre dans « Les Intemporels »</button>
               <button type="button" onClick={() => setSelected(new Set())} className="h-10 px-3 text-[10px] uppercase tracking-[0.18em] text-ink/55 hover:text-ink">Annuler</button>
             </>
           )}

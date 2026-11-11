@@ -23,7 +23,7 @@ const themes = [
     ],
   },
   {
-    name: 'Printemps/Été 2026-2027',
+    name: 'Printemps/Été 2027',
     tagline: 'Doux · Chaleureux · Bien chez soi. Pastels et touches flash en coton, trapilho et rafia.',
     image: IMAGES.macrameMur,
     links: [

@@ -62,8 +62,8 @@ const CAROUSEL_TEMPLATES = [
     description: 'Mettez en avant la collection de la saison.',
     type: 'product-carousel',
     overrides: {
-      label: 'Collection PE 26-27',
-      content: { eyebrow: 'Printemps / Été 2026-2027', title: 'La collection de la saison.', description: 'Pastels, lin et douceur florale pour la nouvelle saison.', viewAllHref: '/collection/printemps-ete-2027', selectionMode: 'auto', filter: 'pe-2026-2027', limit: 6, hideBadges: false, pickedProducts: [] },
+      label: 'Collection PE 2027',
+      content: { eyebrow: 'Printemps / Été 2027', title: 'La collection de la saison.', description: 'Pastels, lin et douceur florale pour la nouvelle saison.', viewAllHref: '/collection/printemps-ete-2027', selectionMode: 'auto', filter: 'pe-2026-2027', limit: 6, hideBadges: false, pickedProducts: [] },
     },
   },
 ]

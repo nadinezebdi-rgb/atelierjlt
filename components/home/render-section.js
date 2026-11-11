@@ -18,7 +18,7 @@ export default function renderSection(s, { ignoreEnabled = false } = {}) {
   const c = s.content || {}
   switch (s.type) {
     case 'category-tiles':
-      return null // collections retirées du site
+      return <CategoryTiles key={s.id} eyebrow={c.eyebrow} title={c.title} />
     case 'editorial-banner':
       return (
         <EditorialBanner
@@ -77,7 +77,7 @@ export default function renderSection(s, { ignoreEnabled = false } = {}) {
       )
     }
     case 'collections-themes':
-      return null // collections retirées du site
+      return <CollectionsThemes key={s.id} />
     case 'newsletter':
       return (
         <Newsletter

@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { IMAGES } from '@/lib/data/products'
+import { PE_DEFAULTS } from '@/lib/page-content-config'
 
 /**
- * Grille des collections — Les Intemporels · Printemps/Été 2026-2027.
+ * Grille des collections — Les Intemporels · Printemps/Été 2027.
  * Chaque vignette : grande image portrait, label émeraude en-dessous.
  */
 const tiles = [
@@ -16,24 +17,26 @@ const tiles = [
     image: IMAGES.heroPlaid,
   },
   {
-    name: 'Printemps/Été 2026-2027',
+    name: 'Printemps/Été 2027',
     tagline: 'Coton · Trapilho · Rafia',
     href: '/collection/printemps-ete-2027',
-    image: IMAGES.macrameMur,
+    image: PE_DEFAULTS.moodImage,
   },
 ]
 
-export default function CategoryTiles() {
+export default function CategoryTiles({ eyebrow, title }) {
+  const heading = title || 'Deux collections, une même main.'
+  const [first, ...rest] = heading.split(',')
   return (
     <section className="py-20 md:py-28 bg-ivory">
       <div className="container">
         <div className="text-center max-w-2xl mx-auto mb-14 md:mb-20">
-          <span className="block text-[10px] uppercase tracking-[0.42em] text-emerald mb-4">Nos collections</span>
+          <span className="block text-[10px] uppercase tracking-[0.42em] text-emerald mb-4">{eyebrow || 'Nos collections'}</span>
           <h2
             className="font-display text-4xl md:text-6xl leading-[1.02] text-balance text-emerald"
             style={{ fontFamily: 'var(--font-logo), var(--font-display), serif', fontWeight: 400 }}
           >
-            Deux collections,<br className="hidden md:block"/> une même main.
+            {rest.length ? <>{first},<br className="hidden md:block"/>{rest.join(',')}</> : heading}
           </h2>
         </div>
 

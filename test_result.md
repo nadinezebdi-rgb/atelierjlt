@@ -6774,3 +6774,22 @@ agent_communication:
            - Original navbar restored after test
         
         ZERO CRITICAL ISSUES. Feature is production-ready.
+
+# ---- Session : titre 2027, choix groupé de collection, vignettes accueil ----
+backend:
+  - task: "Choix groupé de collection + textes 2027 + vignettes collections accueil"
+    implemented: true
+    working: "NA"
+    file: "lib/api/handlers/admin/products.js, lib/brand-text.js, lib/homepage-sections.js, app/collection/printemps-ete-2027/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/admin/products/bulk accepte set.category ∈ {intemporels, pe-2026-2027} (autres valeurs ignorées → 400 si rien d'autre). cleanBrandText remplace 'Printemps/Été 2026-2027', '26-27', 'saison/collection 2026-2027' par 2027 (pas les slugs/hrefs ni 'Tendances déco 2026-2027'). Accueil : nouvelle section par défaut id collection-tiles (type category-tiles) 'Deux collections, une même main.'"
+test_plan:
+  current_focus: ["Choix groupé de collection + textes 2027 + vignettes collections accueil"]
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"

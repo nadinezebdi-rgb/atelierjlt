@@ -2,6 +2,7 @@ import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
 import { getDb } from '@/lib/db'
+import { cleanBrandDeep } from '@/lib/brand-text'
 import { loadProducts as loadCatalog } from '@/lib/api/shared'
 import PESeasonalPage from '@/components/collection/pe-seasonal-page'
 
@@ -20,7 +21,7 @@ async function loadContent() {
   try {
     const db = await getDb()
     const doc = await db.collection('site_content').findOne({ _id: 'home' })
-    const saved = doc?.content?.collectionPE2027 || {}
+    const saved = cleanBrandDeep(doc?.content?.collectionPE2027 || {})
     // Shallow merge — l'admin peut n'avoir modifié qu'un sous-ensemble
     return {
       ...DEFAULT,
