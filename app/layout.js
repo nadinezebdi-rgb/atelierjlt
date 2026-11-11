@@ -29,11 +29,11 @@ const inter = Inter({
 export const metadata = {
   metadataBase: new URL('https://atelierjlt.fr'),
   title: {
-    default: 'Atelier JLT — Maison française de décoration artisanale',
+    default: 'Atelier JLT',
     template: '%s · Atelier JLT',
   },
   description:
-    "Les objets qui donnent une âme à votre intérieur. Chaque création Atelier JLT est imaginée, fabriquée et assemblée à la main dans notre atelier français. Plaids, coussins, macramé, tapis, poterie.",
+    "Les objets qui donnent une âme à votre intérieur. Chaque création Atelier JLT est imaginée, fabriquée et assemblée à la main. Plaids, coussins, macramé, tapis, poterie.",
   applicationName: 'Atelier JLT',
   keywords: [
     'décoration artisanale française',
@@ -53,7 +53,7 @@ export const metadata = {
   },
   openGraph: {
     title: 'Atelier JLT',
-    description: 'Maison française de décoration artisanale.',
+    description: '',
     url: 'https://atelierjlt.fr',
     siteName: 'Atelier JLT',
     locale: 'fr_FR',
@@ -70,7 +70,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Atelier JLT',
-    description: 'Maison française de décoration artisanale.',
+    description: '',
   },
   icons: {
     icon: [{ url: '/favicon.ico', sizes: '32x32' }, { url: '/icon.png', type: 'image/png', sizes: '256x256' }],

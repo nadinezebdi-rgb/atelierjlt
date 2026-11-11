@@ -26,7 +26,7 @@ const DEFAULT_SHIPPING = {
   senderEmail: '',
   returnDelayDays: 14,
   returnInstructions:
-    "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci de nous écrire avant tout renvoi.",
+    "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci d’écrire à contact@atelierjlt.fr avant tout renvoi.",
 }
 
 const SHIPPING_METHOD = { standard: 'Standard', express: 'Express' }

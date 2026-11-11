@@ -33,9 +33,9 @@ const DEFAULT_CONTENT = {
     overlayIntensity: 30,
     eyebrow: 'Nouvelle Collection · Automne-Hiver 2025',
     title: 'L\u2019art discret\nde la maison.',
-    subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.',
+    subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.',
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
-    ctaSecondary: { label: 'À propos de nous', href: '/a-propos' },
+    ctaSecondary: { label: 'À propos', href: '/a-propos' },
     signature: 'Plaid Sylvestre · Crochet main',
     image: '',
     showEyebrow: true,
@@ -63,7 +63,7 @@ const DEFAULT_CONTENT = {
   ],
   sections: HOMEPAGE_SECTION_DEFAULTS.map((s) => ({ ...s, content: { ...s.content } })),
   mediaLibrary: [],
-  // Page "À propos de nous" — image hero éditable depuis le CMS
+  // Page "À propos" — image hero éditable depuis le CMS
   about: {
     heroImage: '',
     heroImageAlt: 'Atelier JLT — créations faites main',
@@ -73,7 +73,7 @@ const DEFAULT_CONTENT = {
 const DEFAULT_SETTINGS = {
   brand: {
     name: 'Atelier JLT',
-    tagline: 'Maison française de décoration artisanale',
+    tagline: '',
     email: 'contact@atelierjlt.fr',
     phone: '',
     address: '',
@@ -89,7 +89,7 @@ const DEFAULT_SETTINGS = {
     senderPhone: '',
     senderEmail: '',
     returnDelayDays: 14,
-    returnInstructions: "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci de nous écrire avant tout renvoi.",
+    returnInstructions: "Un article ne vous convient pas ? Cochez-le ci-dessous, indiquez le motif, et glissez ce bordereau dans le colis de retour. Merci d’écrire à contact@atelierjlt.fr avant tout renvoi.",
   },
   social: {
     instagram: 'https://www.instagram.com/atelier.jlt/',

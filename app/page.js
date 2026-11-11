@@ -1,3 +1,4 @@
+import { cleanBrandDeep } from '@/lib/brand-text'
 import Header from '@/components/site/header'
 import Footer from '@/components/site/footer'
 import CartDrawer from '@/components/site/cart-drawer'
@@ -22,7 +23,7 @@ const jsonLd = {
   alternateName: 'Atelier JLT',
   url: 'https://atelierjlt.fr',
   logo: 'https://atelierjlt.fr/api/img/logo',
-  description: 'Maison française de décoration artisanale. Plaids, coussins, macramé, tapis, poterie faits main.',
+  description: 'Plaids, coussins, macramé, tapis, poterie faits main.',
   sameAs: [
     'https://www.instagram.com/atelier.jlt/',
     'https://www.facebook.com/atelier.jlt/',
@@ -38,7 +39,8 @@ const jsonLd = {
 async function loadHomeContent() {
   try {
     const db = await getDb()
-    const doc = await db.collection('site_content').findOne({ _id: 'home' })
+    const raw = await db.collection('site_content').findOne({ _id: 'home' })
+    const doc = raw ? { ...raw, content: cleanBrandDeep(raw.content || {}) } : null
     return {
       sections: mergeHomepageSections(doc?.content?.sections || []),
       hero: doc?.content?.hero || null,

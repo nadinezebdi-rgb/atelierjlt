@@ -329,7 +329,7 @@ export default function ProductPage() {
               {[
                 ['desc', 'Description complète', <>
                   <p>{p.story}</p>
-                  <p className="mt-3">Style : {p.style}. Toutes les pièces sont exécutées dans notre atelier français et légèrement différentes les unes des autres.</p>
+                  <p className="mt-3">Style : {p.style}. Toutes les pièces sont faites à la main et légèrement différentes les unes des autres.</p>
                 </>],
                 ['care', 'Conseils d’entretien', <p key="care">{p.care}</p>],
                 ['ship', 'Livraison', <p key="ship">Expédié sous 2 à 4 jours ouvrés en France métropolitaine. Livraison Europe en 5 à 8 jours. Emballage soigné et neutre en carbone.</p>],

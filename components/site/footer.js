@@ -53,9 +53,9 @@ export default function Footer() {
             </div>
           </div>
           <FooterCol title="Maison" items={[
-            ['À propos de nous', '/a-propos'],
+            ['À propos', '/a-propos'],
             ['Journal', '/journal'],
-            ['Nous contacter', '/contact'],
+            ['Contact', '/contact'],
           ]} />
           <FooterCol title="Boutique" items={[
             ['Tous les produits', '/produits'],

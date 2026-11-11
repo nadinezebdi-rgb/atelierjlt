@@ -52,7 +52,7 @@ export default function HeroFerm({
   const heroLayout = layout || 'full-image'
   const heroEyebrow = eyebrow || 'Nouvelle Collection · Automne-Hiver 2025'
   const heroTitle = title || 'L’art discret\nde la maison.'
-  const heroSubtitle = subtitle || 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main dans notre atelier français.'
+  const heroSubtitle = subtitle || 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.'
   const cta1 = ctaPrimary || { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' }
   const cta2 = ctaSecondary || { label: 'Notre atelier', href: '/atelier' }
   const sig = signature || 'Plaid Sylvestre · Crochet main'
