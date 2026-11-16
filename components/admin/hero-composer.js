@@ -465,7 +465,7 @@ function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
         </ElementRow>
 
         <ElementRow show={s.showSignature !== false} onToggle={(v) => onUpdateField('showSignature', v)} label="Étiquette signature" onClear={() => onUpdateField('signature', '')}>
-          <input value={s.signature || ''} onChange={(e) => onUpdateField('signature', e.target.value)} placeholder="Plaid Sylvestre · Crochet main" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
+          <input value={s.signature || ''} onChange={(e) => onUpdateField('signature', e.target.value)} placeholder="Création artisanale · Fait main" className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
         </ElementRow>
       </div>
     </div>

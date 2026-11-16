@@ -68,7 +68,7 @@ export default function SectionFields({ section, updateContent }) {
           <textarea className={`${INPUT_CLS} min-h-[90px]`} value={c.subtitle || ''} onChange={(e) => updateContent({ subtitle: e.target.value })} placeholder="Plaids crochet, macramé mural…" />
         </Field>
         <Field label="Signature discrète (bas de visuel)">
-          <input className={INPUT_CLS} value={c.signature || ''} onChange={(e) => updateContent({ signature: e.target.value })} placeholder="Plaid Sylvestre · Crochet main" />
+          <input className={INPUT_CLS} value={c.signature || ''} onChange={(e) => updateContent({ signature: e.target.value })} placeholder="Création artisanale · Fait main" />
         </Field>
 
         <div className="pt-2 border-t border-linen">

@@ -55,7 +55,7 @@ export default function HeroFerm({
   const heroSubtitle = subtitle || 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.'
   const cta1 = ctaPrimary || { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' }
   const cta2 = ctaSecondary || { label: 'Notre atelier', href: '/atelier' }
-  const sig = signature || 'Plaid Sylvestre · Crochet main'
+  const sig = signature || 'Création artisanale · Fait main'
   const overlayA = Math.min(100, Math.max(0, overlayIntensity ?? 30)) / 100
   const pos = textPosition || 'bottom-left'
 

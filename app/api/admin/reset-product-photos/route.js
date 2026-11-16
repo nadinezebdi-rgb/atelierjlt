@@ -3,7 +3,7 @@
  * aux valeurs par défaut du catalogue.
  *
  * POST /api/admin/reset-product-photos
- * Body : { slug: "plaid-sylvestre" }
+ * Body : { slug: "slug-du-produit" }
  *
  * L'action est journalisée dans `chat_actions` pour permettre l'undo.
  */

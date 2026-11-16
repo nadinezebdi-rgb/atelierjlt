@@ -62,7 +62,7 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        /* Ginette bespoke palette */
+        /* Palette Atelier JLT */
         ivory: '#F7F4EF',
         cream: '#F1EBE0',
         linen: '#E7DFCF',

@@ -37,7 +37,7 @@ const DEFAULT_CONTENT = {
     subtitle: 'Plaids crochet, macramé mural, poterie tournée main — chaque pièce imaginée, fabriquée et assemblée à la main.',
     ctaPrimary: { label: 'Découvrir la collection', href: '/collections?cat=nouveautes' },
     ctaSecondary: { label: 'À propos', href: '/a-propos' },
-    signature: 'Plaid Sylvestre · Crochet main',
+    signature: 'Création artisanale · Fait main',
     image: '',
     showEyebrow: true,
     showTitle: true,
@@ -317,8 +317,7 @@ function TabProducts() {
     } else toast.error(d.error || 'Erreur')
   }
 
-  // Produits filtrés par recherche + catégorie — permet à la fille de trouver
-  // instantanément « Plaid Sylvestre » sans faire défiler toute la liste.
+  // Produits filtrés par recherche + catégorie pour parcourir rapidement le catalogue.
   const filtered = useMemo(() => {
     if (!products) return []
     const q = search.trim().toLowerCase()
@@ -465,7 +464,7 @@ function TabProducts() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un produit (ex. plaid sylvestre, coussin, panier…)"
+            placeholder="Rechercher un produit (ex. plaid, coussin, panier…)"
             className="w-full bg-ivory border border-ink/15 pl-10 pr-10 py-2.5 text-sm rounded-sm focus:outline-none focus:border-emerald"
           />
           {search && (
@@ -1581,4 +1580,3 @@ function TabSettings() {
     </div>
   )
 }
-
