@@ -5,6 +5,8 @@ import { Plus, Trash2, Copy, ArrowUp, ArrowDown, MousePointer, Move, Layers, Eye
 import { toast } from 'sonner'
 import { sampleImageLuminance, pickTextColor } from '@/lib/color-utils'
 import HeroFerm from '@/components/home/hero-ferm'
+import LinkField from '@/components/edit/link-field'
+import { useAllProducts } from '@/components/edit/section-fields'
 
 /**
  * Composeur Hero — V2
@@ -97,10 +99,10 @@ export default function HeroComposer({
     <section id="admin-hero" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald">Bannière principale · Compositeur V2</h3>
+          <h3 className="text-lg text-emerald">Bannière principale</h3>
           <p className="text-xs text-ink/60 mt-2 max-w-xl">
-            Glisse le bloc texte sur l'image, laisse la couleur s'ajuster automatiquement,
-            active la parallaxe et crée plusieurs compositions pour un carrousel rotatif.
+            Choisissez une photo, écrivez votre texte et vérifiez l’aperçu.
+            Les réglages de position et d’effets sont dans « Options avancées ».
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-ink/60">
@@ -135,14 +137,14 @@ export default function HeroComposer({
             <span className="text-ink/50">Durée :</span>
             <input
               type="number"
-              min={2000}
-              max={30000}
-              step={500}
-              value={rotationInterval}
-              onChange={(e) => onChange({ hero: allSlides[0], heroSlides: allSlides.slice(1), rotationInterval: Math.max(2000, Number(e.target.value) || 5000) })}
+              min={2}
+              max={30}
+              step={0.5}
+              value={rotationInterval / 1000}
+              onChange={(e) => onChange({ hero: allSlides[0], heroSlides: allSlides.slice(1), rotationInterval: Math.min(30000, Math.max(2000, Number(e.target.value) * 1000 || 5000)) })}
               className="w-24 bg-transparent border-b border-ink/20 py-1 focus:outline-none focus:border-emerald text-sm"
             />
-            <span className="text-ink/50">ms</span>
+            <span className="text-ink/50">secondes</span>
           </div>
         </div>
       )}
@@ -161,6 +163,7 @@ export default function HeroComposer({
 
 /* ============ ÉDITEUR D'UNE SLIDE UNIQUE ============ */
 function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
+  const products = useAllProducts()
   const s = slide || {}
   const layout = s.layout || 'full-image'
   const useCustom = !!s.useCustomPosition
@@ -225,7 +228,7 @@ function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
   return (
     <div className="space-y-6">
       {/* Média */}
-      <Field label="Média du hero (photo ou vidéo MP4)">
+      <Field label="Photo ou vidéo de la bannière">
         <ImageUploader
           images={s.image ? [s.image] : []}
           onChange={(imgs) => onUpdateField('image', imgs[0] || '')}
@@ -237,6 +240,8 @@ function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
       </Field>
 
       {/* Mise en page & options globales */}
+      <details className="border border-linen p-4">
+      <summary className="cursor-pointer text-sm mb-4">Options avancées : mise en page, position & effets</summary>
       <div className="grid md:grid-cols-3 gap-4">
         <div>
           <label className="text-[10px] uppercase tracking-[0.24em] text-ink/50">Mise en page</label>
@@ -371,6 +376,7 @@ function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
           )}
         </div>
       )}
+      </details>
 
       {/* Aperçu WYSIWYG interactif */}
       {layout === 'full-image' && mediaUrl && (
@@ -453,14 +459,14 @@ function SlideEditor({ slide, onUpdate, onUpdateField, ImageUploader }) {
         <ElementRow show={s.showPrimary !== false} onToggle={(v) => onUpdateField('showPrimary', v)} label="Bouton principal" onClear={() => { onUpdateField('ctaPrimary.label', ''); onUpdateField('ctaPrimary.href', '') }}>
           <div className="grid grid-cols-2 gap-3">
             <input value={s.ctaPrimary?.label || ''} onChange={(e) => onUpdateField('ctaPrimary.label', e.target.value)} placeholder="Libellé" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
-            <input value={s.ctaPrimary?.href || ''} onChange={(e) => onUpdateField('ctaPrimary.href', e.target.value)} placeholder="/collections" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm font-mono" />
+            <LinkField value={s.ctaPrimary?.href || ''} onChange={(value) => onUpdateField('ctaPrimary.href', value)} products={products || []} />
           </div>
         </ElementRow>
 
         <ElementRow show={s.showSecondary !== false} onToggle={(v) => onUpdateField('showSecondary', v)} label="Bouton secondaire" onClear={() => { onUpdateField('ctaSecondary.label', ''); onUpdateField('ctaSecondary.href', '') }}>
           <div className="grid grid-cols-2 gap-3">
             <input value={s.ctaSecondary?.label || ''} onChange={(e) => onUpdateField('ctaSecondary.label', e.target.value)} placeholder="Libellé" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm" />
-            <input value={s.ctaSecondary?.href || ''} onChange={(e) => onUpdateField('ctaSecondary.href', e.target.value)} placeholder="/atelier" className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-emerald text-sm font-mono" />
+            <LinkField value={s.ctaSecondary?.href || ''} onChange={(value) => onUpdateField('ctaSecondary.href', value)} products={products || []} />
           </div>
         </ElementRow>
 

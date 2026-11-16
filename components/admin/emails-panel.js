@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Mail, ChevronDown, Send, CheckCircle2, AlertCircle, Monitor, Smartphone, ShoppingBag, RefreshCw } from 'lucide-react'
+import { useUnsavedChanges } from './unsaved-changes'
+import { adminRequest } from '@/lib/admin-request'
 
 const KIND = {
   order_confirmation: 'Confirmation de commande',
@@ -70,27 +72,30 @@ export default function EmailsPanel() {
   }, [values, kind, open])
 
   const dirty = !!(values && savedValues && JSON.stringify(values) !== JSON.stringify(savedValues))
+  useUnsavedChanges(dirty || saving)
   const saveTexts = async () => {
     setSaving(true)
-    const r = await fetch('/api/admin/emails/templates', {
+    try {
+    await adminRequest('/api/admin/emails/templates', {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, values }),
     })
-    setSaving(false)
-    if (!r.ok) return toast.error('Enregistrement impossible')
-    const d = await r.json().catch(() => ({}))
     toast.success('Textes enregistrés : les prochains e-mails les utiliseront')
     setSavedValues(values)
-    setTpl((t) => (t ? { ...t, customized: !!d.customized } : t))
+    setTpl((t) => (t ? { ...t, customized: true } : t))
     load()
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving(false) }
   }
   const resetTexts = async () => {
     if (!confirm('Revenir au texte d’origine pour ce modèle ?')) return
-    await fetch(`/api/admin/emails/templates?kind=${encodeURIComponent(kind)}`, { method: 'DELETE', credentials: 'include' })
+    try {
+    await adminRequest(`/api/admin/emails/templates?kind=${encodeURIComponent(kind)}`, { method: 'DELETE' })
     toast.success('Texte d’origine rétabli')
     setValues(tpl?.defaults || null); setSavedValues(tpl?.defaults || null)
     setTpl((t) => (t ? { ...t, customized: false } : t))
     load()
+    } catch (e) { toast.error(e.message) }
   }
 
   const sendTest = async (withKind) => {
@@ -124,7 +129,7 @@ export default function EmailsPanel() {
 
   return (
     <section className="border border-linen bg-ivory mb-6" data-testid="emails-panel">
-      <button type="button" onClick={() => setOpen(!open)} className="w-full p-4 flex flex-wrap items-center gap-3 text-left" data-testid="emails-panel-toggle">
+      <button type="button" disabled={saving} onClick={() => { if (open && dirty) { if (!confirm('Vos modifications non enregistrées seront perdues. Continuer ?')) return; setValues(savedValues) } setOpen(!open) }} className="w-full p-4 flex flex-wrap items-center gap-3 text-left" data-testid="emails-panel-toggle">
         <Mail className="h-5 w-5 text-emerald" strokeWidth={1.5} />
         <div className="flex-1 min-w-[200px]">
           <div className="font-display text-lg">Emails clients</div>
@@ -148,7 +153,7 @@ export default function EmailsPanel() {
           <div data-testid="email-preview">
             <div className="text-[10px] uppercase tracking-[0.24em] text-ink/50 mb-2">Modifier les textes et voir l’aperçu</div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <select value={kind} onChange={(e) => { if (dirty && !confirm('Vos modifications non enregistrées seront perdues. Continuer ?')) return; setKind(e.target.value) }} data-testid="email-preview-kind" className="h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none flex-1 min-w-[220px]">
+              <select disabled={saving} value={kind} onChange={(e) => { if (dirty && !confirm('Vos modifications non enregistrées seront perdues. Continuer ?')) return; setKind(e.target.value) }} data-testid="email-preview-kind" className="h-10 px-3 bg-transparent border border-ink/20 focus:border-ink outline-none flex-1 min-w-[220px]">
                 {kinds.map(([k, l]) => <option key={k} value={k}>{l}{(data?.customized || []).includes(k) ? ' — modifié' : ''}</option>)}
               </select>
               <div className="inline-flex border border-ink/20">
@@ -202,7 +207,7 @@ export default function EmailsPanel() {
                         {saving ? 'Enregistrement…' : dirty ? 'Enregistrer' : 'Enregistré'}
                       </button>
                       {tpl.customized && (
-                        <button type="button" onClick={resetTexts} data-testid="email-texts-reset" className="h-10 px-4 border border-ink/20 hover:border-terracotta hover:text-terracotta text-[10px] uppercase tracking-[0.18em]">
+                        <button type="button" disabled={saving} onClick={resetTexts} data-testid="email-texts-reset" className="h-10 px-4 border border-ink/20 hover:border-terracotta hover:text-terracotta text-[10px] uppercase tracking-[0.18em]">
                           Tout remettre d’origine
                         </button>
                       )}

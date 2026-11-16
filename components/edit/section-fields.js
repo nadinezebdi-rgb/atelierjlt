@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Trash2, Search, Plus, Check, ShoppingBag, Wand2, Hand, ArrowUp, ArrowDown } from 'lucide-react'
 import { CAROUSEL_FILTERS, getCarouselMode, filterProductsForCarousel } from '@/lib/homepage-sections'
+import LinkField from './link-field'
 
 export const INPUT_CLS =
   'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald transition rounded-sm'
@@ -165,7 +166,7 @@ export default function SectionFields({ section, updateContent }) {
           <input className={INPUT_CLS} value={c.ctaLabel || ''} onChange={(e) => updateContent({ ctaLabel: e.target.value })} placeholder="Découvrir" />
         </Field>
         <Field label="Lien du bouton">
-          <input className={INPUT_CLS} value={c.ctaHref || ''} onChange={(e) => updateContent({ ctaHref: e.target.value })} placeholder="/collections" />
+          <LinkField value={c.ctaHref || ''} onChange={(value) => updateContent({ ctaHref: value })} />
         </Field>
         <Field label="Position du texte">
           <Segmented
@@ -221,7 +222,7 @@ export default function SectionFields({ section, updateContent }) {
           />
         </Field>
         <Field label="Lien « Tout voir » (facultatif)">
-          <input className={INPUT_CLS} value={c.viewAllHref || ''} onChange={(e) => updateContent({ viewAllHref: e.target.value })} placeholder="/collections" />
+          <LinkField value={c.viewAllHref || ''} onChange={(value) => updateContent({ viewAllHref: value })} />
         </Field>
         <label className="flex items-center gap-2 py-1 cursor-pointer select-none">
           <input

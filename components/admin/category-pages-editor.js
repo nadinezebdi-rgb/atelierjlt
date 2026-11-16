@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ChevronDown, Eye, Save, RotateCcw } from 'lucide-react'
+import { useUnsavedChanges } from './unsaved-changes'
+import { adminRequest } from '@/lib/admin-request'
 
 const INPUT = 'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald rounded-sm'
 const LABEL = 'block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2'
@@ -13,10 +15,14 @@ export default function CategoryPagesEditor() {
   const [open, setOpen] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  useUnsavedChanges(dirty || saving)
 
-  useEffect(() => {
-    fetch('/api/site-pages/categories').then((r) => r.json()).then((d) => setCats(d.categories || [])).catch(() => setCats([]))
-  }, [])
+  const load = () => {
+    setError('')
+    return adminRequest('/api/site-pages/categories').then((d) => setCats(d.categories || [])).catch((e) => setError(e.message))
+  }
+  useEffect(() => { load() }, [])
 
   const upd = (slug, patch) => {
     setCats((list) => list.map((c) => (c.slug === slug ? { ...c, ...patch } : c)))
@@ -24,14 +30,16 @@ export default function CategoryPagesEditor() {
   }
   const save = async () => {
     setSaving(true)
+    try {
     const items = Object.fromEntries(cats.map((c) => [c.slug, { name: c.name, tagline: c.tagline, eyebrow: c.eyebrow }]))
-    const r = await fetch('/api/admin/site-pages/categories', {
+    await adminRequest('/api/admin/site-pages/categories', {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     })
-    setSaving(false)
-    if (r.ok) { setDirty(false); toast.success('Pages Collections enregistrées') } else toast.error('Erreur à l’enregistrement')
+      setDirty(false); toast.success('Pages du catalogue enregistrées')
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving(false) }
   }
 
   return (
@@ -55,8 +63,8 @@ export default function CategoryPagesEditor() {
         </button>
       </div>
       {open && (
-        <div className="border-t border-linen/60 bg-cream/20 p-6 md:p-8 space-y-4">
-          {!cats ? <div className="text-ink/50 text-sm">Chargement…</div> : cats.map((c) => (
+        <fieldset disabled={saving} className="border-t border-linen/60 bg-cream/20 p-6 md:p-8 space-y-4">
+          {error ? <div role="alert"><p>{error}</p><button onClick={load} className="border px-4 py-2 mt-3">Réessayer</button></div> : !cats ? <div className="text-ink/50 text-sm">Chargement…</div> : cats.map((c) => (
             <div key={c.slug} className="border border-linen bg-ivory p-4" data-testid={`category-${c.slug}`}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="font-display text-lg">{c.name || c.defaultName}</div>
@@ -76,7 +84,7 @@ export default function CategoryPagesEditor() {
               </div>
             </div>
           ))}
-        </div>
+        </fieldset>
       )}
     </section>
   )

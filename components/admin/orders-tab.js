@@ -15,6 +15,8 @@ import { CARRIERS } from '@/lib/tracking'
 import EmailsPanel from '@/components/admin/emails-panel'
 import SalesSwitch from '@/components/admin/sales-switch'
 import RelaySettingsPanel from '@/components/admin/relay-settings-panel'
+import { adminRequest } from '@/lib/admin-request'
+import { useAdminNavigation, useUnsavedChanges } from './unsaved-changes'
 
 export const ORDER_STATUSES = [
   ['received', 'Reçue'],
@@ -35,26 +37,32 @@ export default function TabOrders() {
   const [openId, setOpenId] = useState(null)
   const [filter, setFilter] = useState('todo')
   const [conn, setConn] = useState({})
+  const [search, setSearch] = useState('')
+  const [error, setError] = useState('')
+  const [updating, setUpdating] = useState(false)
+  const confirmNavigation = useAdminNavigation()
+  useUnsavedChanges(updating)
   useEffect(() => {
     fetch('/api/admin/shipping', { credentials: 'include' }).then((r) => r.json()).then(setConn).catch(() => {})
   }, [])
 
-  const load = () =>
-    fetch('/api/admin/orders', { credentials: 'include' })
-      .then((r) => r.json())
+  const load = () => {
+    setError('')
+    return adminRequest('/api/admin/orders')
       .then((d) => setOrders(d.orders || []))
-      .catch(() => setOrders([]))
+      .catch((e) => setError(e.message))
+  }
   useEffect(() => { load() }, [])
 
   const patch = async (id, body, msg = 'Commande mise à jour') => {
-    const r = await fetch('/api/admin/orders?id=' + encodeURIComponent(id), {
+    setUpdating(true)
+    try {
+    const d = await adminRequest('/api/admin/orders?id=' + encodeURIComponent(id), {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok) toast.success(msg)
-    else toast.error(d.error || 'Erreur')
+    toast.success(msg)
     if (d.email) {
       if (d.email.ok) toast.success('Email « commande expédiée » envoyé au client')
       else if (d.email.error === 'not_configured') toast.message('Email non envoyé : l’envoi des emails n’est pas encore activé')
@@ -62,11 +70,18 @@ export default function TabOrders() {
       else toast.error('L’email au client n’a pas pu partir')
     }
     load()
+      return true
+    } catch (e) { toast.error(e.message); return false }
+    finally { setUpdating(false) }
   }
 
-  if (!orders) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <div role="alert" className="border border-linen p-5"><p>{error}</p><button onClick={load} className="mt-3 border px-4 py-2">Réessayer</button></div>
+  if (!orders) return <div role="status" className="text-ink/50">Chargement…</div>
 
   const visible = orders.filter((o) => {
+    const query = search.trim().toLocaleLowerCase('fr')
+    const address = o.address || {}
+    if (query && !`${o.orderNumber} ${address.name || ''} ${address.firstName || ''} ${address.lastName || ''} ${address.email || ''}`.toLocaleLowerCase('fr').includes(query)) return false
     if (filter === 'todo') return ['received', 'preparing'].includes(o.status || 'received')
     if (filter === 'shipped') return ['shipped', 'delivered'].includes(o.status)
     return true
@@ -103,13 +118,10 @@ export default function TabOrders() {
         </button>
       </div>
 
-      <SalesSwitch />
-      <RelaySettingsPanel />
-      <EmailsPanel />
-
+      <label className="block mb-4"><span className="block text-sm mb-2">Rechercher une commande</span><input disabled={updating} type="search" value={search} onChange={(e) => { if (confirmNavigation()) setSearch(e.target.value) }} placeholder="Numéro, nom du client ou email" className="w-full border border-linen bg-ivory px-4 py-3" /></label>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {[['todo', 'À expédier'], ['shipped', 'Expédiées'], ['all', 'Toutes']].map(([v, l]) => (
-          <button key={v} type="button" onClick={() => setFilter(v)} className={`h-10 px-4 text-[11px] uppercase tracking-[0.2em] border transition ${filter === v ? 'bg-ink text-ivory border-ink' : 'border-ink/20 hover:border-ink'}`}>
+          <button key={v} disabled={updating} type="button" onClick={() => { if (confirmNavigation()) setFilter(v) }} className={`h-10 px-4 text-[11px] uppercase tracking-[0.2em] border transition ${filter === v ? 'bg-ink text-ivory border-ink' : 'border-ink/20 hover:border-ink'}`}>
             {l}
           </button>
         ))}
@@ -136,15 +148,20 @@ export default function TabOrders() {
               onPatch={(body, msg) => patch(o._id, body, msg)}
               conn={conn}
               onReload={load}
+              updating={updating}
             />
           ))}
         </div>
       )}
+      <details className="mt-8 border border-linen p-4">
+        <summary className="cursor-pointer text-lg">Réglages de vente, livraison & emails</summary>
+        <SalesSwitch /><RelaySettingsPanel /><EmailsPanel />
+      </details>
     </div>
   )
 }
 
-function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = {}, onReload }) {
+function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = {}, onReload, updating }) {
   const [tracking, setTracking] = useState(o.trackingNumber || '')
   const [carrier, setCarrier] = useState(o.carrier || 'colissimo')
   const [customUrl, setCustomUrl] = useState(o.carrier === 'other' ? (o.trackingUrl || '') : '')
@@ -152,6 +169,20 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = 
   const [offer, setOffer] = useState('')
   const [dims, setDims] = useState({ weight: '', length: '30', width: '20', height: '10' })
   const [busy, setBusy] = useState(false)
+  const [savedTracking, setSavedTracking] = useState({ tracking: o.trackingNumber || '', carrier: o.carrier || 'colissimo', customUrl: o.carrier === 'other' ? (o.trackingUrl || '') : '' })
+  const dirty = tracking !== savedTracking.tracking || carrier !== savedTracking.carrier || customUrl !== savedTracking.customUrl
+  useUnsavedChanges(dirty || busy || updating)
+  const saveTracking = async () => {
+    const shipping = tracking.trim() && ['received', 'preparing'].includes(o.status || 'received')
+    if (shipping && !confirm('Marquer cette commande comme expédiée et envoyer l’email au client si l’envoi est activé ?')) return
+    const snapshot = { tracking, carrier, customUrl }
+    const ok = await onPatch({
+      trackingNumber: tracking.trim(), carrier,
+      trackingUrl: carrier === 'other' ? customUrl.trim() : (o.carrierLabel?.trackingUrl && o.carrierLabel?.trackingNumber === tracking.trim() ? o.carrierLabel.trackingUrl : ''),
+      ...(shipping ? { status: 'shipped' } : {}),
+    }, 'Suivi enregistré')
+    if (ok) setSavedTracking(snapshot)
+  }
   const createPaidLabel = async () => {
     setBusy(true)
     try {
@@ -191,7 +222,11 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = 
         <div className="font-display text-xl tabular-nums">{formatPrice(o.total)}</div>
         <select
           value={o.status || 'received'}
-          onChange={(e) => onPatch({ status: e.target.value, ...(e.target.value === 'shipped' && !o.shippedAt ? { shippedAt: new Date().toISOString() } : {}) }, 'Statut mis à jour')}
+          disabled={updating || busy}
+          onChange={(e) => {
+            if (['shipped', 'cancelled'].includes(e.target.value) && !confirm(e.target.value === 'shipped' ? 'Marquer comme expédiée ? Un email peut être envoyé au client.' : 'Annuler cette commande ?')) return
+            onPatch({ status: e.target.value, ...(e.target.value === 'shipped' && !o.shippedAt ? { shippedAt: new Date().toISOString() } : {}) }, 'Statut mis à jour')
+          }}
           className="h-11 bg-transparent border border-ink/20 px-3 text-[11px] uppercase tracking-[0.18em] focus:outline-none focus:border-ink"
           aria-label="Statut"
         >
@@ -266,15 +301,11 @@ function OrderRow({ order: o, selected, onToggle, open, onOpen, onPatch, conn = 
             <button
               type="button"
               data-testid={`tracking-save-${o._id}`}
-              onClick={() => onPatch({
-                trackingNumber: tracking.trim(),
-                carrier,
-                trackingUrl: carrier === 'other' ? customUrl.trim() : (o.carrierLabel?.trackingUrl && o.carrierLabel?.trackingNumber === tracking.trim() ? o.carrierLabel.trackingUrl : ''),
-                ...(tracking.trim() && (o.status === 'received' || o.status === 'preparing' || !o.status) ? { status: 'shipped' } : {}),
-              }, 'Suivi enregistré')}
+              disabled={updating || busy}
+              onClick={saveTracking}
               className="w-full h-11 bg-ink text-ivory text-[11px] uppercase tracking-[0.2em] hover:bg-emerald"
             >
-              Enregistrer le suivi
+              {updating ? 'Enregistrement…' : tracking.trim() && ['received', 'preparing'].includes(o.status || 'received') ? 'Expédier et prévenir le client' : 'Enregistrer le suivi'}
             </button>
             <div className="text-[11px] text-ink/55 leading-snug">
               {o.shippedEmailSentAt

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowUp, ArrowDown, ChevronDown, ListOrdered } from 'lucide-react'
 import { toast } from 'sonner'
+import { useUnsavedChanges } from './unsaved-changes'
+import { adminRequest } from '@/lib/admin-request'
 
 const COLLECTIONS = [
   { key: 'intemporels', label: 'Les Intemporels' },
@@ -19,6 +21,7 @@ export default function ProductOrderPanel({ products = [], onSaved }) {
   const [list, setList] = useState([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  useUnsavedChanges(dirty || saving)
 
   useEffect(() => {
     setList(products.filter((p) => p.category === col))
@@ -43,14 +46,15 @@ export default function ProductOrderPanel({ products = [], onSaved }) {
 
   const save = async () => {
     setSaving(true)
-    const r = await fetch('/api/admin/products/order', {
+    try {
+    await adminRequest('/api/admin/products/order', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category: col, slugs: list.map((p) => p.slug) }),
     })
-    setSaving(false)
-    if (r.ok) { toast.success('Ordre enregistré — il est visible sur le site'); setDirty(false); onSaved?.() }
-    else toast.error('Enregistrement impossible')
+      toast.success('Ordre enregistré — il est visible sur le site'); setDirty(false); onSaved?.()
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving(false) }
   }
 
   const switchCol = (k) => {
@@ -72,7 +76,7 @@ export default function ProductOrderPanel({ products = [], onSaved }) {
       </button>
 
       {open && (
-        <div className="border-t border-linen p-4">
+        <fieldset disabled={saving} className="border-t border-linen p-4">
           <div className="flex flex-wrap gap-2 mb-4">
             {COLLECTIONS.map((c) => (
               <button
@@ -115,7 +119,7 @@ export default function ProductOrderPanel({ products = [], onSaved }) {
               </button>
             </div>
           )}
-        </div>
+        </fieldset>
       )}
     </div>
   )

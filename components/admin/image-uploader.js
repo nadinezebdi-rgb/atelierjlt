@@ -108,10 +108,10 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
                   <span className="text-[9px] uppercase tracking-[0.22em] mt-1">PDF</span>
                 </div>
               )}
-              <div className="absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-2 text-ivory">
+              <div className="admin-image-actions absolute inset-0 bg-ink/60 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition flex flex-col items-center justify-center gap-2 text-ivory">
                 <div className="flex gap-1 text-[10px]">
-                  <button type="button" onClick={() => move(i, -1)} className="bg-ivory/20 px-2 py-1 hover:bg-ivory/40 disabled:opacity-30" disabled={i === 0}>◀</button>
-                  <button type="button" onClick={() => move(i, 1)} className="bg-ivory/20 px-2 py-1 hover:bg-ivory/40 disabled:opacity-30" disabled={i === (images.length - 1)}>▶</button>
+                  <button type="button" aria-label={`Déplacer la photo ${i + 1} vers la gauche`} onClick={() => move(i, -1)} className="bg-ivory/20 px-2 py-1 hover:bg-ivory/40 disabled:opacity-30" disabled={i === 0}>◀</button>
+                  <button type="button" aria-label={`Déplacer la photo ${i + 1} vers la droite`} onClick={() => move(i, 1)} className="bg-ivory/20 px-2 py-1 hover:bg-ivory/40 disabled:opacity-30" disabled={i === (images.length - 1)}>▶</button>
                 </div>
                 <a href={url} target="_blank" rel="noopener noreferrer" className="bg-ivory/20 px-3 py-1 text-[10px] uppercase tracking-[0.2em] hover:bg-ivory/40">Voir</a>
                 <button type="button" onClick={() => remove(i)} className="bg-brique px-3 py-1 text-[10px] uppercase tracking-[0.2em]">Retirer</button>
@@ -122,7 +122,7 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
         })}
         <label className="aspect-square bg-cream border border-dashed border-ink/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-emerald hover:text-emerald transition text-ink/50 text-[10px] uppercase tracking-[0.22em] text-center px-2">
           <Upload className="h-5 w-5" strokeWidth={1.5} />
-          {uploading ? 'Envoi…' : (accept === 'all' ? 'Télécharger' : 'Ajouter')}
+          {uploading ? 'Envoi…' : 'Ajouter un fichier'}
           {accept === 'all' && !uploading && (
             <span className="text-[8px] normal-case tracking-normal text-ink/40">
               PNG · JPG · MP4 · PDF
@@ -133,6 +133,8 @@ function ImageUploader({ images, onChange, accept = 'images' }) {
             multiple
             accept={acceptAttr}
             className="hidden"
+            disabled={uploading}
+            aria-label="Ajouter des photos ou fichiers"
             onChange={(e) => handleFiles(Array.from(e.target.files || []))}
           />
         </label>

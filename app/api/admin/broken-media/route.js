@@ -23,9 +23,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   if (!isAdmin(request)) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
-  // Uniquement les produits réellement en vente (comme la liste Produits) :
-  // un produit supprimé ou masqué n'a pas besoin de ses photos.
-  const all = await loadProducts()
+  const all = await loadProducts({ includeDrafts: true })
 
   // Extrait toutes les URLs médias
   const products = []

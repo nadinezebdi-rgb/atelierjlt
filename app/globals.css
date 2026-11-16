@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+.admin-workspace :is(button, summary, select, input:not([type="checkbox"]):not([type="range"]):not([type="file"])) {
+  min-height: 44px;
+}
+
+.admin-workspace :is(button, summary) {
+  min-width: 44px;
+}
+
+.admin-workspace :is(input, select, textarea) {
+  font-size: 16px;
+}
+
+.admin-workspace :is(label, button, summary, nav a) {
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.admin-workspace :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #0F5C3F;
+  outline-offset: 3px;
+}
+
+@media (hover: none) {
+  .admin-image-actions {
+    position: static;
+    opacity: 1;
+    padding: 8px;
+  }
+  .admin-image-actions button,
+  .admin-image-actions a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  div:has(> .admin-image-actions) {
+    aspect-ratio: auto;
+  }
+}
+
 :root {
   --background: 40 33% 96%;
   --foreground: 20 14% 8%;

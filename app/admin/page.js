@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { formatPrice } from '@/lib/utils'
@@ -23,6 +23,9 @@ import PageContentEditor from '@/components/admin/page-content-editor'
 import CategoryPagesEditor from '@/components/admin/category-pages-editor'
 import ProductSlugEditor from '@/components/admin/product-slug-editor'
 import NavbarBlock from '@/components/admin/navbar-block'
+import { adminRequest } from '@/lib/admin-request'
+import { publicationErrors } from '@/lib/product-publication'
+import { UnsavedChangesProvider, useAdminNavigation, useFormChanges, useUnsavedChanges } from '@/components/admin/unsaved-changes'
 
 /* =========================================================
    ONGLET — CONTENU DU SITE (hero + collections)
@@ -108,75 +111,92 @@ const DEFAULT_SETTINGS = {
 import { cn } from '@/lib/utils'
 
 export default function AdminPage() {
+  return <UnsavedChangesProvider><AdminWorkspace /></UnsavedChangesProvider>
+}
+
+function AdminWorkspace() {
   const [status, setStatus] = useState('loading') // loading | out | in
   const [pw, setPw] = useState('')
   const [tab, setTab] = useState('dashboard')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [contentDirty, setContentDirty] = useState(false)
+  const [productFilter, setProductFilter] = useState('all')
+  const [authError, setAuthError] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
+  const confirmNavigation = useAdminNavigation()
 
-  useEffect(() => {
-    fetch('/api/auth/admin-status', { credentials: 'include' }).then((r) => r.json()).then((d) => setStatus(d.isAdmin ? 'in' : 'out'))
-  }, [])
+  const checkSession = () => {
+    setAuthError('')
+    adminRequest('/api/auth/admin-status').then((d) => setStatus(d.isAdmin ? 'in' : 'out'))
+      .catch(() => { setAuthError('Connexion impossible. Vérifiez votre connexion et réessayez.'); setStatus('out') })
+  }
+  useEffect(checkSession, [])
 
   const login = async (e) => {
     e.preventDefault()
-    const r = await fetch('/api/auth/admin-login', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    })
-    if (r.ok) { setStatus('in'); toast.success('Connecté en admin') }
-    else toast.error('Mot de passe invalide')
+    setLoggingIn(true)
+    setAuthError('')
+    try {
+      await adminRequest('/api/auth/admin-login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      })
+      setStatus('in'); setPw(''); toast.success('Bienvenue dans votre atelier')
+    } catch (error) { setAuthError(error.message) }
+    finally { setLoggingIn(false) }
   }
 
   const logout = async () => {
-    await fetch('/api/auth/admin-logout', { method: 'POST', credentials: 'include' })
-    setStatus('out')
+    if (!confirmNavigation()) return
+    try {
+      await adminRequest('/api/auth/admin-logout', { method: 'POST' })
+      setStatus('out')
+    } catch (error) { toast.error(error.message) }
   }
 
-  if (status === 'loading') return <div className="min-h-screen bg-ivory" />
+  if (status === 'loading') return <div role="status" className="min-h-screen bg-ivory flex items-center justify-center">Ouverture de votre atelier…</div>
 
   if (status === 'out') {
     return (
       <div className="min-h-screen bg-ivory flex items-center justify-center px-6">
         <motion.form initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onSubmit={login} className="w-full max-w-sm">
           <span className="text-[10px] uppercase tracking-[0.36em] text-terracotta">Espace atelier</span>
-          <h1 className="font-display font-bold text-4xl mt-3">Back-office</h1>
+          <h1 className="font-display font-bold text-4xl mt-3">Mon atelier</h1>
           <p className="text-ink/60 mt-3 text-sm">Accès réservé à l'équipe JLT.</p>
           <div className="mt-8">
-            <label className="text-[10px] uppercase tracking-[0.28em] text-ink/60">Mot de passe admin</label>
-            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full mt-2 bg-transparent border-b border-ink/30 focus:border-ink outline-none py-3" autoFocus required />
+            <label htmlFor="admin-password" className="text-sm text-ink/70">Mot de passe</label>
+            <input id="admin-password" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full mt-2 bg-transparent border-b border-ink/30 focus:border-ink outline-none py-3" autoFocus required />
           </div>
-          <button className="w-full mt-8 bg-ink text-ivory py-4 text-[11px] uppercase tracking-[0.28em] hover:bg-terracotta transition">Entrer</button>
+          {authError && <p role="alert" className="text-sm text-terracotta mt-4">{authError}</p>}
+          <button disabled={loggingIn} className="w-full mt-8 bg-ink text-ivory py-4 text-sm hover:bg-terracotta transition disabled:opacity-50">{loggingIn ? 'Connexion…' : 'Entrer dans mon atelier'}</button>
         </motion.form>
       </div>
     )
   }
 
   const groups = [
-    { title: 'Vue générale', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
-    { title: 'Site & contenu', items: [
-      { key: 'content', label: 'Éditeur du site', icon: Layers },
-      { key: 'blog', label: 'Journal', icon: BookOpen },
-      { key: 'legal', label: 'Menu, footer & pages', icon: FileText },
-      { key: 'settings', label: 'Identité & paramètres', icon: SettingsIcon },
-    ] },
-    { title: 'Boutique', items: [
-      { key: 'products', label: 'Produits', icon: Package },
+    { title: 'Au quotidien', items: [
+      { key: 'dashboard', label: 'Accueil', icon: LayoutDashboard },
       { key: 'orders', label: 'Commandes', icon: ShoppingBag },
-      { key: 'coupons', label: 'Codes promo', icon: Ticket },
+      { key: 'products', label: 'Produits', icon: Package },
     ] },
-    { title: 'Audience', items: [
+    { title: 'Mon site', items: [
+      { key: 'content', label: 'Pages & images', icon: Layers },
+      { key: 'blog', label: 'Journal', icon: BookOpen },
+      { key: 'legal', label: 'Menu & bas de page', icon: FileText },
+    ] },
+    { title: 'Clients & promotions', items: [
       { key: 'users', label: 'Clients', icon: Users },
-      { key: 'newsletter', label: 'Newsletter', icon: Mail },
+      { key: 'coupons', label: 'Codes promo', icon: Ticket },
+      { key: 'newsletter', label: 'Abonnés newsletter', icon: Mail },
     ] },
+    { title: 'Configuration', items: [{ key: 'settings', label: 'Réglages', icon: SettingsIcon }] },
   ]
   const activeLabel = groups.flatMap((group) => group.items).find((item) => item.key === tab)?.label
-  const selectTab = (key) => {
-    if (key !== tab && tab === 'content' && contentDirty && !window.confirm('Des modifications de l’éditeur du site ne sont pas enregistrées. Quitter sans enregistrer ?')) return
+  const selectTab = (key, filter = 'all') => {
+    if (key !== tab && !confirmNavigation()) return
+    if (key === 'products') setProductFilter(filter)
     setTab(key)
     setMobileNavOpen(false)
-    if (key !== 'content') setContentDirty(false)
   }
   const navigation = (
     <nav aria-label="Navigation de l’administration" className="space-y-7">
@@ -197,7 +217,7 @@ export default function AdminPage() {
   )
 
   return (
-    <div className="min-h-screen bg-ivory">
+    <div className="admin-workspace min-h-screen bg-ivory">
       <header className="border-b border-linen sticky top-0 bg-ivory/95 backdrop-blur z-30">
         <div className="px-5 lg:px-8 flex items-center justify-between h-16 gap-3">
           <div className="flex items-center gap-4 min-w-0">
@@ -213,14 +233,14 @@ export default function AdminPage() {
       </header>
 
       <div className="flex min-h-[calc(100vh-4rem)]">
-        <aside className="hidden lg:block w-64 shrink-0 border-r border-linen bg-cream/30 p-5" aria-label="Espaces d’administration">{navigation}</aside>
+        <aside className="hidden lg:block w-64 shrink-0 border-r border-linen bg-cream/30 p-5 sticky top-16 h-[calc(100vh-4rem)] overflow-auto" aria-label="Espaces d’administration">{navigation}</aside>
         <main className="min-w-0 flex-1 px-5 py-8 lg:px-10 lg:py-10">
           <div className="text-[10px] uppercase tracking-[0.22em] text-ink/45 mb-5">Atelier JLT / {activeLabel}</div>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-            {tab === 'dashboard' && <TabDashboard />}
-            {tab === 'content' && <TabContent onDirtyChange={setContentDirty} />}
-            {tab === 'products' && <TabProducts />}
+            {tab === 'dashboard' && <TabDashboard onNavigate={selectTab} />}
+            {tab === 'content' && <TabContent />}
+            {tab === 'products' && <TabProducts initialFilter={productFilter} />}
             {tab === 'blog' && <TabBlog />}
             {tab === 'legal' && <LegalPagesTab />}
             {tab === 'orders' && <TabOrders />}
@@ -245,9 +265,10 @@ function Stat({ label, value }) {
   )
 }
 
-function TabDashboard() {
+function TabDashboard({ onNavigate }) {
   const [s, setS] = useState(null)
-  const load = () => fetch('/api/admin/stats', { credentials: 'include' }).then((r) => r.json()).then(setS)
+  const [error, setError] = useState('')
+  const load = () => { setError(''); return adminRequest('/api/admin/stats').then(setS).catch((e) => setError(e.message)) }
   useEffect(() => { load() }, [])
   const archive = async () => {
     if (!confirm(`Retirer les ${s.unpaidCount} commande${s.unpaidCount > 1 ? 's' : ''} d’essai non payée${s.unpaidCount > 1 ? 's' : ''} ?\n\nElles disparaissent de la liste des commandes (une copie est conservée en archive).`)) return
@@ -257,10 +278,23 @@ function TabDashboard() {
     toast.success(`${d.archived} commande${d.archived > 1 ? 's' : ''} d’essai retirée${d.archived > 1 ? 's' : ''}`)
     load()
   }
-  if (!s) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <LoadError message={error} onRetry={load} />
+  if (!s) return <div role="status" className="text-ink/50">Chargement…</div>
   return (
     <div>
       <h2 className="font-display text-3xl mb-6">Tableau de bord</h2>
+      <h3 className="text-lg mb-3">À faire aujourd’hui</h3>
+      <div className="grid sm:grid-cols-3 gap-4 mb-8">
+        {[['orders', 'Commandes à préparer', s.toPrepareCount, 'all'], ['products', 'Produits en rupture', s.soldOutCount, 'sold-out'], ['products', 'Brouillons à compléter', s.draftCount, 'draft']].map(([key, label, count, filter]) => (
+          <button key={label} onClick={() => onNavigate(key, filter)} className="border border-linen bg-cream/40 p-5 text-left hover:border-emerald">
+            <span className="block text-2xl font-display">{count ?? 0}</span><span className="block mt-2">{label} →</span>
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 mb-8">
+        <button onClick={() => onNavigate('products')} className="bg-emerald text-ivory px-5 py-3">Gérer mes produits</button>
+        <button onClick={() => onNavigate('content')} className="border border-linen px-5 py-3">Modifier mon site</button>
+      </div>
       <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <Stat label="Chiffre d'affaires" value={formatPrice(s.revenue || 0)} />
         <Stat label="Commandes payées" value={s.orderCount} />
@@ -283,7 +317,7 @@ function TabDashboard() {
   )
 }
 
-function TabProducts() {
+function TabProducts({ initialFilter = 'all' }) {
   const [products, setProducts] = useState(null)
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
@@ -291,30 +325,37 @@ function TabProducts() {
   const [selected, setSelected] = useState(() => new Set())
   const [createOpen, setCreateOpen] = useState(false)
   const [waitingMap, setWaitingMap] = useState({})
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [publicationFilter, setPublicationFilter] = useState(initialFilter)
+  const confirmNavigation = useAdminNavigation()
+  useUnsavedChanges(busy)
 
-  const load = () => fetch('/api/admin/products', { credentials: 'include' }).then((r) => r.json()).then((d) => setProducts(d.products))
+  const load = () => { setError(''); return adminRequest('/api/admin/products').then((d) => setProducts(d.products)).catch((e) => setError(e.message)) }
   useEffect(() => {
     load()
     fetch('/api/admin/stock-alerts', { credentials: 'include' })
       .then((r) => r.json())
       .then((d) => setWaitingMap(Object.fromEntries((d.summary || []).map((s) => [s.slug, s.count]))))
-      .catch(() => {})
+      .catch(() => toast.error('Impossible de charger les alertes de stock.'))
   }, [])
 
   // Modification groupée (Nouveau / Édition limitée)
   const bulk = async (set) => {
+    if (busy || !confirmNavigation()) return
     const slugs = [...selected]
-    const r = await fetch('/api/admin/products/bulk', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slugs, set }),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok) {
+    setBusy(true)
+    try {
+      const d = await adminRequest('/api/admin/products/bulk', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slugs, set }),
+      })
       toast.success(`${d.updated} produit${d.updated > 1 ? 's' : ''} mis à jour`)
+      setEditing(null)
       setSelected(new Set())
       load()
-    } else toast.error(d.error || 'Erreur')
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
   // Produits filtrés par recherche + catégorie pour parcourir rapidement le catalogue.
@@ -323,11 +364,14 @@ function TabProducts() {
     const q = search.trim().toLowerCase()
     return products.filter((p) => {
       if (catFilter !== 'all' && p.category !== catFilter) return false
+      if (publicationFilter === 'draft' && p.published !== false) return false
+      if (publicationFilter === 'published' && p.published === false) return false
+      if (publicationFilter === 'sold-out' && availableUnits(p) !== 0) return false
       if (!q) return true
       const hay = `${p.name} ${p.slug} ${p.category}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [products, search, catFilter])
+  }, [products, search, catFilter, publicationFilter])
 
   const cats = useMemo(() => {
     if (!products) return []
@@ -336,31 +380,37 @@ function TabProducts() {
   }, [products])
 
   const save = async (p) => {
-    const r = await fetch('/api/admin/products?slug=' + p.slug, {
+    setBusy(true)
+    try {
+    const d = await adminRequest('/api/admin/products?slug=' + encodeURIComponent(p.slug), {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p),
     })
-    if (r.ok) {
-      const d = await r.json().catch(() => ({}))
       toast.success('Enregistré'); setEditing(null); load()
       if (d.slug && d.slug !== p.slug) toast.message(`Adresse web : /produit/${d.slug}`)
       const sa = d.stockAlerts
       if (sa?.sent) toast.success(`${sa.sent} client${sa.sent > 1 ? 's' : ''} prévenu${sa.sent > 1 ? 's' : ''} du retour en stock`)
       else if (sa?.ready && !sa.configured) toast.message(`${sa.ready} alerte${sa.ready > 1 ? 's' : ''} retour en stock en attente : envoi des emails pas encore activé`)
-    }
-    else toast.error('Erreur')
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
   const remove = async (slug) => {
-    if (!confirm('Supprimer ce produit ?')) return
-    await fetch('/api/admin/products?slug=' + slug, { method: 'DELETE', credentials: 'include' })
-    toast.success('Supprimé')
-    load()
+    if (busy || !confirmNavigation() || !confirm('Supprimer ce produit ? Cette action retire sa fiche de la boutique.')) return
+    setBusy(true)
+    try {
+      await adminRequest('/api/admin/products?slug=' + encodeURIComponent(slug), { method: 'DELETE' })
+      toast.success('Produit supprimé')
+      setEditing(null); load()
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
   const resetPhotos = async (slug, name) => {
+    if (busy || !confirmNavigation()) return
     if (!confirm(`Réinitialiser toutes les photos de « ${name} » aux valeurs par défaut du catalogue ?\n\nLes photos que vous aviez uploadées ne s'afficheront plus (elles restent dans la médiathèque). Réversible via le bouton Annuler dans le chat Juliette.`)) return
+    setBusy(true)
     try {
       const r = await fetch('/api/admin/reset-product-photos', {
         method: 'POST', credentials: 'include',
@@ -370,59 +420,59 @@ function TabProducts() {
       const data = await r.json()
       if (r.ok && data.ok) {
         toast.success(data.message || 'Photos réinitialisées')
+        setEditing(null)
         load()
       } else {
         toast.error(data.error || 'Impossible de réinitialiser')
       }
     } catch (e) {
       toast.error('Erreur réseau')
-    }
+    } finally { setBusy(false) }
   }
 
   // Nouveau produit : on choisit d'abord sa collection, puis la fiche s'ouvre
   const create = async (category = 'intemporels') => {
-    const r = await fetch('/api/admin/products', {
+    if (busy || !confirmNavigation()) return
+    setBusy(true)
+    try {
+    const d = await adminRequest('/api/admin/products', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Nouvelle création',
-        category, collection: category, price: 0, stock: 1,
+        category, collection: category, price: 0, stock: 0,
       }),
     })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok) {
-      toast.success(category === 'pe-2026-2027' ? 'Créé dans « Printemps/Été 2027 »' : 'Créé dans « Les Intemporels »')
-      setSearch(''); setCatFilter('all'); setCreateOpen(false)
+      toast.success('Brouillon créé : il n’est pas visible sur le site')
+      setSearch(''); setCatFilter('all'); setPublicationFilter('all'); setEditing(null); setCreateOpen(false)
       await load()
       if (d.slug) setEditing(d.slug)
-    } else toast.error(d.error || 'Création impossible')
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
   const mismatchCount = (products || []).filter((p) => stockMismatch(p)).length
   const alignStocks = async () => {
+    if (busy || !confirmNavigation()) return
     const list = (products || []).filter((p) => stockMismatch(p))
     const lines = list.slice(0, 12).map((p) => { const m = stockMismatch(p); return `• ${p.name} : ${m.total} → ${m.sum}` }).join('\n')
     if (!confirm(`Aligner le stock total sur la somme des couleurs / tailles pour ${list.length} produit${list.length > 1 ? 's' : ''} ?\n\n${lines}${list.length > 12 ? '\n…' : ''}`)) return
-    const r = await fetch('/api/admin/products/align-stock', { method: 'POST', credentials: 'include' })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) return toast.error('Alignement impossible')
-    toast.success(`${d.fixed?.length || 0} stock${(d.fixed?.length || 0) > 1 ? 's' : ''} aligné${(d.fixed?.length || 0) > 1 ? 's' : ''}`)
-    load()
+    setBusy(true)
+    try {
+      const d = await adminRequest('/api/admin/products/align-stock', { method: 'POST' })
+      toast.success(`${d.fixed?.length || 0} stock${(d.fixed?.length || 0) > 1 ? 's' : ''} aligné${(d.fixed?.length || 0) > 1 ? 's' : ''}`)
+      setEditing(null); load()
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
-  if (!products) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <LoadError message={error} onRetry={load} />
+  if (!products) return <div role="status" className="text-ink/50">Chargement…</div>
 
   const CAT_LABELS = PRODUCT_CATEGORY_LABELS
 
   return (
     <div>
-      {/* Bandeau récupération photos manquantes (auto-hidden si 0) */}
-      <MissingMediaRecovery />
-
-      <StockAlertsPanel products={products} />
-
-      <div className="mt-8"><ProductOrderPanel products={products} onSaved={load} /></div>
-
       {/* En-tête + action principale */}
       <div className="flex items-center justify-between mb-4 mt-8 flex-wrap gap-3">
         <div>
@@ -436,7 +486,7 @@ function TabProducts() {
             </button>
           )}
           <div className="relative">
-            <button onClick={() => setCreateOpen((v) => !v)} data-testid="new-product" className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
+            <button disabled={busy} onClick={() => setCreateOpen((v) => !v)} data-testid="new-product" className="bg-ink text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2 disabled:opacity-50">
               <Plus className="h-4 w-4" strokeWidth={1.5} /> Nouveau produit
             </button>
             {createOpen && (
@@ -456,6 +506,11 @@ function TabProducts() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4" aria-label="État des produits">
+        {[['all', 'Tous'], ['published', 'Publiés'], ['draft', 'Brouillons'], ['sold-out', 'En rupture']].map(([value, label]) => (
+          <button key={value} aria-pressed={publicationFilter === value} onClick={() => setPublicationFilter(value)} className={`px-4 py-2 border ${publicationFilter === value ? 'bg-ink text-ivory' : 'border-linen'}`}>{label}</button>
+        ))}
+      </div>
       {/* Barre de recherche + filtres de catégorie */}
       <div className="bg-cream/50 border border-linen p-3 md:p-4 mb-5 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="relative flex-1">
@@ -499,7 +554,7 @@ function TabProducts() {
         <div className="border border-dashed border-ink/20 bg-cream/40 p-8 text-center">
           <p className="text-sm text-ink/60">Aucun produit ne correspond à votre recherche.</p>
           {search && (
-            <button onClick={() => { setSearch(''); setCatFilter('all') }} className="mt-3 text-[10px] uppercase tracking-[0.22em] text-emerald hover:underline">
+            <button onClick={() => { setSearch(''); setCatFilter('all'); setPublicationFilter('all') }} className="mt-3 text-[10px] uppercase tracking-[0.22em] text-emerald hover:underline">
               Effacer les filtres
             </button>
           )}
@@ -537,6 +592,7 @@ function TabProducts() {
         </div>
       )}
 
+      {editing && products.some((p) => p.slug === editing) && <div className="border border-linen mb-6"><ProductEditor key={editing} product={products.find((p) => p.slug === editing)} busy={busy} onSave={save} onCancel={() => setEditing(null)} onSlugChanged={(ns) => { setEditing(ns); load() }} /></div>}
       <div className="space-y-2">
         {filtered.map((p) => {
           const units = availableUnits(p)
@@ -560,6 +616,7 @@ function TabProducts() {
                 <div className="font-display text-lg leading-tight">{p.name}</div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">{CAT_LABELS[p.category] || p.category || '—'} · /produit/{p.slug}</div>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <span className={`px-2 py-1 text-xs ${p.published === false ? 'bg-amber-50 text-amber-900' : 'bg-emerald/10 text-emerald'}`}>{p.published === false ? 'Brouillon · privé' : 'Publié'}</span>
                   {p.isNew && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-emerald/10 text-emerald">Nouveau</span>}
                   {p.isLimited && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-brique/10 text-brique">Édition limitée</span>}
                   {units === 0 && <span className="text-[9px] uppercase tracking-[0.2em] px-2 py-0.5 bg-ink text-ivory">Épuisé</span>}
@@ -580,9 +637,12 @@ function TabProducts() {
                 <div className="font-display text-lg tabular-nums">{formatPrice(p.price)}</div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-ink/50">Stock : {units}</div>
               </div>
-              <button onClick={() => setEditing(editing === p.slug ? null : p.slug)} className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-ink transition">
+              <button disabled={busy} onClick={() => { if (confirmNavigation()) setEditing(editing === p.slug ? null : p.slug) }} className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 hover:border-ink transition">
                 {editing === p.slug ? 'Fermer' : 'Modifier'}
               </button>
+              <details className="relative">
+              <summary className="cursor-pointer px-3 py-3 text-sm">Autres actions</summary>
+              <div className="absolute right-0 z-20 bg-ivory border border-linen shadow-lg p-3 w-48 flex items-center gap-3">
               <button
                 onClick={() => resetPhotos(p.slug, p.name)}
                 className="text-[11px] uppercase tracking-[0.22em] px-3 py-2 border border-ink/20 text-ink/70 hover:border-terracotta hover:text-terracotta transition"
@@ -593,24 +653,49 @@ function TabProducts() {
               <button onClick={() => remove(p.slug)} className="text-terracotta hover:opacity-70" aria-label="Supprimer">
                 <Trash2 className="h-4 w-4" strokeWidth={1.5} />
               </button>
+              </div></details>
             </div>
-            {editing === p.slug && <ProductEditor product={p} onSave={save} onSlugChanged={(ns) => { setEditing(ns); load() }} />}
           </div>
           )
         })}
       </div>
+      <details hidden={!!editing || busy} className="mt-8 border border-linen p-4">
+        <summary className="cursor-pointer text-lg">Stock, ordre d’affichage & outils</summary>
+        <MissingMediaRecovery />
+        <StockAlertsPanel products={products.filter((p) => p.published !== false)} />
+        <ProductOrderPanel products={products} onSaved={load} />
+      </details>
     </div>
   )
 }
 
 const PRODUCT_CATEGORY_LABELS = { intemporels: 'Les Intemporels', 'pe-2026-2027': 'Printemps/Été 2027', decoration: 'Décoration', nouveautes: 'Nouveautés' }
 
-function ProductEditor({ product, onSave, onSlugChanged }) {
+function ProductEditor({ product, onSave, onSlugChanged, onCancel, busy }) {
   const [p, setP] = useState({ ...product })
+  const [preview, setPreview] = useState(false)
+  const { dirty, confirmDiscard } = useFormChanges(p)
+  useUnsavedChanges(busy)
+  const errors = publicationErrors(p)
   const upd = (k, v) => setP({ ...p, [k]: v })
   const editMismatch = stockMismatch(p)
   return (
     <div className="p-4 border-t border-linen bg-cream/30">
+      <div className="sticky top-16 z-20 bg-ivory border border-linen p-3 flex flex-wrap gap-3 items-center">
+        <span role="status" className="flex-1 text-sm">{dirty ? 'Modifications non enregistrées' : p.published === false ? 'Brouillon privé' : 'Produit publié'}</span>
+        <button type="button" disabled={busy} onClick={() => { if (confirmDiscard()) onCancel() }} className="border border-linen px-4 py-2">Annuler</button>
+        <button type="button" onClick={() => setPreview(!preview)} className="border border-linen px-4 py-2">{preview ? 'Fermer l’aperçu' : 'Prévisualiser'}</button>
+        <button disabled={busy || !dirty} onClick={() => onSave(p)} className="bg-emerald text-ivory px-4 py-2 disabled:opacity-40">{busy ? 'Enregistrement…' : 'Enregistrer'}</button>
+        {p.published === false && <button disabled={busy || errors.length > 0} onClick={() => { if (confirm('Publier ce produit ? Il sera visible dans la boutique.')) onSave({ ...p, published: true }) }} className="bg-ink text-ivory px-4 py-2 disabled:opacity-40">Publier</button>}
+        {p.published !== false && <button disabled={busy} onClick={() => { if (confirm('Retirer ce produit du site et le garder en brouillon ?')) onSave({ ...p, published: false }) }} className="border border-linen px-4 py-2">Mettre en brouillon</button>}
+      </div>
+      {p.published === false && errors.length > 0 && <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 mt-4 text-sm"><p className="font-medium">Avant de publier :</p><ul className="list-disc pl-5">{errors.map((error) => <li key={error}>{error}</li>)}</ul></div>}
+      {preview && <div className="mt-4 border border-linen bg-ivory p-6 grid sm:grid-cols-2 gap-6" data-testid="product-preview">
+        <div>{p.images?.[0] ? <img src={p.images[0]} alt={p.name || 'Aperçu du produit'} className="w-full aspect-square object-cover" /> : <p>Ajoutez une photo pour voir l’aperçu.</p>}</div>
+        <div><p className="text-sm text-ink/60">Aperçu privé — modifications en cours</p><h3 className="font-display text-3xl mt-3">{p.name}</h3><p className="text-xl mt-3">{formatPrice(p.price)}</p><p className="mt-4 whitespace-pre-wrap">{p.story}</p><p className="mt-4">Stock : {availableUnits(p)}</p></div>
+      </div>}
+      <fieldset disabled={busy}>
+      <h3 className="text-lg mt-6">Informations essentielles</h3>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Field label="Nom"><input value={p.name || ''} onChange={(e) => upd('name', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
         <Field label="Prix (€)"><input type="number" value={p.price || 0} onChange={(e) => upd('price', Number(e.target.value))} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
@@ -642,7 +727,7 @@ function ProductEditor({ product, onSave, onSlugChanged }) {
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!p.isNew} onChange={(e) => upd('isNew', e.target.checked)} /> Nouveauté</label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!p.isLimited} onChange={(e) => upd('isLimited', e.target.checked)} /> Édition limitée</label>
       </div>
-      <Field label="Description narrative (story)">
+      <Field label="Description du produit">
         <textarea rows={4} value={p.story || ''} onChange={(e) => upd('story', e.target.value)} className="w-full mt-1 bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink text-sm" />
       </Field>
       <Field label="Entretien">
@@ -657,21 +742,29 @@ function ProductEditor({ product, onSave, onSlugChanged }) {
       <Field label="Photos du produit">
         <ImageUploader images={p.images || []} onChange={(imgs) => upd('images', imgs)} />
       </Field>
-      <ProductSlugEditor product={product} name={p.name} story={p.story} onChanged={onSlugChanged} />
-      <button onClick={() => onSave(p)} className="mt-4 bg-ink text-ivory px-6 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-terracotta transition flex items-center gap-2">
-        <Save className="h-4 w-4" strokeWidth={1.5} /> Enregistrer
-      </button>
+      <details className="mt-6 border border-linen p-4"><summary className="cursor-pointer">Options avancées : adresse de la page & aperçu Google</summary>
+        {dirty && <p className="text-sm mt-3">Enregistrez d’abord la fiche avant de changer son adresse.</p>}
+        <fieldset disabled={dirty || busy}><ProductSlugEditor product={product} name={p.name} story={p.story} onChanged={onSlugChanged} /></fieldset>
+      </details>
+      </fieldset>
     </div>
   )
 }
 
 function Field({ label, children }) {
+  const id = useId()
+  const items = Children.toArray(children)
+  const index = items.findIndex((child) => isValidElement(child) && ['input', 'select', 'textarea'].includes(child.type))
   return (
     <div className="mt-4">
-      <label className="text-[10px] uppercase tracking-[0.24em] text-ink/50">{label}</label>
-      <div className="mt-1">{children}</div>
+      {index >= 0 ? <label htmlFor={items[index].props.id || id} className="text-sm text-ink/70">{label}</label> : <p className="text-sm text-ink/70">{label}</p>}
+      <div className="mt-1">{items.map((child, i) => i === index ? cloneElement(child, { id: child.props.id || id }) : child)}</div>
     </div>
   )
+}
+
+function LoadError({ message, onRetry }) {
+  return <div role="alert" className="border border-terracotta/30 bg-ivory p-5"><p>{message}</p><button type="button" onClick={onRetry} className="mt-3 border border-linen px-4 py-2">Réessayer</button></div>
 }
 
 /**
@@ -824,57 +917,58 @@ function TabBlog() {
   const [posts, setPosts] = useState(null)
   const [editing, setEditing] = useState(null) // slug being edited
   const [creating, setCreating] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
 
-  const load = () =>
-    fetch('/api/admin/blog', { credentials: 'include' })
-      .then((r) => r.json())
+  const load = () => {
+    setError('')
+    return adminRequest('/api/admin/blog')
       .then((d) => setPosts(d.posts || []))
+      .catch((e) => setError(e.message))
+  }
   useEffect(() => { load() }, [])
 
   const save = async (data, isNew) => {
-    if (isNew) {
-      const r = await fetch('/api/admin/blog', {
-        method: 'POST', credentials: 'include',
+    setBusy(true)
+    try {
+      await adminRequest(isNew ? '/api/admin/blog' : '/api/admin/blog?slug=' + encodeURIComponent(data.slug), {
+        method: isNew ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      const d = await r.json()
-      if (r.ok) { toast.success('Article créé'); setCreating(false); load() }
-      else toast.error(d.error || 'Erreur')
-    } else {
-      const r = await fetch('/api/admin/blog?slug=' + encodeURIComponent(data.slug), {
-        method: 'PATCH', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (r.ok) { toast.success('Article enregistré'); setEditing(null); load() }
-      else toast.error('Erreur')
-    }
+      toast.success('Article enregistré'); setCreating(false); setEditing(null); load()
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
 
   const remove = async (slug) => {
     if (!confirm('Supprimer cet article définitivement ?')) return
-    await fetch('/api/admin/blog?slug=' + encodeURIComponent(slug), {
+    try {
+    await adminRequest('/api/admin/blog?slug=' + encodeURIComponent(slug), {
       method: 'DELETE', credentials: 'include',
     })
     toast.success('Supprimé')
     load()
+    } catch (e) { toast.error(e.message) }
   }
 
   const togglePublish = async (post) => {
     const nextPublished = !post.published
-    await fetch('/api/admin/blog?slug=' + encodeURIComponent(post.slug), {
+    try {
+    await adminRequest('/api/admin/blog?slug=' + encodeURIComponent(post.slug), {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ published: nextPublished }),
     })
     toast.success(nextPublished ? 'Publié' : 'Dépublié')
     load()
+    } catch (e) { toast.error(e.message) }
   }
 
   if (creating) {
     return (
       <BlogEditor
+        busy={busy}
         initial={{
           slug: '', title: '', category: 'Journal', excerpt: '', image: '', imageAlt: '',
           content: '', keywords: [], author: 'Atelier JLT', readingTime: '5 min',
@@ -891,6 +985,7 @@ function TabBlog() {
     if (!post) return null
     return (
       <BlogEditor
+        busy={busy}
         initial={post}
         onSave={(d) => save(d, false)}
         onCancel={() => setEditing(null)}
@@ -904,6 +999,7 @@ function TabBlog() {
         <div>
           <h2 className="font-display text-4xl">Journal</h2>
           <p className="text-ink/60 text-sm mt-1">Articles publiés sur /journal.</p>
+          {error && <LoadError message={error} onRetry={load} />}
         </div>
         <button
           onClick={() => setCreating(true)}
@@ -985,11 +1081,13 @@ function TabBlog() {
   )
 }
 
-function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
+function BlogEditor({ initial, onSave, onCancel, isNew = false, busy }) {
   const [p, setP] = useState({
     ...initial,
     keywords: Array.isArray(initial.keywords) ? initial.keywords.join(', ') : (initial.keywords || ''),
   })
+  const { dirty, confirmDiscard } = useFormChanges(p)
+  useUnsavedChanges(busy)
   const upd = (k, v) => setP({ ...p, [k]: v })
 
   // Auto-generate slug from title when creating
@@ -1019,7 +1117,7 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="sticky top-16 z-20 bg-ivory py-4 flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
           <span className="text-[10px] uppercase tracking-[0.28em] text-terracotta">
             {isNew ? 'Nouvel article' : 'Modifier l’article'}
@@ -1027,19 +1125,21 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
           <h2 className="font-display text-3xl mt-1">{p.title || 'Sans titre'}</h2>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={onCancel} className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 border border-ink/25 hover:bg-linen/50 transition">
+          <button disabled={busy} onClick={() => { if (confirmDiscard()) onCancel() }} className="text-[11px] uppercase tracking-[0.24em] px-4 py-2 border border-ink/25 hover:bg-linen/50 transition">
             Annuler
           </button>
+          <span role="status" className="text-sm">{dirty ? 'Modifications non enregistrées' : 'Aucune modification'}</span>
           <button
             onClick={submit}
+            disabled={busy}
             className="bg-emerald text-ivory px-6 py-2.5 text-[11px] uppercase tracking-[0.24em] hover:bg-emeraldDark transition flex items-center gap-2"
           >
-            <Save className="h-4 w-4" strokeWidth={1.5} /> Enregistrer
+            <Save className="h-4 w-4" strokeWidth={1.5} /> {busy ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_320px] gap-8">
+      <fieldset disabled={busy} className="grid lg:grid-cols-[1fr_320px] gap-8">
         {/* Colonne principale */}
         <div className="space-y-6">
           <Field label="Titre de l’article">
@@ -1188,7 +1288,7 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
             </a>
           )}
         </div>
-      </div>
+      </fieldset>
     </div>
   )
 }
@@ -1197,20 +1297,30 @@ function BlogEditor({ initial, onSave, onCancel, isNew = false }) {
 function TabCoupons() {
   const [coupons, setCoupons] = useState(null)
   const [form, setForm] = useState({ code: '', type: 'percent', value: 10, label: '', active: true })
-  const load = () => fetch('/api/admin/coupons', { credentials: 'include' }).then((r) => r.json()).then((d) => setCoupons(d.coupons))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const load = () => { setError(''); return adminRequest('/api/admin/coupons').then((d) => setCoupons(d.coupons)).catch((e) => setError(e.message)) }
   useEffect(() => { load() }, [])
   const create = async (e) => {
     e.preventDefault()
-    await fetch('/api/admin/coupons', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    setBusy(true)
+    try {
+    await adminRequest('/api/admin/coupons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     toast.success('Coupon créé')
     setForm({ code: '', type: 'percent', value: 10, label: '', active: true })
     load()
+    } catch (e) { toast.error(e.message) }
+    finally { setBusy(false) }
   }
   const remove = async (id) => {
-    await fetch('/api/admin/coupons?id=' + id, { method: 'DELETE', credentials: 'include' })
-    load()
+    if (!confirm('Supprimer ce code promo ?')) return
+    try {
+      await adminRequest('/api/admin/coupons?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      toast.success('Code promo supprimé'); load()
+    } catch (e) { toast.error(e.message) }
   }
-  if (!coupons) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <LoadError message={error} onRetry={load} />
+  if (!coupons) return <div role="status" className="text-ink/50">Chargement…</div>
   return (
     <div>
       <h2 className="font-display text-3xl mb-6">Codes promo</h2>
@@ -1222,7 +1332,7 @@ function TabCoupons() {
         </select>
         <input type="number" placeholder="Valeur" value={form.value} onChange={(e) => setForm({ ...form, value: Number(e.target.value) })} className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" required />
         <input placeholder="Libellé (ex: Bienvenue -10%)" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className="bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" />
-        <button className="bg-ink text-ivory px-4 py-2 text-[11px] uppercase tracking-[0.22em] hover:bg-terracotta transition">Créer</button>
+        <button disabled={busy} className="bg-ink text-ivory px-4 py-2 text-[11px] uppercase tracking-[0.22em] hover:bg-terracotta transition disabled:opacity-50">{busy ? 'Création…' : 'Créer'}</button>
       </form>
       {coupons.length === 0 ? <p className="text-ink/60">Aucun code promo actif.</p> : (
         <div className="space-y-2">
@@ -1282,40 +1392,40 @@ function TabUsers() {
   )
 }
 
-function TabContent({ onDirtyChange }) {
+function TabContent() {
   const [c, setC] = useState(null)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
-  useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
-  useEffect(() => {
-    if (!dirty) return
-    const warn = (event) => { event.preventDefault(); event.returnValue = '' }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
+  const [error, setError] = useState('')
+  const [page, setPage] = useState('home')
+  const [savedContent, setSavedContent] = useState(null)
+  useUnsavedChanges(dirty || saving)
 
-  useEffect(() => {
-    fetch('/api/admin/site-content', { credentials: 'include' })
-      .then((r) => r.json())
+  const load = () => {
+    setError('')
+    return adminRequest('/api/admin/site-content')
       .then((d) => {
         const dbContent = d.content || {}
         const merged = { ...DEFAULT_CONTENT, ...dbContent }
         merged.sections = mergeHomepageSections(dbContent.sections)
         setC(merged)
+        setSavedContent(merged)
       })
-      .catch(() => setC({ ...DEFAULT_CONTENT, sections: mergeHomepageSections(null) }))
-  }, [])
+      .catch((e) => setError(e.message))
+  }
+  useEffect(() => { load() }, [])
 
   const save = async () => {
     setSaving(true)
-    const r = await fetch('/api/admin/site-content', {
+    try {
+    await adminRequest('/api/admin/site-content', {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(c),
     })
-    setSaving(false)
-    if (r.ok) { setDirty(false); toast.success('Contenu enregistré') }
-    else toast.error('Erreur')
+      setDirty(false); setSavedContent(c); toast.success('Contenu enregistré — visible sur le site')
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving(false) }
   }
 
   const upd = (path, value) => {
@@ -1344,17 +1454,19 @@ function TabContent({ onDirtyChange }) {
     })
   }
 
-  if (!c) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <LoadError message={error} onRetry={load} />
+  if (!c) return <div role="status" className="text-ink/50">Chargement…</div>
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+      <div className="sticky top-16 z-20 bg-ivory border-b border-linen py-4 flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 className="font-display text-3xl">Éditeur du site</h2>
-          <p className="text-sm text-ink/60 mt-2">Accueil (bannière, sections), pages À propos, Collection Printemps/Été, Contact, Pages Collections et Médiathèque — tout le contenu du site au même endroit.</p>
-          <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Modifications non enregistrées' : 'Toutes les modifications sont enregistrées'}</p>
+          <h2 className="font-display text-3xl">Mon site</h2>
+          <p className="text-sm text-ink/60 mt-2">Choisissez une page, modifiez son contenu puis enregistrez. L’enregistrement met à jour le site public.</p>
+          <p role="status" className="text-xs mt-2 text-ink/60">{dirty ? 'Contenu de page non enregistré' : 'Contenu de page enregistré'}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
+          <button disabled={!dirty || saving} onClick={() => { if (confirm('Annuler les modifications non enregistrées ?')) { setC(structuredClone(savedContent)); setDirty(false) } }} className="border border-linen px-4 py-3 disabled:opacity-40">Annuler</button>
           <a
             href="/?edit=1"
             target="_blank"
@@ -1372,14 +1484,12 @@ function TabContent({ onDirtyChange }) {
       </div>
 
       <nav aria-label="Sections de l’éditeur" className="flex flex-wrap gap-2 mb-8">
-        {[['#admin-navbar', 'Menu de navigation'], ['#admin-hero', 'Bannière principale'], ['#admin-sections', 'Sections de la page'], ['#admin-page-about', 'Page À propos'], ['#admin-page-collectionPE2027', 'Collection Printemps/Été 2027'], ['#admin-page-contact', 'Page Contact'], ['#admin-category-pages', 'Pages Intemporels / Nouveautés / Éditions limitées'], ['#admin-media', 'Médiathèque']].map(([href, label]) => (
-          <a key={href} href={href} className="border border-linen bg-cream/40 px-3 py-2 text-xs hover:border-emerald hover:text-emerald transition">{label}</a>
+        {[['home', 'Accueil'], ['about', 'À propos'], ['collectionPE2027', 'Printemps/Été 2027'], ['contact', 'Contact'], ['categories', 'Pages du catalogue'], ['media', 'Photos & fichiers']].map(([key, label]) => (
+          <button key={key} type="button" aria-pressed={page === key} disabled={saving} onClick={() => setPage(key)} className={`border px-4 py-2 ${page === key ? 'bg-emerald text-ivory' : 'border-linen bg-cream/40'}`}>{label}</button>
         ))}
       </nav>
-      <div className="space-y-10 max-w-5xl">
-        {/* MENU DE NAVIGATION — enregistré séparément */}
-        <NavbarBlock />
-        {/* HERO — Compositeur V2 (WYSIWYG + contraste auto + multi-slides + parallaxe) */}
+      <fieldset disabled={saving} className="space-y-10 max-w-5xl">
+        <div hidden={page !== 'home'} className="space-y-8">
         <HeroComposer
           hero={c.hero}
           heroSlides={c.heroSlides || []}
@@ -1390,56 +1500,17 @@ function TabContent({ onDirtyChange }) {
           }}
           ImageUploader={ImageUploader}
         />
-        {/* BIBLIOTHÈQUE DE FICHIERS — téléchargement direct */}
-        {/* HERO */}
-        <section id="admin-hero" className="border border-linen bg-ivory p-6 md:p-8 scroll-mt-24">
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-6">Section Hero (accueil)</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Surtitre (petit texte)"><input value={c.hero.eyebrow} onChange={(e) => upd('hero.eyebrow', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Titre principal (utilise \n pour passer à la ligne)">
-              <textarea rows={2} value={c.hero.title} onChange={(e) => upd('hero.title', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink font-display text-lg" />
-            </Field>
-          </div>
-          <Field label="Sous-titre">
-            <textarea rows={3} value={c.hero.subtitle} onChange={(e) => upd('hero.subtitle', e.target.value)} className="w-full bg-transparent border border-ink/15 p-3 focus:outline-none focus:border-ink text-sm" />
-          </Field>
-          <Field label="Média du hero (photo ou vidéo MP4 — glisser-déposer)">
-            <ImageUploader
-              images={c.hero.image ? [c.hero.image] : []}
-              onChange={(imgs) => upd('hero.image', imgs[0] || '')}
-              accept="all"
-            />
-            <p className="text-[11px] text-ink/50 italic mt-2">
-              💡 Astuce : vous pouvez insérer une vidéo MP4/WEBM à la place d'une photo. Elle jouera en boucle silencieuse.
-            </p>
-          </Field>
-          <div className="grid md:grid-cols-2 gap-4 mt-2">
-            <Field label="Bouton principal — libellé"><input value={c.hero.ctaPrimary?.label || ''} onChange={(e) => upd('hero.ctaPrimary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton principal — lien"><input value={c.hero.ctaPrimary?.href || ''} onChange={(e) => upd('hero.ctaPrimary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton secondaire — libellé"><input value={c.hero.ctaSecondary?.label || ''} onChange={(e) => upd('hero.ctaSecondary.label', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-            <Field label="Bouton secondaire — lien"><input value={c.hero.ctaSecondary?.href || ''} onChange={(e) => upd('hero.ctaSecondary.href', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
-          </div>
-        </section>
-
         {/* SECTIONS PAGE D'ACCUEIL — activation, ordre et contenu */}
         <div id="admin-sections" className="scroll-mt-24"><HomeSectionsEditor sections={c.sections} onChange={(next) => upd('sections', next)} /></div>
+        </div>
 
         {/* ===== PAGES SECONDAIRES — mêmes champs que l'édition visuelle (?edit=1) ===== */}
-        <div className="space-y-4">
-          <h3 className="text-[11px] uppercase tracking-[0.32em] text-ink/60">Pages du site</h3>
-          <PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} />
-          <PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} />
-          <PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} />
-          <CategoryPagesEditor />
-        </div>
-
-        <div id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
-
-        <div className="text-[11px] text-ink/50 italic">
-          ✨ Astuce : pour changer une photo, va d\u2019abord dans <b>Produits → Modifier</b> → <b>Photos du produit</b> pour uploader ta nouvelle image,
-          puis copie l\u2019URL qui apparaît (ex. <code>/api/img/upload-xxxxxx</code>) et colle-la ici.
-        </div>
-      </div>
+        <div hidden={page !== 'about'}><PageContentEditor pageKey="about" value={c.about} onChange={(next) => upd('about', next)} /></div>
+        <div hidden={page !== 'collectionPE2027'}><PageContentEditor pageKey="collectionPE2027" value={c.collectionPE2027} onChange={(next) => upd('collectionPE2027', next)} /></div>
+        <div hidden={page !== 'contact'}><PageContentEditor pageKey="contact" value={c.contact} onChange={(next) => upd('contact', next)} /></div>
+        <div hidden={page !== 'categories'}><p className="text-sm mb-4">Ces titres s’enregistrent avec le bouton du bloc ci-dessous.</p><CategoryPagesEditor /></div>
+        <div hidden={page !== 'media'} id="admin-media" className="scroll-mt-24"><MediaLibrary files={c.mediaLibrary || []} onChange={(files) => upd('mediaLibrary', files)} /></div>
+      </fieldset>
     </div>
   )
 }
@@ -1459,42 +1530,48 @@ function TabContent({ onDirtyChange }) {
 function TabSettings() {
   const [s, setS] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const { dirty, confirmDiscard, markSaved, restore } = useFormChanges(s)
 
-  useEffect(() => {
-    fetch('/api/admin/settings', { credentials: 'include' })
-      .then((r) => r.json())
+  const load = () => {
+    setError('')
+    return adminRequest('/api/admin/settings')
       .then((d) => setS({ ...DEFAULT_SETTINGS, ...(d.settings || {}) }))
-      .catch(() => setS({ ...DEFAULT_SETTINGS }))
-  }, [])
+      .catch((e) => setError(e.message))
+  }
+  useEffect(() => { load() }, [])
 
   const save = async () => {
     setSaving(true)
-    const r = await fetch('/api/admin/settings', {
+    try {
+    await adminRequest('/api/admin/settings', {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(s),
     })
-    setSaving(false)
-    if (r.ok) toast.success('Paramètres enregistrés')
-    else toast.error('Erreur')
+      markSaved(s); toast.success('Réglages enregistrés')
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving(false) }
   }
 
   const upd = (section, key, value) => {
     setS((prev) => ({ ...prev, [section]: { ...prev[section], [key]: value } }))
   }
 
-  if (!s) return <div className="text-ink/50">Chargement…</div>
+  if (error) return <LoadError message={error} onRetry={load} />
+  if (!s) return <div role="status" className="text-ink/50">Chargement…</div>
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h2 className="font-display text-3xl">Paramètres</h2>
-        <button onClick={save} disabled={saving} className="bg-emerald text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-emeraldDark transition flex items-center gap-2 disabled:opacity-60">
+      <div className="sticky top-16 z-20 bg-ivory py-4 flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div><h2 className="font-display text-3xl">Réglages</h2><p role="status" className="text-sm mt-2">{dirty ? 'Modifications non enregistrées' : 'Réglages enregistrés'}</p></div>
+        <button disabled={!dirty || saving} onClick={() => { if (confirmDiscard()) setS(restore()) }} className="border border-linen px-4 py-3 disabled:opacity-40">Annuler</button>
+        <button onClick={save} disabled={saving || !dirty} className="bg-emerald text-ivory px-5 py-3 text-[11px] uppercase tracking-[0.24em] hover:bg-emeraldDark transition flex items-center gap-2 disabled:opacity-60">
           <Save className="h-4 w-4" strokeWidth={1.5} /> {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
 
-      <div className="space-y-8 max-w-3xl">
+      <fieldset disabled={saving} className="space-y-8 max-w-3xl">
         <section className="border border-linen bg-ivory p-6">
           <h3 className="text-[11px] uppercase tracking-[0.32em] text-emerald mb-5">Marque</h3>
           <div className="grid md:grid-cols-2 gap-4">
@@ -1576,7 +1653,7 @@ function TabSettings() {
             <Field label="Message 3"><input value={s.marquee.line3} onChange={(e) => upd('marquee', 'line3', e.target.value)} className="w-full bg-transparent border-b border-ink/20 py-2 focus:outline-none focus:border-ink" /></Field>
           </div>
         </section>
-      </div>
+      </fieldset>
     </div>
   )
 }

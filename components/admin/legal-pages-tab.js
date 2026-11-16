@@ -12,6 +12,8 @@ import { ChevronDown, Eye, Plus, Trash2, ArrowUp, ArrowDown, AlertTriangle, Save
 import { LEGAL_PAGES, LEGAL_SLUGS } from '@/lib/legal-defaults'
 import { NAV_PAGE_OPTIONS, NAVBAR_DEFAULTS, NAVBAR_OPTION_DEFAULTS } from '@/lib/navbar'
 import { ImageField } from '@/components/edit/section-fields'
+import { useUnsavedChanges } from './unsaved-changes'
+import { adminRequest } from '@/lib/admin-request'
 
 const INPUT = 'w-full bg-ivory border border-ink/15 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald rounded-sm'
 const LABEL = 'block text-[10px] uppercase tracking-[0.26em] text-ink/60 mb-2'
@@ -21,21 +23,18 @@ export default function LegalPagesTab() {
   const [dirty, setDirty] = useState({})
   const [saving, setSaving] = useState('')
   const [open, setOpen] = useState('navbar')
+  const [error, setError] = useState('')
+  useUnsavedChanges(Object.values(dirty).some(Boolean) || !!saving)
 
-  useEffect(() => {
-    fetch('/api/admin/site-pages', { credentials: 'include' })
-      .then((r) => r.json())
+  const load = () => {
+    setError('')
+    return adminRequest('/api/admin/site-pages')
       .then((d) => setData({ footer: d.footer, navbar: d.navbar, ...d.pages }))
-      .catch(() => toast.error('Chargement impossible'))
-  }, [])
+      .catch((e) => setError(e.message))
+  }
+  useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    const any = Object.values(dirty).some(Boolean)
-    const warn = (e) => { if (any) { e.preventDefault(); e.returnValue = '' } }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [dirty])
-
+  if (error) return <div role="alert" className="border border-linen p-5"><p>{error}</p><button onClick={load} className="mt-3 border px-4 py-2">Réessayer</button></div>
   if (!data) return <div className="text-ink/50">Chargement…</div>
 
   const set = (key, next) => {
@@ -44,22 +43,23 @@ export default function LegalPagesTab() {
   }
   const save = async (key) => {
     setSaving(key)
-    const r = await fetch(`/api/admin/site-pages/${key}`, {
+    const snapshot = data[key]
+    try {
+    await adminRequest(`/api/admin/site-pages/${key}`, {
       method: 'PATCH', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data[key]),
+      body: JSON.stringify(snapshot),
     })
-    setSaving('')
-    if (r.ok) {
       setDirty((x) => ({ ...x, [key]: false }))
       toast.success('Enregistré — visible tout de suite sur le site')
-    } else toast.error('Erreur à l’enregistrement')
+    } catch (e) { toast.error(e.message) }
+    finally { setSaving('') }
   }
 
   return (
-    <div className="space-y-4" data-testid="admin-legal-tab">
+    <fieldset disabled={!!saving} className="space-y-4" data-testid="admin-legal-tab">
       <div className="mb-6">
-        <h2 className="font-display text-3xl">Menu, footer & pages</h2>
+        <h2 className="font-display text-3xl">Menu, bas de page & informations légales</h2>
         <p className="text-sm text-ink/60 mt-2 max-w-2xl leading-relaxed">
           Modifiez le menu du haut, le bas de page du site, le texte du bandeau cookies et les pages CGV, Livraison & retours, Suivi de commande, Confidentialité (RGPD) et Mentions légales.
           Chaque bloc s’enregistre séparément.
@@ -68,7 +68,7 @@ export default function LegalPagesTab() {
 
       <Card
         id="navbar"
-        title="Menu de navigation (navbar)"
+        title="Menu de navigation"
         subtitle="Les liens affichés en haut du site — nom, page reliée, ordre"
         open={open === 'navbar'}
         onToggle={() => setOpen(open === 'navbar' ? '' : 'navbar')}
@@ -81,7 +81,7 @@ export default function LegalPagesTab() {
 
       <Card
         id="footer"
-        title="Footer (bas de page)"
+        title="Bas de page"
         subtitle="Présentation, email, réseaux sociaux et liens « Client »"
         open={open === 'footer'}
         onToggle={() => setOpen(open === 'footer' ? '' : 'footer')}
@@ -109,7 +109,7 @@ export default function LegalPagesTab() {
           <PageEditor value={data[slug]} onChange={(v) => set(slug, v)} />
         </Card>
       ))}
-    </div>
+    </fieldset>
   )
 }
 
